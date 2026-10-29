@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 临时/备份文件
+*.bak
+*.bak-*
+*.tmp
+*.log
+
+# 本地环境与密钥
+.env
+.env.*
+*.local
+.secrets/
+
+# 编辑器/系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Cloudflare / 部署产物
+.wrangler/
+.wrangler.toml
+dist/
+build/
