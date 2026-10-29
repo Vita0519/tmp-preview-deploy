@@ -251,6 +251,12 @@ body{background:linear-gradient(180deg,#fbfcfb,#f2f4f2 60%,#eef1ef);min-height:1
 .dock{position:sticky;top:0;z-index:20;margin:0 -20px;padding:18px 20px 0;
 background:rgba(250,251,250,.9);backdrop-filter:blur(12px) saturate(1.15);
 -webkit-backdrop-filter:blur(12px) saturate(1.15);border-bottom:1px solid rgba(20,22,26,.06)}
+/* 失效提示条：在吸顶区之外，滚走就滚走，不占吸顶空间 */
+.gonebar{display:flex;align-items:center;gap:8px;margin:14px 0 0;padding:9px 12px;border-radius:9px;
+background:#fdf4e8;border:1px solid rgba(180,83,9,.22);color:#8a5210;font-size:12.5px;line-height:1.5}
+.gonebar[hidden]{display:none}
+.gonebar svg{flex:0 0 auto;opacity:.85}
+.gonebar b{font-weight:650}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
 .hgroup{display:flex;align-items:center;gap:12px;min-width:0}
 .hgroup .mark{flex:0 0 auto;border-radius:23.75%;box-shadow:0 9px 20px -12px rgba(15,118,110,.9)}
@@ -556,14 +562,20 @@ PORTAL_JS = """
       finally{ document.body.removeChild(ta); }
     });
   }
+  function absUrl(p){
+    // 外链项目的 data-path 本身就是完整 URL，别再拼 origin
+    return /^https?:\\/\\//i.test(p) ? p : location.origin + p;
+  }
   [].forEach.call(document.querySelectorAll('.cbtn'),function(b){
     b.addEventListener('click',function(e){
       e.preventDefault(); e.stopPropagation();
-      copyText(location.origin+b.dataset.path)
+      copyText(absUrl(b.dataset.path))
         .then(function(){ mark(b,true); })
         .catch(function(){ mark(b,false); });
     });
   });
+  var gb=document.getElementById('gonebar');
+  if(gb&&/[?&]gone=1(&|$)/.test(location.search)){ gb.hidden=false; }
   var tb=document.getElementById('tagsbar');
   if(tb){
     var seen={}, order=[];
@@ -706,6 +718,10 @@ def portal_page(
         size = _human(p["size_bytes"]) if p["kind"] != "link" else "外链"
         num_cls = "sm" if views >= 1000 else ""
         ends = "" if not exp else f"到期 {_fmt_day(exp)}"
+        # 外链项目直接指向外部站点：不套预览外壳，也不先进 iframe 再跳一次
+        is_ext = p["kind"] == "link" and bool(p.get("link_url"))
+        target_url = p["link_url"] if is_ext else f"/v/{p['slug']}"
+        ext_attr = ' rel="noopener noreferrer"' if is_ext else ' rel="noopener"'
         data_attr = (
             f'data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}" '
             f'data-kind="{p["kind"]}" data-tags="{escape(chr(124).join(tags_list), quote=True)}" '
@@ -713,7 +729,7 @@ def portal_page(
         )
         cards.append(
             f"""<div class="card" style="order:0" {data_attr}>
-  <a class="hit" href="/v/{p['slug']}" target="_blank" rel="noopener"
+  <a class="hit" href="{escape(target_url, quote=True)}" target="_blank"{ext_attr}
      aria-label="打开 {escape(p['title'])}"></a>
   <div class="top">
     <div class="tinfo">
@@ -728,7 +744,7 @@ def portal_page(
       <span class="cdend">{ends}</span></div>
     <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
-  <button class="cbtn" type="button" data-path="/v/{p['slug']}" title="复制链接" aria-label="复制链接">
+  <button class="cbtn" type="button" data-path="{escape(target_url, quote=True)}" title="复制链接" aria-label="复制链接">
     {COPY_ICON}<span class="tip">已复制</span>
   </button>
   <div class="ring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
@@ -738,7 +754,7 @@ def portal_page(
         )
         rows.append(
             f"""<div class="row" style="order:0" {data_attr}>
-  <a class="hit" href="/v/{p['slug']}" target="_blank" rel="noopener"
+  <a class="hit" href="{escape(target_url, quote=True)}" target="_blank"{ext_attr}
      aria-label="打开 {escape(p['title'])}"></a>
   <div class="rmain">
     <span class="rname">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></span>
@@ -754,7 +770,7 @@ def portal_page(
       <span class="cdend">{ends}</span></div>
     <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
-  <button class="cbtn inflow" type="button" data-path="/v/{p['slug']}" title="复制链接" aria-label="复制链接">
+  <button class="cbtn inflow" type="button" data-path="{escape(target_url, quote=True)}" title="复制链接" aria-label="复制链接">
     {COPY_ICON}<span class="tip">已复制</span>
   </button>
 </div>"""
@@ -771,6 +787,10 @@ def portal_page(
 {BASE_CSS}
 {PORTAL_CSS}
 </style></head><body><div class="wrap">
+<div class="gonebar" id="gonebar" hidden>
+<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6.4"/><path d="M8 4.6v3.9M8 11.3v.2"/></svg>
+<span>你打开的那个预览链接已经失效（可能已到期或被移除），这里是站点门户。</span>
+</div>
 <div class="dock">
 <header><div class="hgroup">{BRAND_MARK}<div class="htext"><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div></div>{login}</header>
 {who}
@@ -814,6 +834,36 @@ def portal_page(
 {PORTAL_JS.replace("__NOW__", str(server_now))}
 </script></body></html>"""
 
+
+
+def gone_page(target: str = "/portal?gone=1") -> str:
+    """失效链接的中转页：把**顶层窗口**带走，而不是在 iframe 里显示一张 404。
+
+    访客预览外壳是用 iframe 装项目内容的，项目没了/过期了如果直接回 404，
+    404 就会长在 iframe 里（顶栏还在、倒计时还在），看着像「网站坏了」。
+    这里用一个极轻的页面把 top 导航到门户，并留 meta refresh 与手点链接兜底。
+    """
+    url = escape(target, quote=True)
+    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="refresh" content="0;url={url}">
+<title>正在前往门户…</title>
+<style>
+html,body{{margin:0;height:100%}}
+body{{display:flex;align-items:center;justify-content:center;background:#f6f7f5;
+font:13px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#7b8189}}
+p{{margin:0}}
+a{{color:#0f766e;font-weight:600;text-decoration:none}}
+</style></head><body>
+<p>链接已失效，正在前往 <a href="{url}">站点门户</a>…</p>
+<script>
+(function(){{
+  var u={target!r};
+  try{{ (window.top||window).location.replace(u); }}
+  catch(e){{ location.replace(u); }}
+}})();
+</script></body></html>"""
 
 
 def error_page(code: int, title: str, desc: str, back: str = "/") -> str:

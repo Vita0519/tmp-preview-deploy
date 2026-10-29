@@ -71,12 +71,21 @@ def save_conf(data: dict) -> None:
         pass
 
 
-def _opener(url: str):
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """不跟随 3xx：用来判断链接是否还停在原地。"""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _opener(url: str, redirect: bool = True):
     from urllib.parse import urlparse
 
     handlers = []
     if (urlparse(url).hostname or "") in LOCAL_HOSTS:
         handlers.append(urllib.request.ProxyHandler({}))
+    if not redirect:
+        handlers.append(_NoRedirect())
     return urllib.request.build_opener(*handlers)
 
 
@@ -233,17 +242,26 @@ def remaining(p: dict) -> str:
     return f"{m}分"
 
 
-def probe(url: str) -> int:
+def probe(url: str, redirect: bool = True) -> int:
     """匿名探活，返回 HTTP 状态；0 表示连不上。"""
     try:
         req = urllib.request.Request(url, method="GET", headers={"User-Agent": f"agentctl/{VERSION}"})
-        with _opener(url).open(req, timeout=20) as r:
+        with _opener(url, redirect).open(req, timeout=20) as r:
             r.read(2048)
             return r.status
     except urllib.error.HTTPError as e:
         return e.code
     except Exception:  # noqa: BLE001 - 探活失败不该中断主流程
         return 0
+
+
+def is_gone(url: str) -> bool:
+    """链接是否已经打不开了。
+
+    失效不再表现为 404：站点会把失效链接 302 回门户首页（可能是转去登录页，
+    也可能是「链接已失效」的门户），所以只有「原地仍然 200」才算还活着。
+    """
+    return probe(url, redirect=False) != 200
 
 
 def find_agent(items, key):
@@ -581,9 +599,13 @@ def cmd_rm(args):
     code, d = call(url, f"/api/projects/{args.slug}", token, "DELETE")
     if code != 200:
         return emit(args, False, "rm", error=f"删除失败 HTTP {code}：{d.get('detail') or ''}")
-    gone = probe(f"{url}/v/{args.slug}")
-    return emit(args, True, "rm", {"slug": args.slug, "deleted": True, "after_status": gone},
-                human=[f"✅ 已删除 {args.slug}（访问校验：HTTP {gone}）"])
+    gone = probe(f"{url}/v/{args.slug}", redirect=False)
+    ok = gone != 200
+    return emit(args, ok, "rm", {"slug": args.slug, "deleted": True, "after_status": gone,
+                                 "gone": ok},
+                error="" if ok else "删除接口返回成功，但地址仍能打开，请检查存储残留",
+                human=[f"✅ 已删除 {args.slug}（访问校验：HTTP {gone}"
+                       f"{'，链接已失效' if ok else '，⚠️ 仍可访问'}）"])
 
 
 def cmd_bulk(args):
@@ -765,7 +787,7 @@ def cmd_selfcheck(args):
 
         code, upd = call(url, f"/api/projects/{slug}", token, "PATCH", body={"visibility": "private"})
         step("改为仅自己可见", code == 200 and upd.get("visibility") == "private", f"{code}")
-        step("仅自己可见：匿名应 404", probe(pv) == 404, f"HTTP {probe(pv)}")
+        step("仅自己可见：匿名看不到", is_gone(pv), f"HTTP {probe(pv, redirect=False)}")
 
         code, upd = call(url, f"/api/projects/{slug}", token, "PATCH", body={"visibility": "link"})
         step("改回持链接", code == 200 and upd.get("visibility") == "link", f"{code}")
@@ -784,7 +806,7 @@ def cmd_selfcheck(args):
 
         code, _ = call(url, f"/api/projects/{slug}", token, "DELETE")
         step("删除", code == 200, f"{code}")
-        step("删除后预览 404", probe(pv) == 404, f"HTTP {probe(pv)}")
+        step("删除后链接失效（跳门户）", is_gone(pv), f"HTTP {probe(pv, redirect=False)}")
 
         ok = all(s["ok"] for s in steps)
         return emit(args, ok, "selfcheck",

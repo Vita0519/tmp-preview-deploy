@@ -65,13 +65,14 @@ settings(key, value)
 | `GET /p/<slug>/<path>` | 命中文件 → `FileResponse`；无扩展名 → 补 `index.html`；仍无 → 回退项目 `entry`（SPA 兜底）；路径越界 → 404 |
 | 缓存头 | 入口文档 `no-store`；静态子资源 `public, max-age=300`；均带 `ETag`，命中 `If-None-Match` 返回 304 |
 | 计数 | 只有「入口文档 + `Accept: text/html` + GET」才 +1，子资源与 SPA 内部跳转不重复计 |
-| `GET /download/<slug>` | 有预置 zip 直接发；没有则按需打包（`ZIP_DEFLATED`，保留 mtime）并缓存到 `/data/zips` |
+| `GET /download/<slug>` | 有预置 zip 直接发；没有则按需打包（`ZIP_DEFLATED`，保留 mtime）并缓存到 `/data/zips`；项目失效则 302 回门户 |
+| `GET /v/<slug>` | 可见且未到期 → 预览外壳；外链 → 302 到 `link_url`；失效/无权/无入口 → 302 `/portal?gone=1` |
 
 ## 到期处理
 
 后台任务每 60s 扫一遍 `status='active' AND expires_at <= now`：
 
-- `expire_action='block'` → 置 `status='expired'`，文件保留，访问返回 410 页面；
+- `expire_action='block'` → 置 `status='expired'`，文件保留，访问 **302 回门户首页**（并带「链接已失效」提示）；
 - `expire_action='delete'` → 删目录 + 删 zip + 删行（`project_tags`、`daily_views` 级联）。
 
 `PATCH /api/projects/{slug}` 带 `revive: true` 可以把已到期项目重新激活。

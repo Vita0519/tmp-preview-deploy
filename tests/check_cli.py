@@ -135,7 +135,7 @@ def main():
     print("[7] 删除")
     rc, d, _ = run(url, token, "rm", slug, "--yes")
     check("rm 删除成功", d.get("data", {}).get("deleted") is True, d)
-    check("rm 后地址 404", d.get("data", {}).get("after_status") == 404, d.get("data"))
+    check("rm 后链接失效", d.get("data", {}).get("gone") is True, d.get("data"))
     run(url, token, "rm", f"link-{suffix}", "--yes")
 
     print("[8] 自检命令")
