@@ -5,7 +5,7 @@ from playwright.async_api import async_playwright
 
 OUT = Path("/tmp/shots")
 OUT.mkdir(parents=True, exist_ok=True)
-BASE = "http://127.0.0.1:8010"
+BASE = "http://127.0.0.1:8000"
 
 
 async def main():

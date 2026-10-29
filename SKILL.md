@@ -57,6 +57,9 @@ python cli/agentctl.py rm <slug>
 
 - `/portal` 顶部（标题/作者名片/筛选/标签）吸顶，滚动时不动。
 - 支持卡片 / 列表两种视图，选择记在 localStorage；右上角圆环是访问量，底部是倒计时。
+- 每张卡片和每个列表行右上角都有快捷复制按钮：点一下复制 `origin + /v/<slug>`，
+  按钮变绿打勾并弹出「已复制」气泡，1.6s 后复原；失败显示红色「复制失败」。
+  按钮层级高于整卡的覆盖式链接（`.hit`），点击不会跳转。
 - 支持按类型、标签、关键词筛选，按创建/到期/访问/名称排序。
 
 ## 成员与权限
@@ -93,4 +96,6 @@ docker compose start
 
 ```bash
 python tests/smoke_test.py --url http://127.0.0.1:8080   # 26 项端到端检查
+python tests/check_portal.py                            # 41 项门户结构回归
+python tests/check_copy.py                              # 26 项复制按钮（需 chrome）
 ```

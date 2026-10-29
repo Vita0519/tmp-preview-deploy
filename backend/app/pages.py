@@ -252,7 +252,7 @@ border-radius:12px;padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
 .card[hidden]{display:none}
 .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(15,118,110,.32)}
-.top{min-width:0;padding-right:52px}
+.top{min-width:0;padding-right:90px}
 .tinfo{min-width:0}
 .name{display:flex;align-items:center;gap:6px;font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a;
 min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -291,11 +291,32 @@ background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef1ef 0)}
 .ring b.sm{font-size:9.5px}
 .ring i{font-style:normal;font-size:8px;color:#a3aab0;letter-spacing:.02em}
 .card:hover .ring{background:conic-gradient(#0d6a62 calc(var(--p,0) * 1%), #e9ecea 0)}
+/* 整卡可点：一层覆盖式链接，复制按钮浮在上面 */
+.hit{position:absolute;inset:0;z-index:1;border-radius:inherit}
+.cbtn{position:absolute;z-index:3;top:11px;right:61px;width:26px;height:26px;padding:0;
+display:grid;place-items:center;border:1px solid transparent;border-radius:8px;background:transparent;
+color:#9aa1a8;cursor:pointer;transition:color .16s,background .16s,border-color .16s}
+.cbtn:hover{color:#0f766e;background:#f1f5f3;border-color:rgba(15,118,110,.2)}
+.cbtn:active{transform:scale(.94)}
+.cbtn:focus-visible{outline:2px solid rgba(15,118,110,.45);outline-offset:2px}
+.cbtn svg{width:13px;height:13px;display:block}
+.cbtn .ic-done{display:none;stroke-width:2.2}
+.cbtn.done{color:#0f766e;background:#e9f3f0;border-color:rgba(15,118,110,.26)}
+.cbtn.done .ic-copy{display:none}
+.cbtn.done .ic-done{display:block}
+.cbtn.fail{color:#b42318;background:#fdeceb;border-color:rgba(180,35,24,.24)}
+.cbtn .tip{position:absolute;top:calc(100% + 7px);right:0;transform:scale(.92);
+transform-origin:100% 0;padding:3px 8px;border-radius:6px;background:#14161a;color:#fff;
+font-size:11px;font-weight:600;line-height:1.4;white-space:nowrap;opacity:0;
+pointer-events:none;transition:opacity .16s,transform .16s;z-index:4}
+.cbtn.done .tip{opacity:1;transform:scale(1)}
+.cbtn.fail .tip{background:#b42318;opacity:1;transform:scale(1)}
 /* ---------- 列表模式（独立结构，不复用卡片） ---------- */
 .rows{display:flex;flex-direction:column;gap:8px;padding-top:14px}
 .rows[hidden]{display:none}
-.row{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr) auto 36px 170px;
-grid-template-areas:"main desc tags ring foot";align-items:center;gap:14px;
+.row{position:relative;display:grid;
+grid-template-columns:minmax(0,240px) minmax(0,1fr) auto 36px 170px 28px;
+grid-template-areas:"main desc tags ring foot copy";align-items:center;gap:14px;
 background:#fff;border:1px solid rgba(20,22,26,.09);border-radius:12px;padding:10px 14px;
 transition:border-color .16s,box-shadow .16s}
 .row[hidden]{display:none}
@@ -320,14 +341,20 @@ place-items:center;background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef
 .rfoot .cdrow{margin-bottom:5px}
 .rfoot .cd{font-size:12px}
 .rfoot .cdend{font-size:10px}
+.cbtn.inflow{position:relative;z-index:3;top:auto;right:auto;grid-area:copy;width:26px;height:26px}
+.cbtn.inflow .tip{right:auto;left:50%;transform:translateX(-50%) scale(.92);transform-origin:50% 0}
+.cbtn.inflow.done .tip,
+.cbtn.inflow.fail .tip{transform:translateX(-50%) scale(1)}
 @media (max-width:900px){
-  .row{grid-template-columns:minmax(0,1fr) 34px 152px;grid-template-areas:"main ring foot"}
+  .row{grid-template-columns:minmax(0,1fr) 34px 152px 28px;grid-template-areas:"main ring foot copy"}
   .rdesc,.rtags{display:none}
 }
 @media (max-width:620px){
-  .row{grid-template-columns:minmax(0,1fr) 52px;grid-template-areas:"main ring" "foot foot";
-  gap:8px 10px;padding:11px 12px}
+  .row{grid-template-columns:minmax(0,1fr) 36px 28px;
+  grid-template-areas:"main ring copy" "foot foot foot";gap:8px 8px;padding:11px 12px}
   .rring{width:34px;height:34px;align-self:start}
+  .cbtn.inflow{align-self:start;justify-self:end}
+  .card .cbtn{top:9px;right:58px}
 }
 .blank{margin-top:14px;text-align:center;color:#8a9099;padding:56px 0;
 border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
@@ -444,6 +471,37 @@ PORTAL_JS = """
     setView(saved==='list'?'list':'grid');
     [].forEach.call(vs.children,function(b){ b.onclick=function(){ setView(b.dataset.view); }; });
   }
+  // 快捷复制链接：成功后打勾 + 冒出「已复制」，失败标红「复制失败」
+  function mark(btn, ok){
+    btn.classList.remove('done','fail');
+    btn.classList.add(ok?'done':'fail');
+    var tip=btn.querySelector('.tip');
+    if(tip) tip.textContent = ok?'已复制':'复制失败';
+    clearTimeout(btn._t);
+    btn._t=setTimeout(function(){ btn.classList.remove('done','fail'); },1600);
+  }
+  function copyText(text){
+    if(navigator.clipboard&&window.isSecureContext){
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function(res,rej){
+      var ta=document.createElement('textarea');
+      ta.value=text; ta.setAttribute('readonly','');
+      ta.style.cssText='position:fixed;top:0;left:-9999px;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy')?res():rej(new Error('copy failed')); }
+      catch(e){ rej(e); }
+      finally{ document.body.removeChild(ta); }
+    });
+  }
+  [].forEach.call(document.querySelectorAll('.cbtn'),function(b){
+    b.addEventListener('click',function(e){
+      e.preventDefault(); e.stopPropagation();
+      copyText(location.origin+b.dataset.path)
+        .then(function(){ mark(b,true); })
+        .catch(function(){ mark(b,false); });
+    });
+  });
   var tb=document.getElementById('tagsbar');
   if(tb){
     var seen={}, order=[];
@@ -468,6 +526,18 @@ PORTAL_JS = """
 """
 
 KIND_LABEL = {"static": "静态站", "link": "外链", "zip": "压缩包"}
+
+# 卡片上的复制按钮：复制图标 + 打勾图标（点击后切换）
+COPY_ICON = (
+    '<svg class="ic-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"'
+    ' stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M6.5 6.5V3.8c0-.7.6-1.3 1.3-1.3h4.4c.7 0 1.3.6 1.3 1.3v4.9c0 .7-.6 1.3-1.3 1.3H7.8'
+    'c-.7 0-1.3-.6-1.3-1.3Z"/>'
+    '<path d="M3.5 7.5h5.2c.7 0 1.3.6 1.3 1.3v4.4c0 .7-.6 1.3-1.3 1.3H3.5c-.7 0-1.3-.6-1.3-1.3V8.8'
+    'c0-.7.6-1.3 1.3-1.3Z"/></svg>'
+    '<svg class="ic-done" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"'
+    ' stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.6 6.4 11.5 12.5 5.2"/></svg>'
+)
 
 # 16×16 线性图标（stroke=currentColor），门户作者区用
 ICONS = {
@@ -580,8 +650,9 @@ def portal_page(
             f'data-title="{escape(p["title"], quote=True)}"'
         )
         cards.append(
-            f"""<a class="card" href="/v/{p['slug']}" target="_blank" rel="noopener" style="order:0"
-   {data_attr}>
+            f"""<div class="card" style="order:0" {data_attr}>
+  <a class="hit" href="/v/{p['slug']}" target="_blank" rel="noopener"
+     aria-label="打开 {escape(p['title'])}"></a>
   <div class="top">
     <div class="tinfo">
       <div class="name">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
@@ -595,14 +666,18 @@ def portal_page(
       <span class="cdend">{ends}</span></div>
     <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
+  <button class="cbtn" type="button" data-path="/v/{p['slug']}" title="复制链接" aria-label="复制链接">
+    {COPY_ICON}<span class="tip">已复制</span>
+  </button>
   <div class="ring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
     <span class="in"><b class="{num_cls}">{views}</b><i>访问</i></span>
   </div>
-</a>"""
+</div>"""
         )
         rows.append(
-            f"""<a class="row" href="/v/{p['slug']}" target="_blank" rel="noopener" style="order:0"
-   {data_attr}>
+            f"""<div class="row" style="order:0" {data_attr}>
+  <a class="hit" href="/v/{p['slug']}" target="_blank" rel="noopener"
+     aria-label="打开 {escape(p['title'])}"></a>
   <div class="rmain">
     <span class="rname">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></span>
     <div class="rmeta">{owner or '—'} · {size}</div>
@@ -617,7 +692,10 @@ def portal_page(
       <span class="cdend">{ends}</span></div>
     <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
-</a>"""
+  <button class="cbtn inflow" type="button" data-path="/v/{p['slug']}" title="复制链接" aria-label="复制链接">
+    {COPY_ICON}<span class="tip">已复制</span>
+  </button>
+</div>"""
         )
     body = "".join(cards) or ""
     rowbody = "".join(rows)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """校验「按可见性区分的默认时长」与「到期策略默认值」。
 
-用法: python tests/check_ttl.py [--url http://127.0.0.1:8010]
+用法: python tests/check_ttl.py [--url http://127.0.0.1:8000]
 """
 import argparse
 import sys
@@ -27,7 +27,7 @@ def check(name, cond, extra=""):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url", default="http://127.0.0.1:8010")
+    ap.add_argument("--url", default="http://127.0.0.1:8000")
     ap.add_argument("--user", default="admin")
     ap.add_argument("--password", default="admin123")
     args = ap.parse_args()

@@ -58,20 +58,36 @@ def main():
 
     print("[3] 圆环与倒计时")
     # 卡片：ring 必须是 card 的直接子元素（不在 .top 里），才不会跟标题挤一行
-    first_card = html.split('class="card"', 1)[1].split("</a>", 1)[0] if cards else ""
+    first_card = html.split('class="card"', 1)[1].split('<div class="card"', 1)[0] if cards else ""
     top_block = first_card.split('class="top"', 1)[1].split('class="desc"', 1)[0] if 'class="top"' in first_card else ""
     check("圆环不在 .top 里", "ring" not in top_block, top_block[:120])
     check("圆环在卡片内", 'class="ring"' in first_card)
     check("倒计时在 .foot 里", re.search(r'class="foot".*?class="cd ', first_card, re.S) is not None)
     check("卡片圆环绝对定位", re.search(r"\.ring\{position:absolute", html) is not None)
 
-    first_row = html.split('class="row"', 1)[1].split("</a>", 1)[0] if rows else ""
+    first_row = html.split('class="row"', 1)[1].split('<div class="row"', 1)[0] if rows else ""
     for cls in ("rmain", "rdesc", "rtags", "rring", "rfoot"):
         check(f"列表行含 .{cls}", f'class="{cls}"' in first_row or f'class="{cls} ' in first_row)
 
     print("[4] 数据属性")
     for attr in ("data-exp", "data-total", "data-created", "data-views", "data-kind", "data-tags", "data-title"):
         check(f"卡片带 {attr}", attr in first_card)
+
+    print("[5] 复制链接按钮")
+    cbtns = re.findall(r'class="cbtn"', html)
+    inflow = re.findall(r'class="cbtn inflow"', html)
+    check("每张卡片一个复制按钮", len(cbtns) == len(cards) and len(cards) > 0, f"cbtn={len(cbtns)} card={len(cards)}")
+    check("每个列表行一个复制按钮", len(inflow) == len(rows), f"inflow={len(inflow)} row={len(rows)}")
+    check("按钮带 data-path", 'data-path="/v/' in first_card)
+    check("卡片内有覆盖式链接 .hit", 'class="hit"' in first_card)
+    check("按钮含「已复制」气泡", '<span class="tip">已复制</span>' in first_card)
+    check("按钮含打勾图标", 'class="ic-done"' in first_card and 'class="ic-copy"' in first_card)
+    check(".hit 覆盖层绝对定位", re.search(r"\.hit\{position:absolute", html) is not None)
+    check(".cbtn 绝对定位且层级高于 .hit", re.search(r"\.cbtn\{position:absolute;z-index:3", html) is not None)
+    check("行内按钮用 relative 参与网格", re.search(r"\.cbtn\.inflow\{position:relative;z-index:3", html) is not None)
+    check("JS 用剪贴板 API", "navigator.clipboard" in html and "writeText" in html)
+    check("JS 有 execCommand 兜底", "execCommand('copy')" in html)
+    check("点击阻止冒泡", "stopPropagation" in html)
 
     total = len(PASS) + len(FAIL)
     print(f"\n{len(PASS)}/{total} 通过")
