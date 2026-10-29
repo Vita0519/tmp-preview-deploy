@@ -187,22 +187,214 @@ def _human(n: int) -> str:
     return f"{n / 1024 ** 3:.2f} GB"
 
 
+PORTAL_CSS = """
+body{background:linear-gradient(180deg,#fbfcfb,#f2f4f2 60%,#eef1ef);min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:44px 20px 80px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+h1{margin:0;font-size:26px;letter-spacing:-.02em}
+.sub{color:#7b8189;font-size:12.5px;margin-top:5px}
+.btn{height:30px;display:inline-flex;align-items:center;padding:0 12px;border-radius:8px;font-size:12.5px;
+font-weight:600;border:1px solid rgba(20,22,26,.14);background:#fff;color:#2a2f36}
+.tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:#eaecea;
+border:1px solid rgba(20,22,26,.06)}
+.seg button{height:26px;padding:0 11px;border:0;border-radius:7px;background:transparent;
+font:600 12px/1 inherit;color:#5b636d;cursor:pointer;transition:background .16s,color .16s,box-shadow .16s}
+.seg button:hover{color:#14161a}
+.seg button.on{background:#fff;color:#14161a;box-shadow:0 1px 2px rgba(20,22,26,.1)}
+.tools .spacer{flex:1 1 auto}
+.search{height:30px;width:210px;padding:0 10px;border-radius:8px;border:1px solid rgba(20,22,26,.14);
+background:#fff;font-size:12.5px;color:#14161a;outline:none;transition:border-color .16s,box-shadow .16s}
+.search:focus{border-color:rgba(15,118,110,.5);box-shadow:0 0 0 3px rgba(15,118,110,.1)}
+.sort{height:30px;padding:0 8px;border-radius:8px;border:1px solid rgba(20,22,26,.14);background:#fff;
+font-size:12.5px;color:#2a2f36;outline:none;cursor:pointer}
+.sort:focus{border-color:rgba(15,118,110,.5)}
+.cnt{font-size:11.5px;color:#8a9099;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tagsbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 16px;min-height:0}
+.tagsbar:empty{display:none}
+.tagsbar button{height:22px;padding:0 8px;border-radius:6px;border:1px solid rgba(20,22,26,.08);
+background:#f4f6f4;color:#5b636d;font:600 11px/1 inherit;cursor:pointer;transition:.16s}
+.tagsbar button:hover{background:#eef2f0;color:#14161a}
+.tagsbar button.on{background:#0f766e;border-color:#0f766e;color:#fff}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.card{display:block;background:#fff;border:1px solid rgba(20,22,26,.09);border-radius:12px;padding:14px 15px 13px;
+transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
+.card[hidden]{display:none}
+.card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(15,118,110,.32)}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.name{font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a;min-width:0;
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kind{font-size:10px;font-weight:600;color:#7b8189;background:#f3f5f3;border:1px solid rgba(20,22,26,.06);
+border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:1px}
+.cv{flex:0 0 auto;font-size:11px;font-weight:600;color:#0f766e;background:#eff4f2;border-radius:999px;
+padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cv.perm{color:#3a4a63;background:#eef2f8}
+.cv.warn{color:#b45309;background:#fdf3e7}
+.cv.dead{color:#b42318;background:#fdeceb}
+.desc{margin:7px 0 9px;color:#5b636d;font-size:12.5px;line-height:1.55;display:-webkit-box;
+-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:19px}
+.track{height:3px;border-radius:99px;background:#eef1ef;overflow:hidden}
+.track > i{display:block;height:100%;border-radius:99px;background:#0f766e;transition:width .5s ease}
+.track.warn > i{background:#b45309}
+.track.dead > i{background:#b42318}
+.meta{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5px;color:#8a9099;
+font-variant-numeric:tabular-nums}
+.meta .dot{width:3px;height:3px;border-radius:50%;background:#c8ccd1;flex:0 0 auto}
+.meta .who{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta .right{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.meta .right b{font-weight:650;color:#5b636d;font-variant-numeric:tabular-nums}
+.vbar{width:34px;height:3px;border-radius:99px;background:#eef1ef;overflow:hidden}
+.vbar > i{display:block;height:100%;border-radius:99px;background:#b6c2bd}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tags:empty{display:none}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:#f3f5f3;color:#5b636d;
+border:1px solid rgba(20,22,26,.06)}
+.blank{grid-column:1/-1;text-align:center;color:#8a9099;padding:56px 0;
+border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
+@media (max-width:620px){
+  .wrap{padding:28px 14px 60px}
+  h1{font-size:22px}
+  .search{width:100%;order:9}
+  .tools .spacer{display:none}
+  .grid{grid-template-columns:1fr}
+}
+"""
+
+PORTAL_JS = """
+(function(){
+  var NOW=__NOW__, off=0;
+  var grid=document.getElementById('grid');
+  var cards=[].slice.call(grid.querySelectorAll('.card'));
+  var cnt=document.getElementById('cnt'), blank=document.getElementById('blank');
+  var state={kind:'all',q:'',tag:'',sort:'created'};
+  function pad(n){return n<10?'0'+n:''+n}
+  function fmt(ms){
+    if(ms<=0) return '已到期';
+    var s=Math.floor(ms/1000),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),
+        m=Math.floor(s%3600/60),sec=s%60;
+    if(d>0) return d+'天'+h+'h';
+    return h+':'+pad(m)+':'+pad(sec);
+  }
+  function tick(){
+    var now=Date.now()+off;
+    cards.forEach(function(c){
+      var exp=+c.dataset.exp; if(!exp) return;
+      var left=exp-now, pill=c.querySelector('.cv'), bar=c.querySelector('.track');
+      var warn=left>0&&left<2*3600e3, dead=left<=0;
+      if(pill){
+        pill.textContent = dead ? '已到期' : '剩余 '+fmt(left);
+        pill.classList.toggle('warn',warn); pill.classList.toggle('dead',dead);
+      }
+      if(bar){
+        var total=+c.dataset.total||1;
+        var pct=Math.max(1.5,Math.min(100,left/total*100));
+        bar.firstElementChild.style.width=(dead?0:pct)+'%';
+        bar.classList.toggle('warn',warn); bar.classList.toggle('dead',dead);
+      }
+    });
+  }
+  function cmp(a,b){
+    if(state.sort==='exp'){ return (+a.dataset.exp||Infinity)-(+b.dataset.exp||Infinity); }
+    if(state.sort==='views'){ return (+b.dataset.views||0)-(+a.dataset.views||0); }
+    if(state.sort==='name'){ return a.dataset.title.localeCompare(b.dataset.title,'zh'); }
+    return (+b.dataset.created||0)-(+a.dataset.created||0);
+  }
+  function apply(){
+    var q=state.q.toLowerCase(), shown=[];
+    cards.forEach(function(c){
+      var tags=(c.dataset.tags||'').split('|');
+      var ok = (state.kind==='all'||c.dataset.kind===state.kind)
+        && (!state.tag||tags.indexOf(state.tag)>=0)
+        && (!q||(c.dataset.title+' '+tags.join(' ')).toLowerCase().indexOf(q)>=0);
+      c.hidden=!ok; if(ok) shown.push(c);
+    });
+    shown.sort(cmp).forEach(function(c,i){ c.style.order=i; });
+    if(cnt) cnt.textContent=shown.length+' / '+cards.length+' 个';
+    if(blank) blank.hidden=shown.length>0||!cards.length;
+  }
+  document.querySelectorAll('.seg[data-kind] button').forEach(function(b){
+    b.onclick=function(){
+      state.kind=b.dataset.v;
+      document.querySelectorAll('.seg[data-kind] button').forEach(function(x){x.classList.toggle('on',x===b)});
+      apply();
+    };
+  });
+  var q=document.getElementById('q');
+  if(q) q.oninput=function(){ state.q=q.value.trim(); apply(); };
+  var s=document.getElementById('sort');
+  if(s) s.onchange=function(){ state.sort=s.value; apply(); };
+  var tb=document.getElementById('tagsbar');
+  if(tb){
+    var seen={}, order=[];
+    cards.forEach(function(c){
+      (c.dataset.tags||'').split('|').forEach(function(t){
+        if(t&&!seen[t]){ seen[t]=1; order.push(t); }
+      });
+    });
+    order.forEach(function(t){
+      var b=document.createElement('button');
+      b.textContent=t;
+      b.onclick=function(){
+        state.tag = state.tag===t ? '' : t;
+        [].forEach.call(tb.children,function(x){x.classList.toggle('on',x===b&&!!state.tag)});
+        apply();
+      };
+      tb.appendChild(b);
+    });
+  }
+  tick(); setInterval(tick,1000); apply();
+})();
+"""
+
+KIND_LABEL = {"static": "静态站", "link": "外链", "zip": "压缩包"}
+
+
+def _remain_text(ms: int) -> str:
+    """剩余时长的人话表述（与前端 JS 保持一致，用于首屏无 JS 时也能看）。"""
+    if ms <= 0:
+        return "已到期"
+    s = ms // 1000
+    d, h = s // 86400, (s % 86400) // 3600
+    if d > 0:
+        return f"剩余 {d}天{h}h"
+    return f"剩余 {h}:{(s % 3600) // 60:02d}:{s % 60:02d}"
+
+
 def portal_page(items: list[dict], site_title: str, subtitle: str, server_now: int, logged_in: bool) -> str:
+    max_views = max([(p.get("views") or 0) for p in items] or [0]) or 1
     cards = []
     for p in items:
         exp = p["expires_at"] or 0
-        cls = "perm" if not exp else ""
-        remain = "永久" if not exp else ""
-        href = f"/v/{p['slug']}"
-        tags = "".join(f'<span class="tag">{escape(t)}</span>' for t in (p.get("tags") or [])[:4])
+        created = p.get("created_at") or server_now
+        total = max(1, exp - created) if exp else 0
+        if exp:
+            left = max(0, exp - server_now)
+            pct = max(1.5, min(100.0, left / total * 100))
+            pill_cls = "dead" if left <= 0 else ("warn" if left < 2 * 3600_000 else "")
+            pill = _remain_text(left)
+        else:
+            pct = 100.0
+            pill_cls = "perm"
+            pill = "永久"
+        views = p.get("views") or 0
+        vpct = max(4, round(views / max_views * 100))
+        tags_list = p.get("tags") or []
+        tags = "".join(f'<span class="tag">{escape(t)}</span>' for t in tags_list[:4])
         owner = escape((p.get("owner") or {}).get("display_name") or "")
         cards.append(
-            f"""<a class="card" href="{href}" target="_blank" rel="noopener" data-exp="{exp}">
-  <div class="row"><div class="name">{escape(p['title'])}</div>
-  <span class="cv {cls}">{remain or '—'}</span></div>
+            f"""<a class="card" href="/v/{p['slug']}" target="_blank" rel="noopener" style="order:0"
+   data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}"
+   data-kind="{p['kind']}" data-tags="{escape('|'.join(tags_list), quote=True)}"
+   data-title="{escape(p['title'], quote=True)}">
+  <div class="top"><div class="name">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
+  <span class="cv {pill_cls}">{pill}</span></div>
   <p class="desc">{escape(p['description'] or '')}</p>
-  <div class="meta"><span>{escape(owner)}</span><span class="dot"></span><span>{_human(p['size_bytes'])}</span>
-  <span class="dot"></span><span class="views">{p['views']} 次访问</span></div>
+  <div class="track"><i style="width:{pct:.1f}%"></i></div>
+  <div class="meta">
+    <span class="who">{owner or '—'}</span><span class="dot"></span>
+    <span>{_human(p['size_bytes']) if p['kind'] != 'link' else '外链'}</span>
+    <span class="right"><b>{views}</b> 次访问<span class="vbar"><i style="width:{vpct}%"></i></span></span>
+  </div>
   <div class="tags">{tags}</div>
 </a>"""
         )
@@ -210,57 +402,37 @@ def portal_page(items: list[dict], site_title: str, subtitle: str, server_now: i
     login = '<a class="btn ghost" href="/">进入控制台</a>' if logged_in else ""
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(site_title)}</title>
+<meta name="robots" content="noindex">
 <style>
 {BASE_CSS}
-body{{background:linear-gradient(180deg,#fbfcfb,#f2f4f2 60%,#eef1ef);min-height:100vh}}
-.wrap{{max-width:1080px;margin:0 auto;padding:44px 20px 80px}}
-header{{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}}
-h1{{margin:0;font-size:26px;letter-spacing:-.02em}}
-.sub{{color:#7b8189;font-size:12.5px;margin-top:5px}}
-.btn{{height:30px;display:inline-flex;align-items:center;padding:0 12px;border-radius:8px;font-size:12.5px;
-font-weight:600;border:1px solid rgba(20,22,26,.14);background:#fff;color:#2a2f36}}
-.grid{{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}}
-.card{{display:block;background:#fff;border:1px solid rgba(20,22,26,.09);border-radius:12px;padding:15px 16px;
-transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}}
-.card:hover{{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(15,118,110,.32)}}
-.row{{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}}
-.name{{font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a}}
-.cv{{font-size:11px;font-weight:600;color:#0f766e;background:#eff4f2;border-radius:999px;padding:3px 8px;white-space:nowrap}}
-.cv.perm{{color:#3a4a63;background:#eef2f8}}
-.desc{{margin:7px 0 10px;color:#5b636d;font-size:12.5px;line-height:1.55;display:-webkit-box;
--webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
-.meta{{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#8a9099;font-variant-numeric:tabular-nums}}
-.dot{{width:3px;height:3px;border-radius:50%;background:#c8ccd1}}
-.tags{{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}}
-.tag{{font-size:10.5px;padding:2px 7px;border-radius:5px;background:#f3f5f3;color:#5b636d;border:1px solid rgba(20,22,26,.06)}}
-.blank{{grid-column:1/-1;text-align:center;color:#8a9099;padding:60px 0;border:1px dashed rgba(20,22,26,.14);border-radius:12px}}
+{PORTAL_CSS}
 </style></head><body><div class="wrap">
 <header><div><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div>{login}</header>
-<div class="grid">{body}</div>
+<div class="tools">
+  <div class="seg" data-kind>
+    <button class="on" data-v="all">全部</button>
+    <button data-v="static">静态站</button>
+    <button data-v="link">外链</button>
+    <button data-v="zip">压缩包</button>
+  </div>
+  <span class="spacer"></span>
+  <span class="cnt" id="cnt">{len(items)} 个</span>
+  <select class="sort" id="sort" aria-label="排序">
+    <option value="created">最新创建</option>
+    <option value="exp">最快到期</option>
+    <option value="views">访问最多</option>
+    <option value="name">名称 A→Z</option>
+  </select>
+  <input class="search" id="q" type="search" placeholder="搜索名称或标签" aria-label="搜索">
+</div>
+<div class="tagsbar" id="tagsbar"></div>
+<div class="grid" id="grid">{body}</div>
+<div class="blank" id="blank" hidden>没有匹配的项目，换个筛选条件试试</div>
 </div>
 <script>
-(function(){{
-  var NOW={server_now}, off=0;
-  function pad(n){{return n<10?'0'+n:''+n}}
-  function fmt(ms){{
-    if(ms<=0) return '已到期';
-    var s=Math.floor(ms/1000), d=Math.floor(s/86400), h=Math.floor(s%86400/3600),
-        m=Math.floor(s%3600/60), sec=s%60;
-    if(d>0) return d+'天'+h+'h';
-    return h+':'+pad(m)+':'+pad(sec);
-  }}
-  function tick(){{
-    document.querySelectorAll('.card[data-exp]').forEach(function(c){{
-      var exp=+c.dataset.exp; if(!exp) return;
-      var el=c.querySelector('.cv'); if(!el) return;
-      var left=exp-(Date.now()+off);
-      el.textContent = left>0 ? '剩余 '+fmt(left) : '已到期';
-      el.classList.remove('perm');
-    }});
-  }}
-  tick(); setInterval(tick,1000);
-}})();
+{PORTAL_JS.replace("__NOW__", str(server_now))}
 </script></body></html>"""
+
 
 
 def error_page(code: int, title: str, desc: str, back: str = "/") -> str:

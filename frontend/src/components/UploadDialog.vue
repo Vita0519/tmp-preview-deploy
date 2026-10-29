@@ -1,19 +1,20 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../api'
 import { toast } from '../store'
-import { fmtBytes } from '../format'
+import { fmtBytes, hoursLabel } from '../format'
 import Icon from './Icon.vue'
 
 const emit = defineEmits(['close', 'created'])
 
 const mode = ref('files') // files | zip | link
+const ttlDefaults = ref({ portal: 6, link: 12, private: 0 })
 const form = ref({
   slug: '',
   title: '',
   description: '',
   tags: '',
-  hours: '24',
+  hours: '', // 空 = 跟随可见性默认
   forever: false,
   expire_action: 'block',
   allow_download: false,
@@ -28,6 +29,31 @@ const progress = ref(0)
 const error = ref('')
 
 const totalSize = computed(() => picked.value.reduce((s, p) => s + p.file.size, 0))
+
+const VIS_OPTS = [
+  { key: 'portal', label: '门户可见', desc: '出现在访客门户列表' },
+  { key: 'link', label: '持链接可见', desc: '不列出，拿到链接即可打开' },
+  { key: 'private', label: '仅自己可见', desc: '需登录且为本人或管理员' },
+]
+
+const ttlOf = (vis = form.value.visibility) => Number(ttlDefaults.value[vis] ?? 0)
+const ttlLabel = (vis = form.value.visibility) => (ttlOf(vis) > 0 ? hoursLabel(ttlOf(vis)) : '永久')
+
+// 时长为空时跟随可见性默认，这里只是给个可视化提示
+const effectiveTTL = computed(() => {
+  if (form.value.forever) return '永久'
+  return form.value.hours === '' ? ttlLabel() : hoursLabel(Number(form.value.hours))
+})
+
+onMounted(async () => {
+  try {
+    const m = await api.get('/api/meta')
+    if (m.ttl_defaults) ttlDefaults.value = { ...ttlDefaults.value, ...m.ttl_defaults }
+    if (m.default_expire_action) form.value.expire_action = m.default_expire_action
+  } catch {
+    /* 拿不到就用内置默认值 */
+  }
+})
 
 function addFiles(list) {
   const next = []
@@ -140,7 +166,7 @@ async function submitLink() {
       description: form.value.description,
       tags: form.value.tags,
       visibility: form.value.visibility,
-      hours: form.value.forever ? null : Number(form.value.hours || 24),
+      hours: form.value.forever ? null : form.value.hours === '' ? null : Number(form.value.hours),
       forever: form.value.forever,
     })
     toast('外链已登记')
@@ -246,26 +272,37 @@ async function submitLink() {
           <input v-model="form.tags" class="input" placeholder="用逗号分隔，例如：前端, 验收, v2" />
         </div>
 
-        <div class="frow two">
-          <div class="frow">
-            <label>存活时长</label>
-            <select v-model="form.hours" class="input" :disabled="form.forever">
-              <option value="1">1 小时</option>
-              <option value="6">6 小时</option>
-              <option value="24">24 小时（默认）</option>
-              <option value="72">3 天</option>
-              <option value="168">7 天</option>
-              <option value="720">30 天</option>
-            </select>
+        <div class="frow">
+          <label>可见性</label>
+          <div class="seg" style="width: fit-content">
+            <button
+              v-for="v in VIS_OPTS"
+              :key="v.key"
+              :class="{ on: form.visibility === v.key }"
+              :title="`${v.desc} · 默认 ${ttlLabel(v.key)}`"
+              @click="form.visibility = v.key"
+            >
+              {{ v.label }}
+            </button>
           </div>
-          <div class="frow">
-            <label>可见性</label>
-            <select v-model="form.visibility" class="input">
-              <option value="link">持链接可见</option>
-              <option value="portal">门户列表可见</option>
-              <option value="private">仅自己可见</option>
-            </select>
-          </div>
+          <span class="hint">
+            {{ VIS_OPTS.find((v) => v.key === form.visibility)?.desc }} · 该可见性默认 {{ ttlLabel() }}
+          </span>
+        </div>
+
+        <div class="frow">
+          <label>存活时长</label>
+          <select v-model="form.hours" class="input" :disabled="form.forever">
+            <option value="">跟随可见性默认（{{ ttlLabel() }}）</option>
+            <option value="1">1 小时</option>
+            <option value="6">6 小时</option>
+            <option value="12">12 小时</option>
+            <option value="24">24 小时</option>
+            <option value="72">3 天</option>
+            <option value="168">7 天</option>
+            <option value="720">30 天</option>
+          </select>
+          <span class="hint">本次将创建为：{{ effectiveTTL }}</span>
         </div>
 
         <label class="check">

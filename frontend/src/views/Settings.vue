@@ -21,15 +21,27 @@ const ACTION_LABEL = {
 }
 const actionLabel = (a) => ACTION_LABEL[a] || a
 const busy = ref(false)
-const form = reactive({ site_title: '', default_ttl_hours: 24, public_portal: false })
+const form = reactive({
+  site_title: '',
+  ttl: { portal: 6, link: 12, private: 0 },
+  default_expire_action: 'block',
+  public_portal: false,
+})
 const pw = reactive({ old_password: '', new_password: '' })
+
+const VIS = [
+  { key: 'portal', label: '门户可见', hint: '会出现在 /portal 列表里' },
+  { key: 'link', label: '持链接可见', hint: '不公开列出，拿到链接即可打开' },
+  { key: 'private', label: '仅自己可见', hint: '需登录且是本人或管理员' },
+]
 
 async function load() {
   try {
     const d = await api.get('/api/settings')
     data.value = d
     form.site_title = d.site_title
-    form.default_ttl_hours = d.default_ttl_hours
+    form.ttl = { ...form.ttl, ...(d.ttl_defaults || {}) }
+    form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
   } catch (e) {
     toast(e.message || '读取失败', 'err')
@@ -41,7 +53,12 @@ async function save() {
   try {
     const d = await api.patch('/api/settings', {
       site_title: form.site_title,
-      default_ttl_hours: Number(form.default_ttl_hours),
+      ttl_defaults: {
+        portal: Number(form.ttl.portal) || 0,
+        link: Number(form.ttl.link) || 0,
+        private: Number(form.ttl.private) || 0,
+      },
+      default_expire_action: form.default_expire_action,
       public_portal: form.public_portal,
     })
     store.siteTitle = d.site_title || store.siteTitle
@@ -89,8 +106,34 @@ onMounted(load)
           </div>
           <div class="frow">
             <label>默认存活时长（小时）</label>
-            <input v-model.number="form.default_ttl_hours" class="input" type="number" min="0" step="1" />
-            <span class="hint">上传时未指定时长则用这个值；填 0 表示永久</span>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+              <div v-for="v in VIS" :key="v.key" class="frow" style="gap: 4px">
+                <input
+                  v-model.number="form.ttl[v.key]"
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  :aria-label="v.label + ' 默认时长'"
+                />
+                <span class="hint" style="margin: 0">{{ v.label }}<span v-if="!Number(form.ttl[v.key])"> · 永久</span></span>
+              </div>
+            </div>
+            <span class="hint">填 0 表示永久；上传时未指定时长就按可见性取用这里的值</span>
+          </div>
+          <div class="frow">
+            <label>到期后默认动作</label>
+            <div class="seg" style="width: fit-content">
+              <button :class="{ on: form.default_expire_action === 'block' }" @click="form.default_expire_action = 'block'">
+                停止访问
+              </button>
+              <button :class="{ on: form.default_expire_action === 'delete' }" @click="form.default_expire_action = 'delete'">
+                删除文件
+              </button>
+            </div>
+            <span class="hint">
+              新建项目时预选这个策略；单个项目仍可在上传对话框里改。停止访问会保留文件占磁盘，删除文件会连目录一起清掉。
+            </span>
           </div>
           <label class="check">
             <input v-model="form.public_portal" type="checkbox" />

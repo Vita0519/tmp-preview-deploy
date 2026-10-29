@@ -39,6 +39,13 @@ SITE_TITLE = _env("SITE_TITLE", "临时预览站")
 SITE_SUBTITLE = _env("SITE_SUBTITLE", "到期自动回收 · 多 Agent 共享")
 
 DEFAULT_TTL_HOURS = _float("DEFAULT_TTL_HOURS", 24)
+
+# 按可见性区分的默认存活时长（小时，0 = 永久）。未单独配置时回落到 DEFAULT_TTL_HOURS。
+TTL_BY_VISIBILITY = {
+    "portal": _float("DEFAULT_TTL_PORTAL_HOURS", 6),
+    "link": _float("DEFAULT_TTL_LINK_HOURS", 12),
+    "private": _float("DEFAULT_TTL_PRIVATE_HOURS", 0),
+}
 MAX_UPLOAD_MB = _int("MAX_UPLOAD_MB", 1024)
 
 # 首次启动自动创建的管理员

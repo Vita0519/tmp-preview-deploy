@@ -96,7 +96,11 @@ CREATE TABLE IF NOT EXISTS settings (
 DEFAULT_SETTINGS = {
     "site_title": "",
     "default_ttl_hours": "24",
+    "default_ttl_portal": "",
+    "default_ttl_link": "",
+    "default_ttl_private": "",
     "public_portal": "0",
+    "default_expire_action": "block",
 }
 
 

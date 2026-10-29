@@ -9,8 +9,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from .. import config, storage, views
-from ..db import db, log_event, set_tags, tx
+from .. import config, defaults, storage, views
+from ..db import db, get_setting, log_event, set_tags, tx
 from ..security import current_user, now_ms
 from ..serializers import PROJECT_SELECT, project_dict
 
@@ -36,6 +36,11 @@ def origin_of(request: Request) -> str:
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
     return f"{proto}://{host}".rstrip("/")
+
+
+def default_expire_action() -> str:
+    v = get_setting("default_expire_action") or "block"
+    return v if v in EXPIRE_ACTIONS else "block"
 
 
 def _scope_clause(user: dict) -> tuple[str, list]:
@@ -307,9 +312,9 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
     description = str(form.get("description") or "").strip()
     hours_raw = form.get("hours")
     forever = str(form.get("forever") or "").lower() in ("1", "true", "yes", "on")
-    expire_action = str(form.get("expire_action") or "block")
+    expire_action = str(form.get("expire_action") or "")
     if expire_action not in EXPIRE_ACTIONS:
-        expire_action = "block"
+        expire_action = default_expire_action()
     allow_download = str(form.get("allow_download") or "").lower() in ("1", "true", "yes", "on")
     visibility = str(form.get("visibility") or "link")
     if visibility not in VISIBILITY:
@@ -374,7 +379,12 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
         else:
             expires_at = existing["expires_at"]
     else:
-        expires_at = None if forever else (_hours_to_expiry(hours_raw) if hours_raw not in (None, "") else now_ms() + int(config.DEFAULT_TTL_HOURS * 3600_000))
+        if forever:
+            expires_at = None
+        elif hours_raw not in (None, ""):
+            expires_at = _hours_to_expiry(hours_raw)
+        else:
+            expires_at = defaults.expiry_for(visibility, t)
 
     if kind == "zip" and zip_up:
         allow_download = True
@@ -427,9 +437,14 @@ async def create_link(request: Request, user: dict = Depends(current_user)):
     title = str(body.get("title") or "").strip() or url
     slug = storage.slugify(body.get("slug") or title)
     hours = body.get("hours")
-    expires_at = None if body.get("forever") else (_hours_to_expiry(hours) if hours else now_ms() + int(config.DEFAULT_TTL_HOURS * 3600_000))
-    t = now_ms()
     visibility = body.get("visibility") if body.get("visibility") in VISIBILITY else "link"
+    if body.get("forever"):
+        expires_at = None
+    elif hours not in (None, ""):
+        expires_at = _hours_to_expiry(hours)
+    else:
+        expires_at = defaults.expiry_for(visibility)
+    t = now_ms()
     with tx() as conn:
         if conn.execute("SELECT 1 FROM projects WHERE slug=?", (slug,)).fetchone():
             raise HTTPException(status_code=409, detail="slug 已存在")
@@ -437,7 +452,7 @@ async def create_link(request: Request, user: dict = Depends(current_user)):
             "INSERT INTO projects(slug, title, description, owner_id, kind, link_url, visibility, "
             "expire_action, expires_at, status, created_at, updated_at) VALUES(?,?,?,?,'link',?,?,?,?,'active',?,?)",
             (slug, title, str(body.get("description") or ""), user["id"], url, visibility,
-             "block", expires_at, t, t),
+             body.get("expire_action") or default_expire_action(), expires_at, t, t),
         )
         pid = cur.lastrowid
         set_tags(conn, pid, _parse_tags(body.get("tags")))

@@ -212,6 +212,32 @@ p { margin: 0; }
 .panel-head h2 { font-size: 13.5px; }
 .panel-body { padding: 16px; }
 
+/* 桌面表格 / 移动卡片双套渲染的开关 */
+.only-narrow { display: none; }
+@media (max-width: 780px) {
+  .only-wide { display: none !important; }
+  .only-narrow { display: block; }
+}
+
+/* 移动端的成员卡片 */
+.acards { display: flex; flex-direction: column; gap: 10px; }
+.acard {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 13px 14px;
+}
+.acard-top { display: flex; align-items: center; gap: 10px; }
+.acard-top .who { min-width: 0; flex: 1 1 auto; }
+.acard-top .who b { display: block; font-size: 13.5px; font-weight: 650; letter-spacing: -0.01em; }
+.acard-top .who span { display: block; font-size: 11.5px; color: var(--ink-4); font-family: var(--mono); }
+.acard-stats {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--ink-3);
+}
+.acard-stats b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+.acard-ops { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 11px; }
+.acard-ops .btn { flex: 1 1 auto; justify-content: center; min-width: 72px; }
+
 /* ---------------- 指标条 ---------------- */
 
 .stats {
@@ -514,7 +540,8 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
 
 @media (max-width: 860px) {
   :root { --sidebar-w: 0px; }
-  .topbar { padding-left: 46px; }
+  /* 左侧留出汉堡按钮的位置（46px），别再被后面的 padding 覆盖掉 */
+  .topbar { padding: 10px 14px 10px 46px; }
   .topbar h1 { white-space: nowrap; font-size: 15px; }
   .topbar .sub { display: none; }
   .topbar .search { min-width: 0; flex: 1 1 120px; max-width: none; }
@@ -524,7 +551,6 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
   .col-kind { display: none; }
   .col-ops { display: none; }
   .col-views { display: none; }
-  .content { padding-bottom: 96px; }
   .sidebar {
     transform: translateX(-100%); transition: transform 0.22s var(--ease);
     width: 232px; box-shadow: var(--shadow-pop);
@@ -532,7 +558,6 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
   .sidebar.open { transform: none; }
   .main { margin-left: 0; }
   .content { padding: 16px 14px 80px; }
-  .topbar { padding: 10px 14px; }
   .drawer { width: 100%; }
   .hide-sm { display: none !important; }
 }

@@ -79,6 +79,11 @@ async function setVisibility(v) {
   await patch({ visibility: v }, '可见性已更新')
 }
 
+async function toggleExpireAction() {
+  const next = detail.value.expire_action === 'delete' ? 'block' : 'delete'
+  await patch({ expire_action: next }, next === 'delete' ? '到期将删除文件' : '到期将保留文件')
+}
+
 async function addTag() {
   const name = tagDraft.value.trim().slice(0, 24)
   if (!name) return
@@ -253,6 +258,12 @@ onMounted(load)
               <button class="linkbtn" :class="{ dim: detail.visibility !== 'portal' }" @click="setVisibility('portal')">门户</button>
               <button class="linkbtn" :class="{ dim: detail.visibility !== 'link' }" @click="setVisibility('link')">链接</button>
               <button class="linkbtn" :class="{ dim: detail.visibility !== 'private' }" @click="setVisibility('private')">私有</button>
+            </dd>
+            <dt>到期后</dt>
+            <dd>
+              <button class="linkbtn" :disabled="busy" @click="toggleExpireAction">
+                {{ detail.expire_action === 'delete' ? '删除项目及文件（点击改）' : '停止访问、保留文件（点击改）' }}
+              </button>
             </dd>
             <dt>更新</dt>
             <dd>{{ fmtDate(detail.updated_at) }}</dd>

@@ -1,6 +1,6 @@
 ---
 name: tmp-preview-deploy
-description: 把本地目录（静态站 / HTML / WebGL / 构建产物）一键部署成带到期时间的临时预览与下载站，默认 24 小时自动回收。自托管版：Docker Compose 起一个 FastAPI + SQLite + 本地磁盘的服务，Vue 3 控制台，多 Agent 共用一套服务且各自只能看自己的项目，管理员可看全部并按成员/标签/类型筛选、按访问与时间排序。当用户说「部署预览」「临时部署」「分享给客户验收」「上传项目让人预览下载」「24 小时后自动删除的预览链接」「自建预览站」「迁移 Cloudflare 预览站到本地」「docker compose 部署预览服务」时使用。也用于管理成员与 API Key、续期、打标签、从 Cloudflare KV 迁移历史项目。
+description: 把本地目录（静态站 / HTML / WebGL / 构建产物）一键部署成带到期时间的临时预览与下载站，默认按可见性给寿命（门户 6 小时 / 持链接 12 小时 / 私有永久，可配）。自托管版：Docker Compose 起一个 FastAPI + SQLite + 本地磁盘的服务，Vue 3 控制台，多 Agent 共用一套服务且各自只能看自己的项目，管理员可看全部并按成员/标签/类型筛选、按访问与时间排序。当用户说「部署预览」「临时部署」「分享给客户验收」「上传项目让人预览下载」「24 小时后自动删除的预览链接」「自建预览站」「迁移 Cloudflare 预览站到本地」「docker compose 部署预览服务」时使用。也用于管理成员与 API Key、续期、打标签、从 Cloudflare KV 迁移历史项目。
 ---
 
 # tmp-preview-deploy（自托管版）

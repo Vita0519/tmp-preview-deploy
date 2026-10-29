@@ -117,7 +117,7 @@ onMounted(load)
   </header>
 
   <div class="content">
-    <div class="panel">
+    <div class="panel only-wide">
       <table>
         <thead>
           <tr>
@@ -173,6 +173,45 @@ onMounted(load)
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- 窄屏：表格换成卡片，避免列被压成竖排文字 -->
+    <div class="only-narrow">
+      <div v-if="items.length" class="acards">
+        <div v-for="a in items" :key="a.id" class="acard">
+          <div class="acard-top">
+            <div class="avatar" style="width: 30px; height: 30px">{{ (a.display_name || a.username).slice(0, 1) }}</div>
+            <div class="who">
+              <b class="truncate">{{ a.display_name }}</b>
+              <span class="truncate">@{{ a.username }}</span>
+            </div>
+            <span class="badge" :class="{ brand: a.role === 'admin' }">{{ a.role === 'admin' ? '管理员' : '成员' }}</span>
+            <span v-if="!a.active" class="badge">停用</span>
+          </div>
+          <div class="acard-stats">
+            <span><b>{{ a.projects }}</b> 项目</span>
+            <span><b>{{ a.online }}</b> 在线</span>
+            <span><b>{{ fmtNum(a.views) }}</b> 访问</span>
+            <span>登录 <b>{{ a.last_login_at ? relTime(a.last_login_at) : '从未' }}</b></span>
+          </div>
+          <div class="acard-ops">
+            <button class="btn sm" @click="resetPassword(a)">重置密码</button>
+            <button class="btn sm" @click="rotateKey(a)"><Icon name="key" :size="12" /> 轮换 Key</button>
+            <button v-if="a.id !== store.user?.id" class="btn sm" @click="toggleActive(a)">
+              {{ a.active ? '停用' : '启用' }}
+            </button>
+            <button
+              v-if="a.id !== store.user?.id"
+              class="btn sm ghost"
+              style="color: var(--danger)"
+              @click="remove(a)"
+            >
+              <Icon name="trash" :size="12" /> 删除
+            </button>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="loading" class="acard"><div class="skel" style="height: 40px" /></div>
     </div>
 
     <p class="dim" style="font-size: 12px; margin-top: 12px">

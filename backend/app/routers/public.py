@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 
-from .. import config, pages, storage, views
+from .. import config, defaults, pages, storage, views
 from ..db import db, get_setting
 from ..security import now_ms, resolve_user
 
@@ -61,6 +61,8 @@ def _dict(row, origin: str) -> dict:
         "file_count": row["file_count"],
         "size_bytes": row["size_bytes"],
         "allow_download": bool(row["allow_download"]),
+        "visibility": row["visibility"],
+        "created_at": row["created_at"],
         "expires_at": row["expires_at"],
         "expired": row["status"] == "expired"
         or (row["expires_at"] is not None and row["expires_at"] <= now_ms()),
@@ -251,4 +253,6 @@ def meta():
         "version": "2.0.0",
         "online": row["c"],
         "public_portal": get_setting("public_portal", "0") == "1" or config.PUBLIC_PORTAL,
+        "ttl_defaults": defaults.all_defaults(),
+        "default_expire_action": get_setting("default_expire_action") or "block",
     }
