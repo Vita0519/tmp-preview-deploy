@@ -26,7 +26,20 @@ const form = reactive({
   ttl: { portal: 6, link: 12, private: 0 },
   default_expire_action: 'block',
   public_portal: false,
+  author: { name: '', bio: '', links: [] },
 })
+const authorTypes = ref([
+  { key: 'github', label: 'GitHub' },
+  { key: 'x', label: 'X' },
+  { key: 'mail', label: '邮箱' },
+  { key: 'blog', label: '博客' },
+  { key: 'douyin', label: '抖音' },
+  { key: 'wechat', label: '微信' },
+  { key: 'bilibili', label: '哔哩哔哩' },
+  { key: 'zhihu', label: '知乎' },
+  { key: 'rss', label: 'RSS' },
+  { key: 'link', label: '链接' },
+])
 const pw = reactive({ old_password: '', new_password: '' })
 
 const VIS = [
@@ -43,9 +56,37 @@ async function load() {
     form.ttl = { ...form.ttl, ...(d.ttl_defaults || {}) }
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
+    if (Array.isArray(d.author_types) && d.author_types.length) authorTypes.value = d.author_types
+    const a = d.author || {}
+    form.author = {
+      name: a.name || '',
+      bio: a.bio || '',
+      links: (a.links || []).map((l) => ({
+        ...l,
+        // 邮箱在界面上只显示地址，保存时后端再补 mailto:
+        url: l.type === 'mail' ? String(l.url || '').replace(/^mailto:/i, '') : l.url,
+      })),
+    }
   } catch (e) {
     toast(e.message || '读取失败', 'err')
   }
+}
+
+const typeLabel = (key) => authorTypes.value.find((t) => t.key === key)?.label || '链接'
+
+function addLink() {
+  if (form.author.links.length >= 12) return toast('最多 12 个链接', 'err')
+  form.author.links.push({ type: 'github', label: '', url: '' })
+}
+
+function removeLink(i) {
+  form.author.links.splice(i, 1)
+}
+
+function onTypeChange(link) {
+  // 标签为空、或者还是某个类型的默认名时，跟着类型走
+  const labels = authorTypes.value.map((t) => t.label)
+  if (!link.label || labels.includes(link.label)) link.label = typeLabel(link.type)
 }
 
 async function save() {
@@ -60,6 +101,11 @@ async function save() {
       },
       default_expire_action: form.default_expire_action,
       public_portal: form.public_portal,
+      author: {
+        name: form.author.name,
+        bio: form.author.bio,
+        links: form.author.links.filter((l) => l.url.trim()),
+      },
     })
     store.siteTitle = d.site_title || store.siteTitle
     toast('设置已保存')
@@ -95,6 +141,56 @@ onMounted(load)
   </header>
 
   <div class="content" style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start">
+    <div class="panel" style="grid-column: 1 / -1">
+      <div class="panel-head">
+        <h2>作者信息</h2>
+        <span class="dim" style="font-size: 11.5px">填了就展示在访客门户 <span class="mono">/portal</span> 顶部</span>
+      </div>
+      <div class="panel-body">
+        <div class="form">
+          <div class="frow two">
+            <div class="frow">
+              <label>显示名</label>
+              <input v-model="form.author.name" class="input" placeholder="例如：孟庆炜" maxlength="40" />
+            </div>
+            <div class="frow">
+              <label>一句话介绍</label>
+              <input v-model="form.author.bio" class="input" placeholder="例如：做点顺手的小工具" maxlength="120" />
+            </div>
+          </div>
+
+          <div class="frow">
+            <label>链接</label>
+            <div class="linkrows">
+              <div v-for="(l, i) in form.author.links" :key="i" class="linkrow">
+                <select v-model="l.type" class="input type" @change="onTypeChange(l)">
+                  <option v-for="t in authorTypes" :key="t.key" :value="t.key">{{ t.label }}</option>
+                </select>
+                <input v-model="l.label" class="input label" placeholder="显示文字" maxlength="20" />
+                <input
+                  v-model="l.url"
+                  class="input url"
+                  :placeholder="l.type === 'mail' ? 'hi@example.com' : 'https://…（可省略 https://）'"
+                />
+                <button class="btn sm ghost" title="删除" @click="removeLink(i)">
+                  <Icon name="close" :size="12" />
+                </button>
+              </div>
+              <div v-if="!form.author.links.length" class="dim" style="font-size: 12px">
+                还没有链接。加几个，访客门户顶部就会出现对应图标。
+              </div>
+              <div>
+                <button class="btn sm" @click="addLink"><Icon name="plus" :size="12" /> 添加链接</button>
+              </div>
+            </div>
+            <span class="hint">
+              类型决定图标；标签留空就按类型默认（GitHub / 邮箱 / 抖音 …）。邮箱直接填地址即可，会自动补 mailto:。
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-head"><h2>基础</h2></div>
       <div class="panel-body">
@@ -202,5 +298,21 @@ onMounted(load)
 <style scoped>
 @media (max-width: 1080px) {
   .content { grid-template-columns: 1fr !important; }
+}
+.linkrows { display: flex; flex-direction: column; gap: 7px; }
+.linkrow { display: flex; align-items: center; gap: 6px; }
+.linkrow .input { height: 30px; }
+.linkrow .type { flex: 0 0 120px; padding-right: 4px; }
+.linkrow .label { flex: 0 0 120px; }
+.linkrow .url { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 720px) {
+  .linkrow {
+    display: grid; grid-template-columns: 112px minmax(0, 1fr) auto;
+    gap: 6px; padding-bottom: 9px; border-bottom: 1px dashed var(--line);
+  }
+  .linkrow .type { grid-area: 1 / 1; flex: none; }
+  .linkrow .label { grid-area: 1 / 2; flex: none; }
+  .linkrow .url { grid-area: 2 / 1 / 3 / 3; flex: none; }
+  .linkrow .btn { grid-area: 1 / 3; align-self: center; }
 }
 </style>

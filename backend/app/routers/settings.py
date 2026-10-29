@@ -1,7 +1,7 @@
 """系统设置（站点标题、按可见性的默认时长、到期策略、门户可见性）。"""
 from fastapi import APIRouter, Depends
 
-from .. import config, defaults
+from .. import author, config, defaults
 from ..db import all_settings, db, get_setting, set_setting
 from ..security import admin_user
 
@@ -34,6 +34,10 @@ def read_settings(user: dict = Depends(admin_user)):
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": s.get("default_expire_action") or "block",
         "public_portal": s.get("public_portal") == "1",
+        "author": author.load(),
+        "author_types": [
+            {"key": k, "label": v["label"]} for k, v in author.TYPE_META.items()
+        ],
         "runtime": {
             "data_dir": str(config.DATA_DIR),
             "projects": counts["projects"],
@@ -66,6 +70,8 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         set_setting("default_expire_action", payload["default_expire_action"])
     if "public_portal" in payload:
         set_setting("public_portal", "1" if payload["public_portal"] else "0")
+    if "author" in payload:
+        author.save(payload["author"])
 
     return {
         "ok": True,
@@ -74,4 +80,5 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": get_setting("default_expire_action") or "block",
         "public_portal": get_setting("public_portal", "0") == "1",
+        "author": author.load(),
     }

@@ -193,6 +193,28 @@ body{background:linear-gradient(180deg,#fbfcfb,#f2f4f2 60%,#eef1ef);min-height:1
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
 h1{margin:0;font-size:26px;letter-spacing:-.02em}
 .sub{color:#7b8189;font-size:12.5px;margin-top:5px}
+.author{display:flex;align-items:center;gap:11px;margin:0 0 18px;padding:11px 13px;background:#fff;
+border:1px solid rgba(20,22,26,.08);border-radius:12px;box-shadow:0 1px 2px rgba(20,22,26,.03)}
+.author .ava{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+background:#eff4f2;color:#0f766e;font-weight:650;font-size:14px;letter-spacing:-.02em;
+border:1px solid rgba(15,118,110,.14)}
+.author .am{min-width:0;flex:1 1 auto}
+.author .am b{display:block;font-size:13.5px;letter-spacing:-.01em;color:#14161a}
+.author .am span{display:block;margin-top:2px;font-size:11.5px;color:#8a9099;line-height:1.45;
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alinks{flex:0 0 auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.alink{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;border-radius:8px;
+border:1px solid rgba(20,22,26,.1);background:#fff;color:#5b636d;font-size:11.5px;font-weight:600;
+transition:color .16s,border-color .16s,background .16s}
+.alink:hover{color:#0f766e;border-color:rgba(15,118,110,.38);background:#f6fbfa}
+.alink svg{width:13px;height:13px;flex:0 0 auto}
+.alink.only-icon{padding:0;width:28px;justify-content:center}
+@media (max-width:620px){
+  .author{flex-wrap:wrap;padding:10px 11px}
+  .alinks{width:100%;justify-content:flex-start}
+  .alink span{display:none}
+  .alink{padding:0;width:28px;justify-content:center}
+}
 .btn{height:30px;display:inline-flex;align-items:center;padding:0 12px;border-radius:8px;font-size:12.5px;
 font-weight:600;border:1px solid rgba(20,22,26,.14);background:#fff;color:#2a2f36}
 .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -216,39 +238,49 @@ font-size:12.5px;color:#2a2f36;outline:none;cursor:pointer}
 background:#f4f6f4;color:#5b636d;font:600 11px/1 inherit;cursor:pointer;transition:.16s}
 .tagsbar button:hover{background:#eef2f0;color:#14161a}
 .tagsbar button.on{background:#0f766e;border-color:#0f766e;color:#fff}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
-.card{display:block;background:#fff;border:1px solid rgba(20,22,26,.09);border-radius:12px;padding:14px 15px 13px;
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch}
+.card{display:flex;flex-direction:column;background:#fff;border:1px solid rgba(20,22,26,.09);
+border-radius:12px;padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
 .card[hidden]{display:none}
 .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(15,118,110,.32)}
-.top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.top{display:flex;align-items:center;gap:8px;min-width:0}
 .name{font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a;min-width:0;
 overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.kind{font-size:10px;font-weight:600;color:#7b8189;background:#f3f5f3;border:1px solid rgba(20,22,26,.06);
-border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:1px}
-.cv{flex:0 0 auto;font-size:11px;font-weight:600;color:#0f766e;background:#eff4f2;border-radius:999px;
-padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.cv.perm{color:#3a4a63;background:#eef2f8}
-.cv.warn{color:#b45309;background:#fdf3e7}
-.cv.dead{color:#b42318;background:#fdeceb}
-.desc{margin:7px 0 9px;color:#5b636d;font-size:12.5px;line-height:1.55;display:-webkit-box;
+.kind{flex:0 0 auto;font-size:10px;font-weight:600;color:#7b8189;background:#f3f5f3;
+border:1px solid rgba(20,22,26,.06);border-radius:5px;padding:1px 5px}
+.byline{margin-top:5px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:#98a0a6;
+font-variant-numeric:tabular-nums;min-width:0}
+.byline .dot{width:3px;height:3px;border-radius:50%;background:#cdd2d6;flex:0 0 auto}
+.byline span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desc{margin:8px 0 0;color:#5b636d;font-size:12.5px;line-height:1.55;display:-webkit-box;
 -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:19px}
-.track{height:3px;border-radius:99px;background:#eef1ef;overflow:hidden}
-.track > i{display:block;height:100%;border-radius:99px;background:#0f766e;transition:width .5s ease}
-.track.warn > i{background:#b45309}
-.track.dead > i{background:#b42318}
-.meta{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5px;color:#8a9099;
-font-variant-numeric:tabular-nums}
-.meta .dot{width:3px;height:3px;border-radius:50%;background:#c8ccd1;flex:0 0 auto}
-.meta .who{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.meta .right{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto}
-.meta .right b{font-weight:650;color:#5b636d;font-variant-numeric:tabular-nums}
-.vbar{width:34px;height:3px;border-radius:99px;background:#eef1ef;overflow:hidden}
-.vbar > i{display:block;height:100%;border-radius:99px;background:#b6c2bd}
 .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
 .tags:empty{display:none}
 .tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:#f3f5f3;color:#5b636d;
 border:1px solid rgba(20,22,26,.06)}
+.foot{display:flex;align-items:flex-end;gap:12px;margin-top:auto;padding-top:11px;
+border-top:1px solid rgba(20,22,26,.06)}
+.cdwrap{flex:1 1 auto;min-width:0;padding-bottom:2px}
+.cdrow{display:flex;align-items:baseline;gap:5px;margin-bottom:6px}
+.cdlab{font-size:10.5px;color:#98a0a6}
+.cd{font-size:12.5px;font-weight:650;color:#0f766e;font-variant-numeric:tabular-nums;
+letter-spacing:-.01em;white-space:nowrap}
+.cd.perm{color:#3a4a63}
+.cd.warn{color:#b45309}
+.cd.dead{color:#b42318}
+.track{height:3px;border-radius:99px;background:#eef1ef;overflow:hidden}
+.track > i{display:block;height:100%;border-radius:99px;background:#0f766e;transition:width .5s ease}
+.track.warn > i{background:#b45309}
+.track.dead > i{background:#b42318}
+.ring{position:relative;flex:0 0 auto;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
+background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef1ef 0)}
+.ring::after{content:'';position:absolute;inset:4px;border-radius:50%;background:#fff}
+.ring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:2px}
+.ring b{font-size:12px;font-weight:650;color:#14161a;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.ring b.sm{font-size:9.5px}
+.ring i{font-style:normal;font-size:8px;color:#a3aab0;letter-spacing:.02em}
+.ring:hover{background:conic-gradient(#0d6a62 calc(var(--p,0) * 1%), #eef1ef 0)}
 .blank{grid-column:1/-1;text-align:center;color:#8a9099;padding:56px 0;
 border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
 @media (max-width:620px){
@@ -279,11 +311,11 @@ PORTAL_JS = """
     var now=Date.now()+off;
     cards.forEach(function(c){
       var exp=+c.dataset.exp; if(!exp) return;
-      var left=exp-now, pill=c.querySelector('.cv'), bar=c.querySelector('.track');
+      var left=exp-now, cd=c.querySelector('.cd'), bar=c.querySelector('.track');
       var warn=left>0&&left<2*3600e3, dead=left<=0;
-      if(pill){
-        pill.textContent = dead ? '已到期' : '剩余 '+fmt(left);
-        pill.classList.toggle('warn',warn); pill.classList.toggle('dead',dead);
+      if(cd){
+        cd.textContent = dead ? '已到期' : fmt(left);
+        cd.classList.toggle('warn',warn); cd.classList.toggle('dead',dead);
       }
       if(bar){
         var total=+c.dataset.total||1;
@@ -348,6 +380,61 @@ PORTAL_JS = """
 
 KIND_LABEL = {"static": "静态站", "link": "外链", "zip": "压缩包"}
 
+# 16×16 线性图标（stroke=currentColor），门户作者区用
+ICONS = {
+    "github": '<path d="M6 5 3 8l3 3"/><path d="M10 5l3 3-3 3"/>',
+    "x": '<path d="M4 4l8 8"/><path d="M12 4l-8 8"/>',
+    "mail": '<rect x="2.6" y="4" width="10.8" height="8" rx="1.6"/>'
+            '<path d="M3.2 5.1 8 8.6l4.8-3.5"/>',
+    "globe": '<circle cx="8" cy="8" r="5.4"/><path d="M2.7 8h10.6"/>'
+             '<path d="M8 2.6c1.6 1.7 2.4 3.5 2.4 5.4S9.6 12.7 8 13.4C6.4 12.7 5.6 11 5.6 8S6.4 4.3 8 2.6Z"/>',
+    "music": '<path d="M9.7 3.2v6.4a2.2 2.2 0 1 1-1.9-2.2"/>'
+             '<path d="M9.7 3.2c.3 1.6 1.3 2.5 2.9 2.7"/>',
+    "chat": '<path d="M13.4 7.6c0 2.2-2.2 4-4.9 4-.5 0-1-.1-1.5-.2l-2.4 1 .6-1.9'
+            'C3.7 9.8 3.1 8.8 3.1 7.6c0-2.2 2.2-4 4.9-4s5.4 1.8 5.4 4Z"/>',
+    "play": '<rect x="2.4" y="4.4" width="11.2" height="8" rx="2"/><path d="M6.7 7l2.9 1.6-2.9 1.6Z"/>',
+    "star": '<path d="M8 2.8l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 11l-3.2 1.7.6-3.6L2.8 6.6l3.6-.5Z"/>',
+    "rss": '<circle cx="4.7" cy="11.3" r="1.1"/><path d="M3.6 8.3a4.2 4.2 0 0 1 4.1 4.1"/>'
+           '<path d="M3.6 4.9a7.6 7.6 0 0 1 7.5 7.5"/>',
+    "link": '<path d="M6.6 9.4 9.4 6.6"/><path d="M8.1 4.8l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1"/>'
+            '<path d="M7.9 11.2l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1"/>',
+}
+
+ICON_TPL = (
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" '
+    'stroke-linecap="round" stroke-linejoin="round">{}</svg>'
+)
+
+
+def _author_block(author: dict | None) -> str:
+    """门户顶部的作者条：头像首字母 + 名字 + 简介 + 一排链接。"""
+    if not author:
+        return ""
+    name = (author.get("name") or "").strip()
+    bio = (author.get("bio") or "").strip()
+    links = author.get("links") or []
+    if not (name or bio or links):
+        return ""
+    initial = name[:1].upper() if name else "·"
+    links_html = ""
+    for l in links:
+        icon = ICONS.get(l.get("type", "link"), ICONS["link"])
+        label = escape(l.get("label") or "")
+        url = escape(l.get("url") or "#")
+        cls = "alink only-icon" if len(label) > 6 else "alink"
+        links_html += (
+            f'<a class="{cls}" href="{url}" target="_blank" rel="noopener noreferrer" '
+            f'title="{label}">{ICON_TPL.format(icon)}<span>{label}</span></a>'
+        )
+    meta = f'<b>{escape(name)}</b>' if name else ""
+    if bio:
+        meta += f'<span title="{escape(bio, quote=True)}">{escape(bio)}</span>'
+    return (
+        f'<div class="author"><div class="ava">{escape(initial)}</div>'
+        f'<div class="am">{meta}</div>'
+        f'<div class="alinks">{links_html}</div></div>'
+    )
+
 
 def _remain_text(ms: int) -> str:
     """剩余时长的人话表述（与前端 JS 保持一致，用于首屏无 JS 时也能看）。"""
@@ -360,7 +447,14 @@ def _remain_text(ms: int) -> str:
     return f"剩余 {h}:{(s % 3600) // 60:02d}:{s % 60:02d}"
 
 
-def portal_page(items: list[dict], site_title: str, subtitle: str, server_now: int, logged_in: bool) -> str:
+def portal_page(
+    items: list[dict],
+    site_title: str,
+    subtitle: str,
+    server_now: int,
+    logged_in: bool,
+    author: dict | None = None,
+) -> str:
     max_views = max([(p.get("views") or 0) for p in items] or [0]) or 1
     cards = []
     for p in items:
@@ -370,36 +464,43 @@ def portal_page(items: list[dict], site_title: str, subtitle: str, server_now: i
         if exp:
             left = max(0, exp - server_now)
             pct = max(1.5, min(100.0, left / total * 100))
-            pill_cls = "dead" if left <= 0 else ("warn" if left < 2 * 3600_000 else "")
-            pill = _remain_text(left)
+            cd_cls = "dead" if left <= 0 else ("warn" if left < 2 * 3600_000 else "")
+            cd_text = _remain_text(left).replace("剩余 ", "")
         else:
             pct = 100.0
-            pill_cls = "perm"
-            pill = "永久"
+            cd_cls = "perm"
+            cd_text = "永久"
         views = p.get("views") or 0
-        vpct = max(4, round(views / max_views * 100))
+        rpct = max(0, min(100, round(views / max_views * 100)))
         tags_list = p.get("tags") or []
         tags = "".join(f'<span class="tag">{escape(t)}</span>' for t in tags_list[:4])
         owner = escape((p.get("owner") or {}).get("display_name") or "")
+        size = _human(p["size_bytes"]) if p["kind"] != "link" else "外链"
+        num_cls = "sm" if views >= 1000 else ""
         cards.append(
             f"""<a class="card" href="/v/{p['slug']}" target="_blank" rel="noopener" style="order:0"
    data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}"
    data-kind="{p['kind']}" data-tags="{escape('|'.join(tags_list), quote=True)}"
    data-title="{escape(p['title'], quote=True)}">
-  <div class="top"><div class="name">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
-  <span class="cv {pill_cls}">{pill}</span></div>
+  <div class="top"><span class="name">{escape(p['title'])}</span>
+    <span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
+  <div class="byline"><span>{owner or '—'}</span><span class="dot"></span><span>{size}</span></div>
   <p class="desc">{escape(p['description'] or '')}</p>
-  <div class="track"><i style="width:{pct:.1f}%"></i></div>
-  <div class="meta">
-    <span class="who">{owner or '—'}</span><span class="dot"></span>
-    <span>{_human(p['size_bytes']) if p['kind'] != 'link' else '外链'}</span>
-    <span class="right"><b>{views}</b> 次访问<span class="vbar"><i style="width:{vpct}%"></i></span></span>
-  </div>
   <div class="tags">{tags}</div>
+  <div class="foot">
+    <div class="cdwrap">
+      <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span></div>
+      <div class="track"><i style="width:{pct:.1f}%"></i></div>
+    </div>
+    <div class="ring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
+      <span class="in"><b class="{num_cls}">{views}</b><i>访问</i></span>
+    </div>
+  </div>
 </a>"""
         )
     body = "".join(cards) or '<div class="blank">暂无公开项目</div>'
     login = '<a class="btn ghost" href="/">进入控制台</a>' if logged_in else ""
+    who = _author_block(author)
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(site_title)}</title>
 <meta name="robots" content="noindex">
@@ -408,6 +509,7 @@ def portal_page(items: list[dict], site_title: str, subtitle: str, server_now: i
 {PORTAL_CSS}
 </style></head><body><div class="wrap">
 <header><div><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div>{login}</header>
+{who}
 <div class="tools">
   <div class="seg" data-kind>
     <button class="on" data-v="all">全部</button>

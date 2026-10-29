@@ -45,12 +45,17 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/settings` | 🛡 | 站点配置 + `ttl_defaults` + 运行信息 + 最近操作 |
-| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal}` |
+| GET | `/api/settings` | 🛡 | 站点配置 + `ttl_defaults` + `author` + `author_types` + 运行信息 + 最近操作 |
+| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, author}` |
 
 `ttl_defaults` 是**按可见性**区分的默认存活小时数，`0` 表示永久。上传/建外链时若没传 `hours`，
 后端就按项目可见性取这里的值（门户默认 6h、链接 12h、私有永久）。`default_expire_action`
 取值 `block`（到期停访、保留文件）或 `delete`（到期删文件与记录），新建项目时预选。
+
+`author` 结构：`{name, bio, links:[{type,label,url}]}`，`type` ∈
+`github|x|mail|blog|douyin|wechat|bilibili|zhihu|rss|link`（白名单，未知类型落到 `link`）。
+`url` 会做规范化：邮箱可只填地址（自动补 `mailto:`），其他不带协议的自动补 `https://`，
+`javascript:` / `data:` 之类非 http(s) 协议直接丢弃。门户页顶部据此渲染一行图标链接。
 
 ## 访客侧
 

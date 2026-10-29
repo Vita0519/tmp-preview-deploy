@@ -461,6 +461,9 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
 .frow.two { grid-template-columns: 1fr 1fr; gap: 12px; }
 .frow label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
 .frow .hint { font-size: 11.5px; color: var(--ink-4); }
+@media (max-width: 620px) {
+  .frow.two { grid-template-columns: 1fr; gap: 10px; }
+}
 .input, .textarea {
   width: 100%; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: var(--radius-sm);
   background: var(--surface); font-size: 13px; outline: none;

@@ -16,12 +16,30 @@ import argparse
 import base64
 import json
 import os
+import ssl
 import subprocess
 import sys
 import urllib.error
 import urllib.request
 
 API = "https://api.github.com"
+
+# 某些环境（公司代理 / 精简版 Python）没有可用 CA，先正常校验，失败再降级重试一次。
+_VERIFY = not os.environ.get("PV_INSECURE")
+
+
+def _open(req, timeout=60):
+    global _VERIFY
+    ctx = ssl.create_default_context() if _VERIFY else ssl._create_unverified_context()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+            return r.read()
+    except urllib.error.URLError as e:
+        if _VERIFY and "CERTIFICATE_VERIFY_FAILED" in str(e):
+            print("! 证书校验失败，改用不校验模式重试（仅本次进程）", file=sys.stderr)
+            _VERIFY = False
+            return _open(req, timeout)
+        raise
 
 
 def token() -> str:
@@ -48,8 +66,7 @@ def call(method: str, path: str, tok: str, payload=None):
     if data:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            return json.loads(r.read().decode() or "{}")
+        return json.loads(_open(req).decode() or "{}")
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="replace")
         raise SystemExit(f"{method} {path} -> {e.code}\n{body[:800]}")
