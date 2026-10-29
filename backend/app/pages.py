@@ -18,8 +18,36 @@ a{{color:#0f766e;text-decoration:none}}
 # 站点图标：项目自带就用项目的，否则回落到站点图标
 FAVICON_NAMES = ("favicon.ico", "favicon.svg", "favicon.png", "apple-touch-icon.png")
 
+# 站点自己的图标套装（与 frontend/public 下由 tools/gen_icons.py 生成的产物对应）
+SITE_ICON_LINKS = (
+    '<link rel="icon" href="/favicon.svg" type="image/svg+xml">'
+    '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">'
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+    '<link rel="manifest" href="/site.webmanifest">'
+    '<meta name="theme-color" content="#0f766e">'
+)
+
+# 门户页顶部的品牌标记（与 favicon.svg 同一份路径数据；沙漏 = 限时可用）
+BRAND_MARK = (
+    '<svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">'
+    '<defs>'
+    '<linearGradient id="pvMarkG" x1="2" y1="0" x2="30" y2="32" gradientUnits="userSpaceOnUse">'
+    '<stop offset="0" stop-color="#17bca9"/><stop offset=".48" stop-color="#0f766e"/>'
+    '<stop offset="1" stop-color="#095651"/></linearGradient>'
+    '<linearGradient id="pvMarkS" x1="16" y1="0" x2="16" y2="19" gradientUnits="userSpaceOnUse">'
+    '<stop offset="0" stop-color="#fff" stop-opacity=".2"/>'
+    '<stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
+    '</defs>'
+    '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkG)"/>'
+    '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkS)"/>'
+    '<path fill="#fff" d="M12.1 7.4H19.9C21 7.4 21.7 8 21.7 8.9V9.2L17.2 15.2V16.8'
+    'L21.7 22.8V23.1C21.7 24 21 24.6 19.9 24.6H12.1C11 24.6 10.3 24 10.3 23.1V22.8'
+    'L14.8 16.8V15.2L10.3 9.2V8.9C10.3 8 11 7.4 12.1 7.4Z"/></svg>'
+)
+
 
 def favicon_href(slug: str | None = None) -> str:
+    """项目自带的站点图标路径；没有就返回空串（调用方回落到站点图标）。"""
     if slug:
         from . import storage  # 局部导入，避免模块级循环依赖
         for name in FAVICON_NAMES:
@@ -29,7 +57,19 @@ def favicon_href(slug: str | None = None) -> str:
                 target = None
             if target is not None and target.is_file():
                 return f"/p/{slug}/{name}"
-    return "/favicon.svg"
+    return ""
+
+
+def icon_head(slug: str | None = None) -> str:
+    """预览页的图标声明：项目自带优先，否则用站点图标套装。"""
+    own = favicon_href(slug)
+    if own:
+        return (
+            f'<link rel="icon" href="{own}">'
+            '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+            '<meta name="theme-color" content="#0f766e">'
+        )
+    return SITE_ICON_LINKS
 
 
 def preview_page(p: dict, server_now: int, site_title: str) -> str:
@@ -65,7 +105,7 @@ def preview_page(p: dict, server_now: int, site_title: str) -> str:
     return f"""<!doctype html><html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<link rel="icon" href="{favicon_href(p['slug'])}">
+{icon_head(p['slug'])}
 <title>{title} · {escape(site_title)}</title>
 <style>
 {BASE_CSS}
@@ -73,8 +113,8 @@ body{{height:100vh;display:flex;flex-direction:column;overflow:hidden}}
 .bar{{flex:0 0 auto;height:52px;display:flex;align-items:center;gap:10px;padding:0 14px;
 background:rgba(255,255,255,.86);backdrop-filter:blur(14px) saturate(180%);
 border-bottom:1px solid rgba(20,22,26,.08);position:relative;z-index:5}}
-.mark{{width:26px;height:26px;border-radius:7px;background:#0f766e;color:#fff;display:flex;
-align-items:center;justify-content:center;font:600 13px/1 {MONO};flex:0 0 auto}}
+.mark{{width:26px;height:26px;border-radius:23.75%;flex:0 0 auto;
+box-shadow:0 6px 14px -9px rgba(15,118,110,.85)}}
 .ttl{{min-width:0;display:flex;flex-direction:column;gap:1px}}
 .ttl b{{font-size:13.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}}
 .ttl span{{font-size:11.5px;color:#7b8189;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
@@ -117,7 +157,7 @@ background:radial-gradient(120% 90% at 50% 0%,#fbfcfb 0%,#f1f3f1 100%);padding:2
 </style></head>
 <body>
 <div class="bar">
-  <div class="mark">P</div>
+  {BRAND_MARK.replace('width="30" height="30"', 'width="26" height="26"')}
   <div class="ttl"><b>{title}</b><span>{owner + ' · ' if owner else ''}{size}{' · ' + str(p['file_count']) + ' 个文件' if p['file_count'] else ''}</span></div>
   <div class="spacer"></div>
   <span class="pill {'dead' if expired else ('perm' if not expires else '')}" id="pill"><span class="dot"></span><span id="cd">{'已到期' if expired else ('永久' if not expires else '—')}</span></span>
@@ -212,6 +252,9 @@ body{background:linear-gradient(180deg,#fbfcfb,#f2f4f2 60%,#eef1ef);min-height:1
 background:rgba(250,251,250,.9);backdrop-filter:blur(12px) saturate(1.15);
 -webkit-backdrop-filter:blur(12px) saturate(1.15);border-bottom:1px solid rgba(20,22,26,.06)}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
+.hgroup{display:flex;align-items:center;gap:12px;min-width:0}
+.hgroup .mark{flex:0 0 auto;border-radius:23.75%;box-shadow:0 9px 20px -12px rgba(15,118,110,.9)}
+.htext{min-width:0}
 h1{margin:0;font-size:26px;letter-spacing:-.02em}
 .sub{color:#7b8189;font-size:12.5px;margin-top:5px}
 .author{display:flex;align-items:center;gap:11px;margin:0 0 14px;padding:11px 13px;background:#fff;
@@ -384,6 +427,8 @@ border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
   h1{font-size:20px;line-height:1.25}
   .sub{font-size:11.5px;margin-top:3px}
   header{margin-bottom:10px}
+  .hgroup{gap:9px}
+  .hgroup .mark{width:26px;height:26px;border-radius:8px}
   .author{margin-bottom:10px;padding:8px 10px;gap:9px}
   .author .am span{display:none}
   .tools{margin-bottom:8px;gap:6px}
@@ -720,14 +765,14 @@ def portal_page(
     who = _author_block(author)
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(site_title)}</title>
-<link rel="icon" href="/favicon.svg">
+{SITE_ICON_LINKS}
 <meta name="robots" content="noindex">
 <style>
 {BASE_CSS}
 {PORTAL_CSS}
 </style></head><body><div class="wrap">
 <div class="dock">
-<header><div><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div>{login}</header>
+<header><div class="hgroup">{BRAND_MARK}<div class="htext"><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div></div>{login}</header>
 {who}
 <div class="tools">
   <div class="seg" data-kind>
@@ -775,7 +820,7 @@ def error_page(code: int, title: str, desc: str, back: str = "/") -> str:
     accent = "#b45309" if code == 410 else "#14161a"
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{code} · {escape(title)}</title>
-<link rel="icon" href="/favicon.svg">
+{SITE_ICON_LINKS}
 <style>
 {BASE_CSS}
 body{{height:100vh;display:flex;align-items:center;justify-content:center;
@@ -783,10 +828,12 @@ background:radial-gradient(120% 90% at 50% 0%,#fbfcfb,#eff1ef)}}
 .box{{text-align:center;padding:40px 44px;background:#fff;border:1px solid rgba(20,22,26,.08);
 border-radius:14px;box-shadow:0 24px 60px -40px rgba(20,22,26,.5);max-width:420px}}
 .code{{font:600 40px/1 {MONO};color:{accent};letter-spacing:-.03em}}
+.box .mark{{margin:0 auto 18px;border-radius:23.75%;display:block;width:38px;height:38px}}
 h1{{font-size:16px;margin:14px 0 6px;letter-spacing:-.01em}}
 p{{color:#7b8189;font-size:13px;line-height:1.6;margin:0 0 18px}}
 a{{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:8px;background:#14161a;
 color:#fff;font-size:12.5px;font-weight:600}}
 </style></head><body><div class="box">
+{BRAND_MARK}
 <div class="code">{code}</div><h1>{escape(title)}</h1><p>{escape(desc)}</p><a href="{escape(back)}">返回</a>
 </div></body></html>"""

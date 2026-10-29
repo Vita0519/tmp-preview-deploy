@@ -45,6 +45,9 @@ python cli/agentctl.py selfcheck                               # 建→探活→
 `--visibility` 三档：`link`（默认，持链接可见）、`portal`（进门户列表）、`private`（仅自己）。
 `--expire-action` 两档：`block`（默认，到期停访留文件）、`delete`（到期删文件）。
 
+同一成员名下**项目名不能重复**（忽略大小写/首尾空格），撞车返回 409 并点名占用的 slug；
+覆盖更新同一个 slug 不算冲突，跨成员同名互不影响。
+
 ## 管理
 
 ```bash
@@ -133,4 +136,5 @@ python tests/check_visibility.py --url http://127.0.0.1:8000   # 41 项：三档
 python tests/check_cli.py        --url http://127.0.0.1:8000   # 57 项：CLI 全命令 + 越权
 python tests/check_concurrency.py --url http://127.0.0.1:8000  # 20 项：6 agent 并发 / 同 slug 抢占
 python tests/check_copy.py       --url http://127.0.0.1:8000   # 26 项复制按钮（需 chrome）
+python tests/check_title.py      --url http://127.0.0.1:8000   # 22 项：同一成员重名拦截
 ```

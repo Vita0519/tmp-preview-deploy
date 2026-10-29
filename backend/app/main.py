@@ -1,5 +1,6 @@
 """FastAPI 入口：API + 访客页 + 构建后的 SPA 同端口托管。"""
 import asyncio
+import mimetypes
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,6 +12,11 @@ from . import cleanup, config, storage, views
 from .db import init_db
 from .routers import agents, auth, projects, public, settings
 from .security import bootstrap_admin
+
+# 图标与清单文件的 MIME：Python 的 mimetypes 还不认识 webmanifest
+mimetypes.add_type("application/manifest+json", ".webmanifest")
+mimetypes.add_type("image/x-icon", ".ico")
+mimetypes.add_type("image/png", ".png")
 
 STOP = asyncio.Event()
 

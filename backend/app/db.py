@@ -62,6 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_projects_expire ON projects(expires_at);
 CREATE INDEX IF NOT EXISTS idx_projects_views  ON projects(views);
 CREATE INDEX IF NOT EXISTS idx_projects_update ON projects(updated_at);
+-- 同一成员重名检测走表达式索引（大小写与首尾空格不敏感）
+CREATE INDEX IF NOT EXISTS idx_projects_owner_title ON projects(owner_id, lower(trim(title)));
 
 CREATE TABLE IF NOT EXISTS tags (
   id   INTEGER PRIMARY KEY AUTOINCREMENT,
