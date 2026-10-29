@@ -1,7 +1,6 @@
 """项目相关 API：列表（筛选/排序/分面）、上传、改属性、删除、批量操作。"""
 import os
 import re
-import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -366,7 +365,7 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
             zip_name = zip_up.filename or f"{slug}.zip"
             total += zsize if not files else 0
         finally:
-            shutil.rmtree(tmpdir, ignore_errors=True)
+            storage.remove_tree(tmpdir)
 
     limit_bytes = config.MAX_UPLOAD_MB * 1024 * 1024
     if total > limit_bytes:

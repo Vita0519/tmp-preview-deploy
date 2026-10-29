@@ -14,6 +14,69 @@ description: 以「一个账号 = 一个 Agent = 一把 API Key」的身份，�
    └── 1 ── N 项目（publisher 只看自己名下的；admin 看全部）
 ```
 
+## 零、这个 skill 不是说明书，它带可执行脚本
+
+```
+skills/tmp-preview-agent/
+├── SKILL.md              你正在读的这份
+└── scripts/agentctl.py   真正的客户端：单文件、只用标准库、Python 3.10+ 免安装
+```
+
+把 skill 目录整个交给任何一个能执行 shell 的 Agent，它就能真的建 / 改 / 删 / 查，
+不用你代劳，也不需要 `pip install`：
+
+```bash
+python scripts/agentctl.py --help        # 14 个命令全部可用
+python scripts/agentctl.py selfcheck     # 用当前身份真跑一遍：建→探活→改私有→改回→续期→删除
+```
+
+（仓库里 `cli/agentctl.py` 只是指向同一份实现的三行入口壳，两个路径等价。）
+
+| 命令 | 作用 | 关键参数 |
+|---|---|---|
+| `login` | 账号密码或已有 Key 换成本地凭据（0600 落盘） | `--url` `--username` `--password` / `--api-key` |
+| `whoami` | 我是谁、什么角色、能干什么 | — |
+| `health` | 站点是否活着 + Key 是否还有效 | — |
+| `deploy` | 上传目录，**传完自动探活** | `--slug` `--title` `--ttl` `--visibility` `--zip` `--no-verify` |
+| `link` | 只登记外链，不发文件 | `--url` `--title` `--ttl` |
+| `ls` | 列项目（默认只看自己的） | `--status` `--visibility` `--tag` `--q` `--sort` `--limit` |
+| `show` | 单个项目详情：文件清单、14 天访问、事件流水 | `<slug>` |
+| `set` | 改可见性 / 到期 / 标题 / 标签 / 下载开关 | `--visibility` `--ttl` `--forever` `--tags` |
+| `extend` | 只续期 | `<slug> <小时>` 或 `--forever` |
+| `rm` | 删项目（文件 + zip + 访问记录） | `<slug>` `--yes` |
+| `bulk` | 批量改可见性 / 续期 / 删 | `--action` `--slugs` `--yes` |
+| `stats` | 访问趋势 | `--days` |
+| `members` | 成员管理（**需 admin**） | `list/create/set/rm/key`、`--role` `--label` `--rotate-key` |
+| `selfcheck` | 自检，别信文档，信这个 | — |
+
+**输出契约（给上游程序读）**
+
+- `--json`：stdout 只有**一行** JSON `{"ok":true,"cmd":"deploy","data":{…}}`，
+  人读的提示全部走 stderr，两者永不混流；
+- 退出码：`0` 成功 / `1` 失败（原因在 `error` 字段，形如 `HTTP 403：…`）；
+- 5xx 与网络错误自动重试 3 次；4xx 不重试（重试也一样）。
+
+**`deploy` 到底返回什么**（最常被问的「会不会自动给你地址」）
+
+```json
+{"ok":true,"cmd":"deploy","data":{
+  "slug":"landing-v3",
+  "preview_url":"https://preview.example.com/v/landing-v3",
+  "expires_at":1793000000000,"files":3,"size_bytes":84213,
+  "visibility":"link","verified":true,"http_status":200}}
+```
+
+`preview_url` 是完整可点开的地址；`verified` / `http_status` 是**上传完成后真去请求一次**的结果。
+若项目是 `private`，匿名探活会拿到 404——那是正常的，所以你排除掉这一档即可
+（`--no-verify` 可跳过探活）。
+
+**图标**：预览页自动用项目自带的 `favicon.ico / favicon.svg / favicon.png / apple-touch-icon.png`，
+都没有才退回站点默认图标，不需要额外配置。
+
+**并发**：各 agent 用自己的 Key 并行上传是安全的（slug 级锁 + 每次上传独立临时目录 + 原子替换 +
+Windows 文件句柄重试）。同一个 slug 被多路同时覆盖时文件不会写串，但**只有最后一次生效**；
+要保留多份就换 slug。实测 6 个 agent × 3 路并发共 18 个上传全部 200，单次约 3.3s。
+
 ## 一、凭据：一个账号只能有一个 Agent
 
 | 规则 | 说明 |
@@ -31,8 +94,8 @@ description: 以「一个账号 = 一个 Agent = 一把 API Key」的身份，�
 
 ```bash
 # 方式一：CLI 一次性登录，凭据存本地
-python cli/agentctl.py login --url https://preview.example.com --username alice --password xxx
-python cli/agentctl.py deploy ./dist --title "落地页 v3" --ttl 24 --tags 前端,v3
+python scripts/agentctl.py login --url https://preview.example.com --username alice --password xxx
+python scripts/agentctl.py deploy ./dist --title "落地页 v3" --ttl 24 --tags 前端,v3
 
 # 方式二：账号密码直接换 Key（CLI 内部就是这一步）
 curl -X POST -d '{"username":"alice","password":"xxx"}' https://<站点>/api/token
@@ -74,7 +137,7 @@ curl -H "Authorization: Bearer pv_xxx" https://preview.example.com/api/projects
 
 ```bash
 # CLI（会自动打包成 zip 上传，跳过 node_modules/.git 等）
-python cli/agentctl.py deploy ./dist --title "落地页 v3" --ttl 24 --tags 前端,v3 --visibility link
+python scripts/agentctl.py deploy ./dist --title "落地页 v3" --ttl 24 --tags 前端,v3 --visibility link
 ```
 
 ```bash

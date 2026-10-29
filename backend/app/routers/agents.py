@@ -144,12 +144,14 @@ def delete_agent(agent_id: int, user: dict = Depends(admin_user)):
         if not row:
             raise HTTPException(status_code=404, detail="成员不存在")
         projects = conn.execute("SELECT slug FROM projects WHERE owner_id=?", (agent_id,)).fetchall()
+    leftover = 0
     for p in projects:
-        remove_project_files(p["slug"])
+        if not remove_project_files(p["slug"]):
+            leftover += 1  # 文件被占用时记录先删，残留目录交给孤儿清理
     with db() as conn:
         conn.execute("DELETE FROM users WHERE id=?", (agent_id,))
     log_event("agent_delete", user["id"], None, row["username"])
-    return {"ok": True, "removed_projects": len(projects)}
+    return {"ok": True, "removed_projects": len(projects), "leftover_dirs": leftover}
 
 
 @router.get("/{agent_id}/key")

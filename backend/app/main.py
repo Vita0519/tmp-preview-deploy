@@ -7,7 +7,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import cleanup, config, views
+from . import cleanup, config, storage, views
 from .db import init_db
 from .routers import agents, auth, projects, public, settings
 from .security import bootstrap_admin
@@ -19,6 +19,9 @@ STOP = asyncio.Event()
 async def lifespan(app: FastAPI):
     init_db()
     bootstrap_admin()
+    stale = storage.cleanup_stale_tmp()
+    if stale:
+        print(f"[boot] 清理上次残留的临时目录 {stale} 个", flush=True)
     stop = asyncio.Event()
     tasks = [
         asyncio.create_task(cleanup.flush_loop(stop)),

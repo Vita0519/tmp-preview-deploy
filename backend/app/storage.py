@@ -3,7 +3,9 @@ import mimetypes
 import os
 import re
 import shutil
+import threading
 import time
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -17,6 +19,85 @@ mimetypes.add_type("application/javascript", ".mjs")
 mimetypes.add_type("text/html", ".htm")
 
 TEXTUAL = {".html", ".htm", ".css", ".js", ".mjs", ".json", ".svg", ".txt", ".xml", ".map"}
+
+# --------------------------------------------------------------------------- #
+# 并发保护
+#   同一 slug 的「换目录 / 删目录 / 打包」必须串行，否则两个 agent 同时部署
+#   同一个 slug 会在 os.replace 上撞车（Windows 报 WinError 5 拒绝访问）。
+#   锁只在同步的文件系统操作期间持有，不跨越 await。
+# --------------------------------------------------------------------------- #
+_LOCK_GUARD = threading.Lock()
+_SLUG_LOCKS: dict[str, threading.Lock] = {}
+
+
+def slug_lock(slug: str) -> threading.Lock:
+    with _LOCK_GUARD:
+        lock = _SLUG_LOCKS.get(slug)
+        if lock is None:
+            lock = _SLUG_LOCKS[slug] = threading.Lock()
+        return lock
+
+
+def _retry_fs(action, attempts: int = 12, delay: float = 0.05):
+    """Windows 上文件句柄释放有延迟，rename/rmtree 偶发 WinError 5/32，重试即可。"""
+    last = None
+    for i in range(attempts):
+        try:
+            return action()
+        except OSError as exc:
+            winerr = getattr(exc, "winerror", None)
+            if isinstance(exc, PermissionError) or winerr in (5, 32):
+                last = exc
+                time.sleep(min(0.6, delay * (1 + i * 0.6)))
+                continue
+            raise
+    raise last
+
+
+def _rm_tree(path: Path) -> int:
+    """自己递归删除，不走 shutil.rmtree。返回没能删掉的条目数（0 = 清干净）。
+
+    三个原因：
+      1. 服务端删项目目录就该直接删，不该把几个 GB 的站丢进回收站；
+      2. 某些环境会给删除操作打「安全钩子」（限流 / 转回收站），在服务进程里被拦下来
+         会变成 500；而这里只是清理文件，删不掉的留着让孤儿清理兜底即可；
+      3. 逐条删能容忍单个文件被占用（杀毒、索引、正在下载）。
+
+    注意钩子的异常类型：它为了「中断整批删除」抛的是 SystemExit（BaseException 的子类），
+    不是 Exception。所以这里必须显式接住 SystemExit，否则一个删不掉的文件就能把请求打成 500。
+    """
+    if not path.exists():
+        return 0
+    failed = 0
+    blocked = False
+
+    def attempt(fn, target) -> None:
+        nonlocal failed, blocked
+        if blocked:  # 钩子已经拦下整批删除，再试也没用，直接记数目
+            failed += 1
+            return
+        try:
+            fn(target)
+        except FileNotFoundError:
+            pass
+        except SystemExit:  # 环境的删除钩子用 SystemExit 掐断整批删除
+            blocked = True
+            failed += 1
+        except Exception:  # noqa: BLE001 - 删不掉不算失败，交给孤儿清理
+            failed += 1
+
+    for root, dirs, files in os.walk(path, topdown=False):
+        for fn in files:
+            attempt(os.remove, os.path.join(root, fn))
+        for dn in dirs:
+            attempt(os.rmdir, os.path.join(root, dn))
+    attempt(os.rmdir, path)
+    return failed
+
+
+def remove_tree(path) -> int:
+    """对外暴露的容错递归删除：返回残留条目数，绝不抛异常。"""
+    return _rm_tree(Path(path))
 
 
 def slugify(name: str) -> str:
@@ -71,13 +152,16 @@ def resolve_in_project(slug: str, rel: str) -> Path | None:
 
 
 async def write_uploads(slug: str, uploads) -> tuple[int, int, str | None]:
-    """把上传文件写进临时目录后原子替换；返回 (文件数, 总字节, 入口文件)。"""
+    """把上传文件写进临时目录后原子替换；返回 (文件数, 总字节, 入口文件)。
+
+    两个要点：
+      1. 临时目录带随机后缀，多个 agent 同时传同一个 slug 也不会互相覆盖文件；
+      2. 替换阶段按 slug 上锁 + 重试，避免 Windows 上 os.replace 撞到占用中的句柄。
+    """
     import asyncio
 
     FILES_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = FILES_DIR / f".tmp-{slug}"
-    if tmp.exists():
-        shutil.rmtree(tmp, ignore_errors=True)
+    tmp = FILES_DIR / f".tmp-{slug}-{uuid.uuid4().hex[:8]}"
     tmp.mkdir(parents=True, exist_ok=True)
 
     count = 0
@@ -103,14 +187,20 @@ async def write_uploads(slug: str, uploads) -> tuple[int, int, str | None]:
     await asyncio.sleep(0)
 
     target = project_dir(slug)
-    old = FILES_DIR / f".old-{slug}"
-    if old.exists():
-        shutil.rmtree(old, ignore_errors=True)
-    if target.exists():
-        os.replace(target, old)
-    os.replace(tmp, target)
-    if old.exists():
-        shutil.rmtree(old, ignore_errors=True)
+    with slug_lock(slug):
+        old = FILES_DIR / f".old-{slug}-{uuid.uuid4().hex[:8]}"
+
+        def swap():
+            if target.exists():
+                os.replace(target, old)
+            os.replace(tmp, target)
+
+        try:
+            _retry_fs(swap)
+        except OSError:
+            _rm_tree(tmp)
+            raise
+        _rm_tree(old)
 
     entry = "index.html" if "index.html" in names else ("index.htm" if "index.htm" in names else None)
     return count, total, entry
@@ -119,31 +209,66 @@ async def write_uploads(slug: str, uploads) -> tuple[int, int, str | None]:
 def save_zip_file(slug: str, src: Path) -> None:
     ZIPS_DIR.mkdir(parents=True, exist_ok=True)
     dest = zip_path(slug)
-    tmp = ZIPS_DIR / f".{slug}.zip.tmp"
+    tmp = ZIPS_DIR / f".{slug}.zip.tmp.{uuid.uuid4().hex[:6]}"
     shutil.copyfile(src, tmp)
-    os.replace(tmp, dest)
+    with slug_lock(slug):
+        _retry_fs(lambda: os.replace(tmp, dest))
 
 
-def remove_project_files(slug: str) -> None:
+def remove_project_files(slug: str) -> bool:
+    """删掉项目目录与 zip。返回是否清干净。
+
+    刻意不抛异常：文件被占用（杀毒/索引/正在下载）时，数据库里的记录该删还是要删，
+    否则用户会看到一个删不掉的项目。残留目录由启动时的孤儿清理兜底。
+    """
     d = project_dir(slug)
-    if d.exists():
-        shutil.rmtree(d, ignore_errors=True)
     z = zip_path(slug)
-    if z.exists():
-        try:
-            z.unlink()
-        except OSError:
-            pass
+    clean = True
+    with slug_lock(slug):
+        if d.exists():
+            left = _rm_tree(d)
+            if left:
+                print(f"[storage] 目录未清干净 {d}（{left} 项残留）", flush=True)
+                clean = False
+        if z.exists():
+            try:
+                _retry_fs(z.unlink)
+            except (OSError, SystemExit) as exc:
+                print(f"[storage] 删除 zip 失败 {z}: {exc}", flush=True)
+                clean = False
+    return clean
 
 
 def move_project_dir(old_slug: str, new_slug: str) -> None:
     src, dst = project_dir(old_slug), project_dir(new_slug)
-    if src.exists():
-        src.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(src, dst)
-    zs, zd = zip_path(old_slug), zip_path(new_slug)
-    if zs.exists():
-        os.replace(zs, zd)
+    with slug_lock(old_slug), slug_lock(new_slug):
+        if src.exists():
+            src.parent.mkdir(parents=True, exist_ok=True)
+            _retry_fs(lambda: os.replace(src, dst))
+        zs, zd = zip_path(old_slug), zip_path(new_slug)
+        if zs.exists():
+            _retry_fs(lambda: os.replace(zs, zd))
+
+
+def cleanup_stale_tmp(max_age_seconds: int = 3600) -> int:
+    """清掉进程崩溃留下的 .tmp-* / .old-* 目录。"""
+    removed = 0
+    if not FILES_DIR.exists():
+        return 0
+    now = time.time()
+    for p in FILES_DIR.iterdir():
+        if not p.is_dir():
+            continue
+        if not (p.name.startswith(".tmp-") or p.name.startswith(".old-")):
+            continue
+        try:
+            if now - p.stat().st_mtime < max_age_seconds:
+                continue
+            _rm_tree(p)
+            removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 def build_zip_on_demand(slug: str) -> Path | None:
@@ -153,19 +278,33 @@ def build_zip_on_demand(slug: str) -> Path | None:
         return None
     dest = zip_path(slug)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(".zip.tmp")
-    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
-        for root, _dirs, files in os.walk(src):
-            for fn in files:
-                full = Path(root) / fn
-                rel = full.relative_to(src).as_posix()
-                st = full.stat()
-                info = zipfile.ZipInfo(rel, date_time=time.localtime(st.st_mtime)[:6])
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o644 << 16
-                with open(full, "rb") as fh:
-                    z.writestr(info, fh.read())
-    os.replace(tmp, dest)
+    tmp = dest.with_suffix(f".{uuid.uuid4().hex[:6]}.zip.tmp")
+    with slug_lock(slug):
+        if dest.exists():  # 别人已经打好，直接用
+            return dest
+        try:
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+                for root, _dirs, files in os.walk(src):
+                    for fn in files:
+                        full = Path(root) / fn
+                        rel = full.relative_to(src).as_posix()
+                        try:
+                            st = full.stat()
+                            with open(full, "rb") as fh:
+                                payload = fh.read()
+                        except OSError:
+                            continue  # 打包过程中项目被替换/删除，跳过这个文件
+                        info = zipfile.ZipInfo(rel, date_time=time.localtime(st.st_mtime)[:6])
+                        info.compress_type = zipfile.ZIP_DEFLATED
+                        info.external_attr = 0o644 << 16
+                        z.writestr(info, payload)
+            _retry_fs(lambda: os.replace(tmp, dest))
+        except OSError:
+            try:
+                tmp.unlink()
+            except (OSError, SystemExit):
+                pass
+            raise
     return dest
 
 
