@@ -45,6 +45,36 @@ def default_expire_action() -> str:
     return v if v in EXPIRE_ACTIONS else "block"
 
 
+def title_conflict(conn, owner_id: int, title: str, exclude_id: int | None = None):
+    """同一成员名下不允许重名（忽略大小写与首尾空格）。
+
+    返回冲突的那一行（不存在则 None）。历史上已经重名的老数据不追改，
+    只在「新建 / 改名」时拦截——否则一次升级就会让老项目动弹不得。
+    """
+    key = (title or "").strip()
+    if not key or not owner_id:
+        return None
+    sql = (
+        "SELECT id, slug, title FROM projects "
+        "WHERE owner_id=? AND lower(trim(title))=lower(?)"
+    )
+    args: list = [owner_id, key]
+    if exclude_id:
+        sql += " AND id<>?"
+        args.append(exclude_id)
+    return conn.execute(sql + " LIMIT 1", args).fetchone()
+
+
+def _raise_title_conflict(dup, title: str) -> None:
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            f"项目名「{title.strip()}」已被你的其它项目占用（{dup['slug']}）。"
+            f"换个名字，或者直接用那个 slug 覆盖更新。"
+        ),
+    )
+
+
 def _scope_clause(user: dict) -> tuple[str, list]:
     if user["role"] == "admin":
         return "1=1", []
@@ -348,6 +378,12 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
     if existing:
         owner_id = existing["owner_id"] or owner_id
 
+    # 同一成员名下不允许重名；覆盖更新自己这个 slug 时不算冲突
+    with db() as conn:
+        dup = title_conflict(conn, owner_id, title, existing["id"] if existing else None)
+    if dup:
+        _raise_title_conflict(dup, title)
+
     kind = "static" if files else "zip"
     file_count = 0
     total = 0
@@ -450,6 +486,9 @@ async def create_link(request: Request, user: dict = Depends(current_user)):
     with tx() as conn:
         if conn.execute("SELECT 1 FROM projects WHERE slug=?", (slug,)).fetchone():
             raise HTTPException(status_code=409, detail="slug 已存在")
+        dup = title_conflict(conn, user["id"], title)
+        if dup:
+            _raise_title_conflict(dup, title)
         cur = conn.execute(
             "INSERT INTO projects(slug, title, description, owner_id, kind, link_url, visibility, "
             "expire_action, expires_at, status, created_at, updated_at) VALUES(?,?,?,?,'link',?,?,?,?,'active',?,?)",
@@ -473,8 +512,14 @@ async def patch_project(slug: str, request: Request, user: dict = Depends(curren
     tags = None
 
     if "title" in body:
+        new_title = str(body["title"]).strip()[:200] or row["title"]
+        if new_title != row["title"]:
+            with db() as conn:
+                dup = title_conflict(conn, row["owner_id"], new_title, row["id"])
+            if dup:
+                _raise_title_conflict(dup, new_title)
         sets.append("title=?")
-        args.append(str(body["title"]).strip()[:200] or row["title"])
+        args.append(new_title)
     if "description" in body:
         sets.append("description=?")
         args.append(str(body["description"])[:1000])

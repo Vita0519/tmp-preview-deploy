@@ -25,9 +25,11 @@
 - **Agent 侧真能动手**：`cli/agentctl.py` 是可执行的单文件客户端（`login / whoami / health / deploy / link / ls / show / set / extend / rm / bulk / stats / members / selfcheck`），部署完自动探活，直接告诉你「预览地址 + HTTP 200」；`--json` 时 stdout 只有一行 JSON，好接上游程序。
 - **并发安全**：多个 agent 同时上传、同一 slug 被 6 路同时覆盖、混合读写都不会写串也不会 500——slug 级锁 + 每次上传独立临时目录 + 原子替换 + Windows 文件句柄重试。删除时若文件被占用，记录照样删掉，残留目录交给孤儿清理收尾。
 - **站点图标**：预览页优先用项目自带的 `favicon.ico / favicon.svg / favicon.png / apple-touch-icon.png`，没有才退回站点默认图标，标签页不会一水的空白页。
+- **项目名不重名**：同一个成员名下不允许两个同名项目（忽略大小写与首尾空格），新建、登记外链、改名三条路径都会拦，撞上返回 409 并点名占用的 slug。覆盖更新同一个 slug 不算冲突，跨成员同名互不影响。
 - **到期自动化**：到期后可选「停止访问保留文件」或「连同文件删除」，后台每 60s 巡检；站点级可设默认策略。
 - **访客门户** `/portal`：标题＋筛选区整体吸顶（滚动时标签以上不动），提供卡片/列表两种视图（记在本地），卡片右上角圆环显示访问量、底部是实时倒计时与进度条；支持按类型/标签/关键词筛选，按创建、到期、访问、名称排序。每张卡片（含列表行）右上角有**快捷复制**按钮，一点即复制完整直链，按钮自分绿打勾并冒出「已复制」气泡，1.6 秒后自动复原。
-- **作者名片**：设置里填显示名、一句话介绍和几个链接（GitHub / 邮箱 / 抖音 / 博客 / X / B站 / 知乎 / RSS / 自定义），门户顶部就多出一条作者名片，图标 + 标签，移动端自动收成图标。
+- **作者名片**：设置里填显示名、一句话介绍和几个链接（GitHub / 邮箱 / 抖音 / 博客 / X / B站 / 知乎 / RSS / 自定义），门户顶部就多出一条作者名片，图标 + 标签，移动端自动收成图标。出厂默认显示名 `vita`、介绍「互联网混子」，**不含任何真实个人信息**；改 `.env` 的 `AUTHOR_NAME` / `AUTHOR_BIO` 或直接在设置页改。
+- **站点图标**：一枚「沙漏」标记（限时可用 = 临时预览），SVG + ICO + PNG 全尺寸齐全，门户、控制台、访客预览栏、错误页统一使用；项目自带的 favicon 仍然优先。位图由 `tools/gen_icons.py` 从同一份 SVG 生成。
 - **访问统计**：只统计项目首页文档访问，内存累加 + 3s 批量落库（不牺牲响应速度），带 14 天趋势。
 - **管理台**：按成员 / 类型 / 可见性 / 状态 / 标签筛选，按访问、创建、更新、到期、体积排序，表格直接展示可见性列，抽屉里一键续期、改标签、开关下载。
 - **轻**：前端 gzip 后约 65KB；后端只依赖 fastapi / uvicorn / python-multipart，无 ORM、无 Redis。
@@ -126,9 +128,11 @@ backend/app/
   pages.py           访客预览外壳 / 门户 / 错误页（服务端渲染）
   routers/           auth · projects · agents · settings · public
 frontend/src/        Vue 3 控制台（零 UI 框架，手写设计系统）
+frontend/public/     站点图标与 manifest（favicon.svg 是唯一矢量源）
 cli/agentctl.py      成员侧命令行入口（兼容壳，实现见下）
 skills/tmp-preview-agent/  Agent 侧技能包：scripts/agentctl.py 是真实实现（单文件、仅标准库）+ SKILL.md 权限边界
 migrate/             Cloudflare KV → 本地
+tools/               gen_icons.py（从 favicon.svg 生成 ICO/PNG）、push_api.py（推 GitHub）
 tests/               冒烟测试 / 截图脚本 / 演示数据
 legacy/cloudflare/   旧版 Worker 实现（仅存档，不再维护）
 docs/                架构、接口、可见性、迁移说明
@@ -161,6 +165,7 @@ python tests/check_visibility.py --url http://127.0.0.1:8000   # 41 项：三档
 python tests/check_cli.py        --url http://127.0.0.1:8000   # 57 项：CLI 真子进程跑一遍所有命令与越权
 python tests/check_concurrency.py --url http://127.0.0.1:8000 # 20 项：6 agent 并发部署 / 同 slug 抢占 / 混合读写
 python tests/check_copy.py       --url http://127.0.0.1:8000   # 26 项：复制按钮的层级、剪贴板内容、移动端、无溢出
+python tests/check_title.py      --url http://127.0.0.1:8000   # 22 项：同一成员重名拦截（新建/外链/改名/跨成员）
 ```
 
 ## 安全约定

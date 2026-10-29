@@ -255,10 +255,12 @@ async function submitLink() {
           <div class="frow">
             <label>名称</label>
             <input v-model="form.title" class="input" placeholder="用于列表展示，可中文" />
+            <span class="hint">同名不能重复，同名会提示改名</span>
           </div>
           <div class="frow">
             <label>Slug</label>
             <input v-model="form.slug" class="input" placeholder="留空自动生成" />
+            <span class="hint">同一个 slug 再传一次 = 覆盖更新</span>
           </div>
         </div>
 

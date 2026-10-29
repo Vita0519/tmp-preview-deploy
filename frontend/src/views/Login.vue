@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { store, toast } from '../store'
+import BrandMark from '../components/BrandMark.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -39,7 +40,7 @@ onMounted(() => pwInput.value?.focus())
   <div class="login-wrap">
     <div class="login-card">
       <div class="brand">
-        <div class="brand-mark">P</div>
+        <BrandMark :size="30" />
         <div class="brand-text">
           <b>{{ store.siteTitle }}</b>
           <span>临时预览 · 控制台</span>

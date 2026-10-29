@@ -38,6 +38,10 @@ ZIPS_DIR = DATA_DIR / "zips"
 SITE_TITLE = _env("SITE_TITLE", "临时预览站")
 SITE_SUBTITLE = _env("SITE_SUBTITLE", "到期自动回收 · 多 Agent 共享")
 
+# 门户顶部「作者名片」的初始值。刻意用中性占位身份，不写任何真实姓名/联系方式。
+AUTHOR_NAME = _env("AUTHOR_NAME", "vita")
+AUTHOR_BIO = _env("AUTHOR_BIO", "互联网混子")
+
 DEFAULT_TTL_HOURS = _float("DEFAULT_TTL_HOURS", 24)
 
 # 按可见性区分的默认存活时长（小时，0 = 永久）。未单独配置时回落到 DEFAULT_TTL_HOURS。

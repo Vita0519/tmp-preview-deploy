@@ -11,6 +11,8 @@ services:
     environment:
       SITE_TITLE: ${SITE_TITLE:-临时预览站}
       SITE_SUBTITLE: ${SITE_SUBTITLE:-到期自动回收 · 多 Agent 共享}
+      AUTHOR_NAME: ${AUTHOR_NAME:-vita}
+      AUTHOR_BIO: ${AUTHOR_BIO:-互联网混子}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       DEFAULT_TTL_HOURS: ${DEFAULT_TTL_HOURS:-24}

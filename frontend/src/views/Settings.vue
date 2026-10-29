@@ -201,11 +201,13 @@ onMounted(load)
           <div class="frow two">
             <div class="frow">
               <label>显示名</label>
-              <input v-model="form.author.name" class="input" placeholder="例如：Vita0519" maxlength="40" />
+              <input v-model="form.author.name" class="input" placeholder="vita" maxlength="40" />
+              <span class="hint">默认 vita；不用写真实姓名</span>
             </div>
             <div class="frow">
               <label>一句话介绍</label>
-              <input v-model="form.author.bio" class="input" placeholder="例如：做点顺手的小工具" maxlength="120" />
+              <input v-model="form.author.bio" class="input" placeholder="互联网混子" maxlength="120" />
+              <span class="hint">默认「互联网混子」，随时可改</span>
             </div>
           </div>
 

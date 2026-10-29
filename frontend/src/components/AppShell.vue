@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { store, toast } from '../store'
 import { api } from '../api'
 import Icon from './Icon.vue'
+import BrandMark from './BrandMark.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,7 +44,7 @@ function closeNav() {
     <div v-if="store.mobileNav" class="navscrim" @click="store.mobileNav = false" />
     <aside class="sidebar" :class="{ open: store.mobileNav }">
       <div class="brand">
-        <div class="brand-mark">P</div>
+        <BrandMark :size="30" />
         <div class="brand-text">
           <b>{{ store.siteTitle }}</b>
           <span>临时预览 · 控制台</span>
