@@ -1,0 +1,60 @@
+"""后台任务：访问计数批量落库 + 到期清理。"""
+import asyncio
+import time
+
+from . import storage, views
+from .db import db, log_event
+
+TICK_FLUSH = 3.0
+TICK_SWEEP = 60.0
+
+
+def sweep() -> dict:
+    now = int(time.time() * 1000)
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, slug, expire_action FROM projects "
+            "WHERE status='active' AND expires_at IS NOT NULL AND expires_at<=?",
+            (now,),
+        ).fetchall()
+    blocked, purged = 0, 0
+    for r in rows:
+        if r["expire_action"] == "delete":
+            storage.remove_project_files(r["slug"])
+            views.reset(r["id"])
+            with db() as conn:
+                conn.execute("DELETE FROM projects WHERE id=?", (r["id"],))
+            log_event("expire_delete", None, r["id"], r["slug"])
+            purged += 1
+        else:
+            with db() as conn:
+                conn.execute("UPDATE projects SET status='expired' WHERE id=?", (r["id"],))
+            log_event("expire_block", None, r["id"], r["slug"])
+            blocked += 1
+    return {"blocked": blocked, "purged": purged}
+
+
+async def flush_loop(stop: asyncio.Event) -> None:
+    while not stop.is_set():
+        try:
+            views.flush()
+        except Exception as exc:  # 计数失败不影响主流程
+            print(f"[views] flush failed: {exc}", flush=True)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=TICK_FLUSH)
+        except asyncio.TimeoutError:
+            continue
+
+
+async def sweep_loop(stop: asyncio.Event) -> None:
+    while not stop.is_set():
+        try:
+            r = sweep()
+            if r["blocked"] or r["purged"]:
+                print(f"[expire] blocked={r['blocked']} purged={r['purged']}", flush=True)
+        except Exception as exc:
+            print(f"[expire] sweep failed: {exc}", flush=True)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=TICK_SWEEP)
+        except asyncio.TimeoutError:
+            continue

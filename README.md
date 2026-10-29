@@ -1,49 +1,129 @@
-# tmp-preview-deploy
+# tmp-preview · 临时预览站（自托管版）
 
-把一个本地项目目录（HTML / JS / 静态站 / WebGL 作品等）**一键部署成临时预览 + 下载站**：带实时倒计时、默认 24 小时到期自动清理、管理员可随时改存活时长。
+把任意本地目录（静态站 / HTML 单页 / WebGL 作品 / 构建产物）**一键变成带到期时间的预览链接**：
+默认 24 小时后自动回收，多成员共享同一套服务，管理员能看到全部项目。
 
-整套跑在 **Cloudflare Workers + KV** 上——一个 Worker + 一个 KV 命名空间，无需服务器、无需证书、无需绑卡开通 R2。
-
-## 能干什么
-
-- **门户首页**：项目卡片列表（整张卡片可点击），每秒刷新的实时倒计时（前端按服务端时间校准）
-- **门户密码**：根路径需密码（复用 `ADMIN_TOKEN`，与 `/admin` 同一套 Cookie，登录一次通用）；子页面 `/<slug>/` 免密直连
-- **项目本体**：`/<slug>/` 直接访问（HTML / JS / 图片 / 模型文件都行）
-- **打包下载**：`/download/<slug>` 下载 zip，**默认关闭**，需管理员显式开启
-- **到期策略**：默认 24 小时，可设具体小时或永久；到期行为可选 `block`（停访问保留文件）或 `delete`（删项目及文件），cron `*/10 * * * *` 执行
-- **访问计数**：只统计项目首页 HTML 访问，采用抽样写入 + 每 10 分钟批量落库，规避 KV 免费额度 1000 写/天 的限制
-
-## 目录结构
+从 Cloudflare Workers + KV 迁移而来（旧实现保留在 [`legacy/cloudflare/`](legacy/cloudflare/)），
+现在跑在自己的机器上：**FastAPI + SQLite + 本地磁盘 + Vue 3**，一个容器，`docker compose up` 即用。
 
 ```
-SKILL.md                     技能说明（完整使用手册）
-assets/
-  worker.js                  Worker 主程序（门户 / 子页面 / 上传 / 下载 / cron 清理）
-  admin.js                   管理页前端
-  wrangler.toml.tpl          wrangler 配置模板
-references/
-  architecture.md            架构设计说明
-  cloudflare-token.md        Cloudflare API Token 权限清单
-scripts/
-  setup.sh                   首次搭建（建 KV、写配置、部署）
-  deploy.py                  部署 / 新建项目到预览站
-  admin.py                   管理已有项目（改时长、开关下载、查剩余）
-  cf_deploy.py               底层 Cloudflare API 封装
+浏览器 ──┬── /v/<slug>          访客预览外壳（倒计时 + 下载）
+         ├── /p/<slug>/...      项目本体（原始文件直出，支持 SPA 回退）
+         ├── /download/<slug>   zip 下载（可选开放）
+         └── /                  控制台（Vue 3 SPA）
+                    │
+              FastAPI (uvicorn) ── SQLite(WAL) + /data 磁盘
 ```
+
+## 特性
+
+- **多 Agent 共享**：每个成员一把 API Key，上传的项目自带归属，互相看不到；管理员看全部。
+- **权限清晰**：管理员 / 成员两级；项目可见性分「门户可见 / 持链接可见 / 仅自己」。
+- **到期自动化**：到期后可选「停止访问保留文件」或「连同文件删除」，后台每 60s 巡检。
+- **访问统计**：只统计项目首页文档访问，内存累加 + 3s 批量落库（不牺牲响应速度），带 14 天趋势。
+- **管理台**：按成员 / 标签 / 类型 / 状态筛选，按访问、创建、更新、到期、体积排序，抽屉里一键续期、改标签、开关下载。
+- **轻**：前端 gzip 后约 65KB；后端只依赖 fastapi / uvicorn / python-multipart，无 ORM、无 Redis。
+- **迁移友好**：自带 Cloudflare KV → 本地的搬运脚本，保留原 slug、创建时间、到期时间与访问数。
 
 ## 快速开始
 
 ```bash
-export CLOUDFLARE_API_TOKEN=xxx
-export CLOUDFLARE_ACCOUNT_ID=xxx
-
-bash scripts/setup.sh                 # 首次：建 KV + 部署 Worker
-python scripts/deploy.py <目录>       # 部署一个新项目，默认 24 小时
-python scripts/admin.py list          # 查看现有项目与剩余时长
+cp .env.example .env           # 改 ADMIN_PASSWORD、SITE_TITLE、PORT
+docker compose up -d --build    # 首次构建约 1-2 分钟
+docker compose logs -f preview  # 若未指定密码，日志里会打印初始管理员密码
 ```
 
-详细参数与运维说明见 [SKILL.md](SKILL.md)，Token 权限见 [references/cloudflare-token.md](references/cloudflare-token.md)。
+打开 `http://<机器IP>:8080`，用 `.env` 里的 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录。
 
-## 安全提示
+> 没装 Docker？本地也能跑：
+> `python -m venv .venv && .venv/Scripts/pip install -r backend/requirements.txt`（Linux 用 `.venv/bin/pip`），
+> `cd frontend && npm i && npm run build`，然后
+> `DATA_DIR=./data .venv/Scripts/python -m uvicorn app.main:app --app-dir backend --port 8080`。
 
-`ADMIN_TOKEN`、`CLOUDFLARE_API_TOKEN` 等敏感值一律通过环境变量 / Worker secrets 注入，**不要**写进仓库。
+## 给成员（Agent）用
+
+```bash
+# 1) 登录一次，Key 存在 ~/.config/tmp-preview/config.json
+python cli/agentctl.py login --url http://<站点地址>:8080 --username alice --password xxx
+
+# 2) 部署一个目录（默认用服务端 TTL）
+python cli/agentctl.py deploy ./dist --title "落地页 v3" --tags "前端,v3" --ttl 24
+
+# 3) 日常
+python cli/agentctl.py ls
+python cli/agentctl.py extend landing-v3 48
+python cli/agentctl.py extend landing-v3 --forever
+python cli/agentctl.py tags landing-v3 前端,v3,已验收
+python cli/agentctl.py rm landing-v3
+```
+
+机器调用也可以直接走 API：
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/projects \
+  -H "Authorization: Bearer pv_xxx" \
+  -F "slug=demo" -F "title=演示" -F "tags=前端,验收" -F "hours=24" \
+  -F "files=@dist/index.html;filename=index.html" \
+  -F "files=@dist/assets/app.js;filename=assets/app.js"
+```
+
+## 从 Cloudflare 迁到本地
+
+```bash
+docker compose stop            # 先停服务，避免与后台任务抢写
+
+export CF_API_TOKEN=xxx        # 只需 Workers KV 读取权限
+export CF_ACCOUNT_ID=xxx
+export CF_KV_NAMESPACE_ID=xxx
+
+python migrate/from_cloudflare.py --dry-run   # 先看清单
+python migrate/from_cloudflare.py --agent admin
+docker compose start
+```
+
+迁移会保留：slug、标题、说明、文件内容、zip、创建/更新时间、到期时间、到期策略、访问次数。
+详见 [docs/migration.md](docs/migration.md)。
+
+## 目录结构
+
+```
+backend/app/
+  main.py            FastAPI 入口（API + 访客页 + SPA 托管）
+  config.py          全部配置走环境变量
+  db.py              SQLite schema / 连接 / 标签写入
+  security.py        PBKDF2 密码、会话 Cookie、API Key
+  storage.py         文件落盘、路径穿越校验、按需打包 zip
+  views.py           访问计数缓冲与批量落库
+  cleanup.py         到期巡检 + 计数 flush 后台任务
+  serializers.py     行 → API 结构（含倒计时派生字段）
+  pages.py           访客预览外壳 / 门户 / 错误页（服务端渲染）
+  routers/           auth · projects · agents · settings · public
+frontend/src/        Vue 3 控制台（零 UI 框架，手写设计系统）
+cli/agentctl.py      成员侧命令行（仅标准库）
+migrate/             Cloudflare KV → 本地
+tests/               冒烟测试 / 截图脚本 / 演示数据
+legacy/cloudflare/   旧版 Worker 实现（仅存档，不再维护）
+docs/                架构、接口、迁移说明
+```
+
+## 常用运维
+
+| 事项 | 做法 |
+|---|---|
+| 看日志 | `docker compose logs -f --tail=100 preview` |
+| 备份 | 停服后打包 `./data`（SQLite + 项目文件 + zip）；或热备 `sqlite3 data/db.sqlite3 ".backup backup.db"` |
+| 升级 | `git pull && docker compose up -d --build`（数据在 `./data`，不受影响） |
+| 改端口 | `.env` 里 `PORT=9000` |
+| 反向代理 | 交给 Nginx/Caddy 终止 TLS，转发到 `127.0.0.1:8080`，并把 `COOKIE_SECURE=1` |
+| 单进程 | 计数与清理是进程内任务，**保持 1 个 worker**；要横向扩展需改用外置计数/锁 |
+
+## 安全约定
+
+- 密钥只在 `.env` 与环境变量里，不写入仓库；
+- 项目文件路径全部做穿越校验，只有 `data/projects/<slug>/` 下的文件可读；
+- 上传/管理接口都要认证，成员只能操作自己的项目；
+- 访客页与项目响应均带 `X-Robots-Tag: noindex, nofollow`。
+
+## 接口
+
+完整列表见 [docs/api.md](docs/api.md)，架构与设计取舍见 [docs/architecture.md](docs/architecture.md)。

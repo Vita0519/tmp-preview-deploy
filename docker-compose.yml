@@ -1,0 +1,35 @@
+services:
+  preview:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tmp-preview:2.0
+    container_name: tmp-preview
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8000"
+    environment:
+      SITE_TITLE: ${SITE_TITLE:-临时预览站}
+      SITE_SUBTITLE: ${SITE_SUBTITLE:-到期自动回收 · 多 Agent 共享}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DEFAULT_TTL_HOURS: ${DEFAULT_TTL_HOURS:-24}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-1024}
+      PUBLIC_PORTAL: ${PUBLIC_PORTAL:-0}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+      SESSION_DAYS: ${SESSION_DAYS:-7}
+      TZ: ${TZ:-Asia/Shanghai}
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

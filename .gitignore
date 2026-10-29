@@ -4,17 +4,27 @@ __pycache__/
 .venv/
 venv/
 
+# Node / 前端构建产物
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# 本地环境与密钥
+.env
+.env.*
+!.env.example
+*.local
+.secrets/
+
+# 运行数据（项目文件、SQLite、zip）
+/data/
+/.testdata/
+
 # 临时/备份文件
 *.bak
 *.bak-*
 *.tmp
 *.log
-
-# 本地环境与密钥
-.env
-.env.*
-*.local
-.secrets/
 
 # 编辑器/系统
 .DS_Store
@@ -22,12 +32,14 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Cloudflare / 部署产物
+# WorkBuddy 本地数据
+.workbuddy/
+
+# 旧版 Cloudflare 部署工具产物
 .wrangler/
 .wrangler.toml
-dist/
-build/
 
-# 本次推送用的临时脚本
+# 推送/截图临时脚本产物
 /.ghpush/
 /.push_via_api.py
+/tests/shots/

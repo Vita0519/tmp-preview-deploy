@@ -1,0 +1,356 @@
+<script setup>
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { api, qs } from '../api'
+import { confirmAction, store, toast } from '../store'
+import { fmtNum } from '../format'
+import Icon from '../components/Icon.vue'
+import StatStrip from '../components/StatStrip.vue'
+import ProjectTable from '../components/ProjectTable.vue'
+import ProjectDrawer from '../components/ProjectDrawer.vue'
+import UploadDialog from '../components/UploadDialog.vue'
+
+const data = reactive({
+  items: [],
+  total: 0,
+  stats: {},
+  facets: { agents: [], tags: [], kinds: {} },
+  server_now: 0,
+})
+const trend = ref([])
+const filters = reactive({
+  q: '',
+  agent: '',
+  kind: '',
+  status: 'online',
+  tags: [],
+  sort: 'updated_at',
+  order: 'desc',
+})
+const page = ref(1)
+const size = ref(50)
+const loading = ref(false)
+const err = ref('')
+const selected = ref([])
+const openSlug = ref('')
+const uploadOpen = ref(false)
+const now = ref(Date.now())
+let offset = 0
+let qTimer = null
+let refreshTimer = null
+let tickTimer = null
+
+const isAdmin = computed(() => store.user?.role === 'admin')
+const totalPages = computed(() => Math.max(1, Math.ceil(data.total / size.value)))
+const maxTagCount = computed(() =>
+  Math.max(...(data.facets.tags || []).map((t) => t.count), 1)
+)
+const tagsForBar = computed(() => (data.facets.tags || []).slice(0, 10))
+
+const saved = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('pv_filters') || '{}')
+  } catch {
+    return {}
+  }
+})()
+if (saved.status) filters.status = saved.status
+if (saved.sort) filters.sort = saved.sort
+if (saved.order) filters.order = saved.order
+if (saved.size) size.value = saved.size
+
+async function load(keepSelection = false) {
+  loading.value = true
+  err.value = ''
+  try {
+    const query = qs({
+      q: filters.q.trim(),
+      agent: filters.agent,
+      kind: filters.kind,
+      status: filters.status,
+      tag: filters.tags,
+      sort: filters.sort,
+      order: filters.order,
+      limit: size.value,
+      offset: (page.value - 1) * size.value,
+    })
+    const d = await api.get(`/api/projects?${query}`)
+    data.items = d.items
+    data.total = d.total
+    data.stats = d.stats
+    data.facets = d.facets
+    data.server_now = d.server_now
+    offset = d.server_now - Date.now()
+    if (!keepSelection) selected.value = []
+  } catch (e) {
+    if (e.status !== 401) err.value = e.message || '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadTrend() {
+  try {
+    const d = await api.get('/api/stats/trend?days=14')
+    trend.value = d.items
+  } catch {}
+}
+
+function scheduleLoad() {
+  clearTimeout(qTimer)
+  qTimer = setTimeout(() => {
+    page.value = 1
+    load()
+  }, 260)
+}
+
+watch(() => filters.q, scheduleLoad)
+watch(
+  () => [filters.agent, filters.kind, filters.status, filters.tags.join(','), filters.sort, filters.order, size.value],
+  () => {
+    if (page.value !== 1) page.value = 1
+    localStorage.setItem(
+      'pv_filters',
+      JSON.stringify({ status: filters.status, sort: filters.sort, order: filters.order, size: size.value })
+    )
+    load()
+  }
+)
+watch(page, () => load())
+
+function onSort(field) {
+  if (filters.sort === field) filters.order = filters.order === 'desc' ? 'asc' : 'desc'
+  else {
+    filters.sort = field
+    filters.order = 'desc'
+  }
+}
+
+function toggleTag(name) {
+  const i = filters.tags.indexOf(name)
+  if (i >= 0) filters.tags.splice(i, 1)
+  else filters.tags.push(name)
+}
+
+function resetFilters() {
+  filters.q = ''
+  filters.agent = ''
+  filters.kind = ''
+  filters.status = 'online'
+  filters.tags = []
+  filters.sort = 'updated_at'
+  filters.order = 'desc'
+  page.value = 1
+  load()
+}
+
+function toggleSelect(slug) {
+  const i = selected.value.indexOf(slug)
+  if (i >= 0) selected.value.splice(i, 1)
+  else selected.value.push(slug)
+}
+
+function toggleAll(on) {
+  selected.value = on ? data.items.map((i) => i.slug) : []
+}
+
+async function bulk(action, extra = {}) {
+  if (!selected.value.length) return
+  if (action === 'delete') {
+    const ok = await confirmAction({
+      title: `删除 ${selected.value.length} 个项目`,
+      message: '所选项目及其全部文件将被永久删除，链接立即失效。',
+      confirmText: '永久删除',
+      danger: true,
+    })
+    if (!ok) return
+  }
+  try {
+    const d = await api.post('/api/projects/bulk', { slugs: selected.value, action, ...extra })
+    toast(`已处理 ${d.done} 个项目`)
+    selected.value = []
+    load()
+    loadTrend()
+  } catch (e) {
+    toast(e.message || '操作失败', 'err')
+  }
+}
+
+function onCreated(d) {
+  load()
+  loadTrend()
+  if (d?.slug) openSlug.value = d.slug
+}
+
+function onAction({ type, item }) {
+  if (type === 'copied') toast(`已复制 ${item.slug} 的链接`)
+  if (type === 'copy-failed') toast('复制失败，请手动复制', 'err')
+}
+
+function onDrawerChanged() {
+  load(true)
+  loadTrend()
+}
+
+function tick() {
+  now.value = Date.now() + offset
+}
+
+onMounted(() => {
+  load()
+  loadTrend()
+  refreshTimer = setInterval(() => {
+    if (document.hidden) return
+    if (openSlug.value || uploadOpen.value) return
+    load(true)
+  }, 30000)
+  tickTimer = setInterval(tick, 1000)
+})
+
+onBeforeUnmount(() => {
+  clearInterval(refreshTimer)
+  clearInterval(tickTimer)
+  clearTimeout(qTimer)
+})
+</script>
+
+<template>
+  <header class="topbar">
+    <h1>项目</h1>
+    <span class="sub num">{{ fmtNum(data.total) }} 个</span>
+    <div class="grow" />
+    <div class="search">
+      <Icon name="search" :size="13" />
+      <input v-model="filters.q" class="field" placeholder="搜索名称 / slug / 说明" />
+    </div>
+    <button class="btn ghost icon" title="刷新" :disabled="loading" @click="load(true)">
+      <Icon name="refresh" :size="14" />
+    </button>
+    <button class="btn primary" @click="uploadOpen = true">
+      <Icon name="plus" :size="13" /> 新建项目
+    </button>
+  </header>
+
+  <div class="content">
+    <StatStrip :stats="data.stats" :trend="trend" />
+
+    <div class="toolbar">
+      <select v-if="isAdmin" v-model="filters.agent" class="field" style="min-width: 116px">
+        <option value="">全部成员</option>
+        <option v-for="a in data.facets.agents" :key="a.username" :value="a.username">
+          {{ a.display_name }} ({{ a.count }})
+        </option>
+      </select>
+
+      <div class="seg">
+        <button :class="{ on: filters.kind === '' }" @click="filters.kind = ''">全部类型</button>
+        <button :class="{ on: filters.kind === 'static' }" @click="filters.kind = 'static'">静态站</button>
+        <button :class="{ on: filters.kind === 'zip' }" @click="filters.kind = 'zip'">压缩包</button>
+        <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
+      </div>
+
+      <select v-model="filters.status" class="field" style="min-width: 104px">
+        <option value="online">仅在线</option>
+        <option value="expired">已到期</option>
+        <option value="permanent">永久项目</option>
+        <option value="all">全部状态</option>
+      </select>
+
+      <div class="grow" style="flex: 1" />
+
+      <select v-model="filters.sort" class="field" style="min-width: 116px">
+        <option value="updated_at">按更新时间</option>
+        <option value="created_at">按创建时间</option>
+        <option value="views">按访问次数</option>
+        <option value="expires_at">按到期时间</option>
+        <option value="size_bytes">按体积</option>
+      </select>
+      <button class="btn icon" :title="filters.order === 'desc' ? '降序' : '升序'" @click="filters.order = filters.order === 'desc' ? 'asc' : 'desc'">
+        {{ filters.order === 'desc' ? '↓' : '↑' }}
+      </button>
+      <select v-model.number="size" class="field" style="min-width: 86px">
+        <option :value="20">20 / 页</option>
+        <option :value="50">50 / 页</option>
+        <option :value="100">100 / 页</option>
+      </select>
+      <button v-if="filters.q || filters.tags.length || filters.agent || filters.kind" class="btn ghost sm" @click="resetFilters">
+        清除筛选
+      </button>
+    </div>
+
+    <div class="chipbar">
+      <button
+        v-for="t in tagsForBar"
+        :key="t.name"
+        class="chip"
+        :class="{ on: filters.tags.includes(t.name) }"
+        @click="toggleTag(t.name)"
+      >
+        {{ t.name }}<span class="n">{{ t.count }}</span>
+      </button>
+      <span v-if="!tagsForBar.length" class="dim" style="font-size: 11.5px; padding: 3px 0">
+        还没有标签 · 上传时或打开项目详情可添加
+      </span>
+      <span v-if="filters.tags.length" class="dim" style="font-size: 11.5px; padding: 3px 0; margin-left: auto">
+        已选 {{ filters.tags.length }} 个标签
+      </span>
+    </div>
+
+    <div v-if="err" class="panel" style="padding: 12px 14px; margin-bottom: 12px; color: var(--danger)">
+      {{ err }}
+      <button class="linkbtn" style="margin-left: 8px" @click="load()">重试</button>
+    </div>
+
+    <ProjectTable
+      :items="data.items"
+      :loading="loading"
+      :sort="filters.sort"
+      :order="filters.order"
+      :now="now"
+      :selected="selected"
+      @sort="onSort"
+      @open="(p) => (openSlug = p.slug)"
+      @toggle="toggleSelect"
+      @toggle-all="toggleAll"
+      @action="onAction"
+    />
+
+    <div
+      style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 0 2px"
+    >
+      <span class="dim" style="font-size: 12px">
+        共 {{ fmtNum(data.total) }} 条 · 第 {{ page }} / {{ totalPages }} 页
+        <span v-if="loading" style="margin-left: 6px">读取中…</span>
+      </span>
+      <div style="display: flex; gap: 6px">
+        <button class="btn sm" :disabled="page <= 1" @click="page--">上一页</button>
+        <button class="btn sm" :disabled="page >= totalPages" @click="page++">下一页</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="selected.length" class="bulkbar">
+    <span>已选 {{ selected.length }} 项</span>
+    <button class="btn sm" @click="bulk('extend', { hours: 24 })">+24 小时</button>
+    <button class="btn sm" @click="bulk('permanent')">设为永久</button>
+    <button class="btn sm" @click="bulk('allow_download')">开放下载</button>
+    <button class="btn sm danger" @click="bulk('delete')">删除</button>
+    <button class="btn sm" @click="selected = []">取消</button>
+  </div>
+
+  <ProjectDrawer
+    v-if="openSlug"
+    :key="openSlug"
+    :slug="openSlug"
+    :now="now"
+    @close="openSlug = ''"
+    @changed="onDrawerChanged"
+  />
+
+  <UploadDialog v-if="uploadOpen" @close="uploadOpen = false" @created="onCreated" />
+</template>
+
+<style scoped>
+@media (max-width: 900px) {
+  .search { max-width: 100%; flex: 1 1 140px; }
+}
+</style>
