@@ -22,6 +22,9 @@
 - **三种角色**：`viewer` 只能浏览访客门户、`publisher` 能上传并管理自己的项目、`admin` 管全部成员与设置；管理员在成员页直接下拉改角色，改完立即生效（不能改自己，也不会把最后一个管理员降级）。
 - **权限清晰**：项目可见性分「门户可见 / 持链接可见 / 仅自己」，三档各自一套默认时长。**注意「门户」和「持链接」在权限上完全一样**（有 URL 就能看），区别只是会不会被列进门户；「仅自己」不是登录就能看，而是只有作者本人或管理员能看。详见 [docs/visibility.md](docs/visibility.md)。
 - **批量改可见性**：项目页勾选若干条后，底部工具条可直接「门户可见 / 持链接 / 仅自己」一键切换，返回里会单独报出「已到期、需先续期」的条数。
+- **Agent 侧真能动手**：`cli/agentctl.py` 是可执行的单文件客户端（`login / whoami / health / deploy / link / ls / show / set / extend / rm / bulk / stats / members / selfcheck`），部署完自动探活，直接告诉你「预览地址 + HTTP 200」；`--json` 时 stdout 只有一行 JSON，好接上游程序。
+- **并发安全**：多个 agent 同时上传、同一 slug 被 6 路同时覆盖、混合读写都不会写串也不会 500——slug 级锁 + 每次上传独立临时目录 + 原子替换 + Windows 文件句柄重试。删除时若文件被占用，记录照样删掉，残留目录交给孤儿清理收尾。
+- **站点图标**：预览页优先用项目自带的 `favicon.ico / favicon.svg / favicon.png / apple-touch-icon.png`，没有才退回站点默认图标，标签页不会一水的空白页。
 - **到期自动化**：到期后可选「停止访问保留文件」或「连同文件删除」，后台每 60s 巡检；站点级可设默认策略。
 - **访客门户** `/portal`：标题＋筛选区整体吸顶（滚动时标签以上不动），提供卡片/列表两种视图（记在本地），卡片右上角圆环显示访问量、底部是实时倒计时与进度条；支持按类型/标签/关键词筛选，按创建、到期、访问、名称排序。每张卡片（含列表行）右上角有**快捷复制**按钮，一点即复制完整直链，按钮自分绿打勾并冒出「已复制」气泡，1.6 秒后自动复原。
 - **作者名片**：设置里填显示名、一句话介绍和几个链接（GitHub / 邮箱 / 抖音 / 博客 / X / B站 / 知乎 / RSS / 自定义），门户顶部就多出一条作者名片，图标 + 标签，移动端自动收成图标。
@@ -47,20 +50,39 @@ docker compose logs -f preview  # 若未指定密码，日志里会打印初始�
 
 ## 给成员（Agent）用
 
-```bash
-# 1) 登录一次，Key 存在 ~/.config/tmp-preview/config.json
-python cli/agentctl.py login --url http://<站点地址>:8080 --username alice --password xxx
+命令行是**真能增删改查**的，不是说明书。单文件、只用标准库，拷到任何有 Python 3.10+ 的机器上就能跑：
 
-# 2) 部署一个目录（默认用服务端 TTL）
+```bash
+# 1) 登录一次，Key 存到 ~/.config/tmp-preview/config.json（0600）
+python cli/agentctl.py login --url http://<站点地址>:8080 --username alice --password xxx
+python cli/agentctl.py whoami          # 我是谁、什么角色、能干什么
+
+# 2) 部署：上传完直接探活，返回可点开的预览地址 + HTTP 状态
 python cli/agentctl.py deploy ./dist --title "落地页 v3" --tags "前端,v3" --ttl 24
+#   → 预览地址  http://.../v/landing-v3
+#     已验证    HTTP 200
 
 # 3) 日常
-python cli/agentctl.py ls
-python cli/agentctl.py extend landing-v3 48
-python cli/agentctl.py extend landing-v3 --forever
-python cli/agentctl.py tags landing-v3 前端,v3,已验收
+python cli/agentctl.py ls --status online --sort views
+python cli/agentctl.py ls --tag 前端 --visibility portal
+python cli/agentctl.py show landing-v3
+python cli/agentctl.py set landing-v3 --visibility private   # 门户可见 / 持链接 / 仅自己
+python cli/agentctl.py extend landing-v3 48                  # 或 --forever
 python cli/agentctl.py rm landing-v3
+
+# 4) 批量 / 统计 / 管理员
+python cli/agentctl.py bulk --action visibility --visibility portal --slugs a,b,c
+python cli/agentctl.py bulk --action delete --slugs a,b,c --yes
+python cli/agentctl.py stats --days 14
+python cli/agentctl.py members list
+python cli/agentctl.py members set alice --label "claude-code@笔记本" --rotate-key
+
+# 5) 自检：用当前身份真跑一遍 建→探活→改私有(404)→改回(200)→续期→删除
+python cli/agentctl.py selfcheck
 ```
+
+加 `--json` 时 stdout 只有一行 JSON（给上游程序读），人读的提示全部走 stderr，两者不混。
+完整能力边界与调用示例见 [skills/tmp-preview-agent/SKILL.md](skills/tmp-preview-agent/SKILL.md)。
 
 机器调用也可以直接走 API：
 
@@ -104,8 +126,8 @@ backend/app/
   pages.py           访客预览外壳 / 门户 / 错误页（服务端渲染）
   routers/           auth · projects · agents · settings · public
 frontend/src/        Vue 3 控制台（零 UI 框架，手写设计系统）
-cli/agentctl.py      成员侧命令行（仅标准库）
-skills/tmp-preview-agent/  Agent 侧技能包：以一把 Key 管理项目 + 权限边界
+cli/agentctl.py      成员侧命令行入口（兼容壳，实现见下）
+skills/tmp-preview-agent/  Agent 侧技能包：scripts/agentctl.py 是真实实现（单文件、仅标准库）+ SKILL.md 权限边界
 migrate/             Cloudflare KV → 本地
 tests/               冒烟测试 / 截图脚本 / 演示数据
 legacy/cloudflare/   旧版 Worker 实现（仅存档，不再维护）
@@ -122,6 +144,24 @@ docs/                架构、接口、可见性、迁移说明
 | 改端口 | `.env` 里 `PORT=9000` |
 | 反向代理 | 交给 Nginx/Caddy 终止 TLS，转发到 `127.0.0.1:8080`，并把 `COOKIE_SECURE=1` |
 | 单进程 | 计数与清理是进程内任务，**保持 1 个 worker**；要横向扩展需改用外置计数/锁 |
+| 并发上限 | 多个 agent 同时上传是安全的（slug 级锁 + 原子替换），但同一个 slug 同时写只有最后一次生效；打满约 18 路并发上传时单次约 3.3s，再高建议排队 |
+| 清残留目录 | 删除时文件被占用会留下目录，`data/projects/` 下无人认领的目录会在后台约 30 分钟内自动清掉；要立刻清就重启一次（启动时会扫 `.tmp-*` / `.old-*`） |
+
+## 自检与测试
+
+全部测试都是「打真服务的黑盒脚本」，跑之前先起好后端（Playwright 那几项还要起前端 `npm run dev`）：
+
+```bash
+python tests/smoke_test.py       --url http://127.0.0.1:8000   # 26 项：上传/列表/改属性/批量/下载/删除/成员
+python tests/check_ttl.py        --url http://127.0.0.1:8000   # 16 项：三档可见性各自的默认时长与到期策略
+python tests/check_roles.py      --url http://127.0.0.1:8000   # 26 项：三档角色的接口权限与页面权限
+python tests/check_migrate.py    --url http://127.0.0.1:8000   # 19 项：老库加列迁移、悬空外键自愈
+python tests/check_portal.py     --url http://127.0.0.1:8000   # 41 项：门户页结构、吸顶、卡片/列表、复制按钮
+python tests/check_visibility.py --url http://127.0.0.1:8000   # 41 项：三档可见性的真实访问结果 + Key 使用痕迹
+python tests/check_cli.py        --url http://127.0.0.1:8000   # 57 项：CLI 真子进程跑一遍所有命令与越权
+python tests/check_concurrency.py --url http://127.0.0.1:8000 # 20 项：6 agent 并发部署 / 同 slug 抢占 / 混合读写
+python tests/check_copy.py       --url http://127.0.0.1:8000   # 26 项：复制按钮的层级、剪贴板内容、移动端、无溢出
+```
 
 ## 安全约定
 

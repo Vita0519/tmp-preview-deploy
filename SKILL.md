@@ -32,10 +32,15 @@ docker compose logs -f preview   # 未配密码时日志里打印初始密码
 
 ```bash
 python cli/agentctl.py login --url http://<host>:8080 --username alice --password xxx
+python cli/agentctl.py whoami                                  # 我是谁、什么角色、能干什么
 python cli/agentctl.py deploy ./dist --title "落地页 v3" --tags "前端,v3" --ttl 24
 python cli/agentctl.py deploy ./dist --forever --download      # 永久 + 开放下载
 python cli/agentctl.py deploy ./build.zip --zip                # 只做下载包
+python cli/agentctl.py selfcheck                               # 建→探活→改私有→改回→续期→删除
 ```
+
+`deploy` 传完会**自己去请求一次**这个地址，返回里带 `preview_url` 与 `http_status`
+（`--no-verify` 可跳过）。`--json` 时 stdout 只有一行 JSON，退出码 0/1。
 
 `--visibility` 三档：`link`（默认，持链接可见）、`portal`（进门户列表）、`private`（仅自己）。
 `--expire-action` 两档：`block`（默认，到期停访留文件）、`delete`（到期删文件）。
@@ -43,15 +48,19 @@ python cli/agentctl.py deploy ./build.zip --zip                # 只做下载包
 ## 管理
 
 ```bash
-python cli/agentctl.py ls                      # 自己的项目
-python cli/agentctl.py extend <slug> 48        # 续 48 小时
-python cli/agentctl.py extend <slug> --forever  # 转永久
-python cli/agentctl.py tags <slug> a,b,c
+python cli/agentctl.py ls --status online --sort views
+python cli/agentctl.py show <slug>
+python cli/agentctl.py set <slug> --visibility private      # 也可 --ttl / --forever / --tags / --download
+python cli/agentctl.py extend <slug> 48                     # 续 48 小时
+python cli/agentctl.py extend <slug> --forever              # 转永久
+python cli/agentctl.py bulk --action visibility --visibility portal --slugs a,b,c
+python cli/agentctl.py stats --days 14
+python cli/agentctl.py members set alice --label "claude-code@笔记本" --rotate-key
 python cli/agentctl.py rm <slug>
 ```
 
-浏览器控制台还能做：按成员/标签/类型/状态筛选，按访问、创建、更新、到期、体积排序，
-批量续期/转永久/开放下载/删除，抽屉里看文件清单与 14 天访问趋势。
+浏览器控制台还能做：按成员/标签/类型/可见性/状态筛选，按访问、创建、更新、到期、体积排序，
+勾选后一键批量改可见性/续期/转永久/开放下载/删除，抽屉里看文件清单与 14 天访问趋势。
 
 ## 访客门户
 
@@ -85,8 +94,9 @@ python cli/agentctl.py rm <slug>
 
 ## Agent 侧技能包
 
-给「用一把 Key 管理项目」的 Agent 用的操作手册在 [skills/tmp-preview-agent/SKILL.md](skills/tmp-preview-agent/SKILL.md)：
-凭据绑定规则、权限矩阵、部署/续期/改可见性/批量清理的调用示例、错误码、执行红线。
+给「用一把 Key 管理项目」的 Agent 用的技能包在 [skills/tmp-preview-agent/](skills/tmp-preview-agent/)：
+`SKILL.md` 是权限边界与调用示例，**`scripts/agentctl.py` 是可直接执行的客户端**（单文件、仅标准库，
+`cli/agentctl.py` 是同实现的入口壳）。整包交给 Agent，它就能自己建/改/删/查。
 
 ## 从 Cloudflare KV 迁移
 
@@ -106,12 +116,21 @@ docker compose start
 - 备份 = 打包 `./data`；热备用 `sqlite3 data/db.sqlite3 ".backup backup.db"`。
 - 到期巡检每 60s；计数每 3s 落库，掉电最多丢 3 秒访问量。
 - 日志：`docker compose logs -f --tail=100 preview`。
+- **并发**：多 agent 同时上传安全（slug 级锁 + 每次上传独立临时目录 + 原子替换 + WinError 5/32 重试），
+  同 slug 并发覆盖只有最后一次生效、不会写串。实测 18 路并发上传全 200，单次约 3.3s。
+- **删除**：文件被占用时记录先删、目录留下，后台约 30 分钟内由孤儿清理收尾；启动时另清 `.tmp-*` / `.old-*`。
+- **图标**：预览页优先用项目自带的 `favicon.ico/svg/png/apple-touch-icon.png`，否则退回站点图标。
 
 ## 自检
 
 ```bash
-python tests/smoke_test.py --url http://127.0.0.1:8080   # 26 项端到端检查
-python tests/check_visibility.py                        # 41 项：三档可见性 + 批量切换 + Key 绑定
-python tests/check_portal.py                            # 41 项门户结构回归
-python tests/check_copy.py                              # 26 项复制按钮（需 chrome）
+python tests/smoke_test.py       --url http://127.0.0.1:8000   # 26 项端到端
+python tests/check_ttl.py        --url http://127.0.0.1:8000   # 16 项：三档默认时长与到期策略
+python tests/check_roles.py      --url http://127.0.0.1:8000   # 26 项：三档角色接口/页面权限
+python tests/check_migrate.py    --url http://127.0.0.1:8000   # 19 项：加列迁移、悬空外键自愈
+python tests/check_portal.py     --url http://127.0.0.1:8000   # 41 项门户结构回归
+python tests/check_visibility.py --url http://127.0.0.1:8000   # 41 项：三档可见性 + 批量切换 + Key 绑定
+python tests/check_cli.py        --url http://127.0.0.1:8000   # 57 项：CLI 全命令 + 越权
+python tests/check_concurrency.py --url http://127.0.0.1:8000  # 20 项：6 agent 并发 / 同 slug 抢占
+python tests/check_copy.py       --url http://127.0.0.1:8000   # 26 项复制按钮（需 chrome）
 ```

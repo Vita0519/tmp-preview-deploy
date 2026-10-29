@@ -1,4 +1,4 @@
-"""后台任务：访问计数批量落库 + 到期清理。"""
+"""后台任务：访问计数批量落库 + 到期清理 + 孤儿目录清理。"""
 import asyncio
 import time
 
@@ -7,6 +7,7 @@ from .db import db, log_event
 
 TICK_FLUSH = 3.0
 TICK_SWEEP = 60.0
+ORPHAN_EVERY = 30  # 每 30 轮（约 30 分钟）扫一次没人认领的目录
 
 
 def sweep() -> dict:
@@ -34,6 +35,29 @@ def sweep() -> dict:
     return {"blocked": blocked, "purged": purged}
 
 
+def sweep_orphans(grace_seconds: int = 600) -> int:
+    """删掉数据库里已经没有记录的目录。
+
+    删除接口在文件被占用时会让记录先走、目录留下，这里负责收尾；
+    宽限期避免把「刚上传完、还没提交事务」的目录误删。
+    """
+    with db() as conn:
+        known = {r["slug"] for r in conn.execute("SELECT slug FROM projects").fetchall()}
+    removed = 0
+    now = time.time()
+    for p in storage.FILES_DIR.iterdir():
+        if not p.is_dir() or p.name.startswith(".") or p.name in known:
+            continue
+        try:
+            if now - p.stat().st_mtime < grace_seconds:
+                continue
+        except OSError:
+            continue
+        storage.remove_tree(p)
+        removed += 1
+    return removed
+
+
 async def flush_loop(stop: asyncio.Event) -> None:
     while not stop.is_set():
         try:
@@ -47,6 +71,7 @@ async def flush_loop(stop: asyncio.Event) -> None:
 
 
 async def sweep_loop(stop: asyncio.Event) -> None:
+    rounds = 0
     while not stop.is_set():
         try:
             r = sweep()
@@ -54,6 +79,14 @@ async def sweep_loop(stop: asyncio.Event) -> None:
                 print(f"[expire] blocked={r['blocked']} purged={r['purged']}", flush=True)
         except Exception as exc:
             print(f"[expire] sweep failed: {exc}", flush=True)
+        rounds += 1
+        if rounds % ORPHAN_EVERY == 0:
+            try:
+                gone = sweep_orphans()
+                if gone:
+                    print(f"[orphan] 清理无主目录 {gone} 个", flush=True)
+            except Exception as exc:
+                print(f"[orphan] 清理失败: {exc}", flush=True)
         try:
             await asyncio.wait_for(stop.wait(), timeout=TICK_SWEEP)
         except asyncio.TimeoutError:

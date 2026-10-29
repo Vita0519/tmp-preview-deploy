@@ -15,6 +15,22 @@ a{{color:#0f766e;text-decoration:none}}
 .num{{font-variant-numeric:tabular-nums}}
 """
 
+# 站点图标：项目自带就用项目的，否则回落到站点图标
+FAVICON_NAMES = ("favicon.ico", "favicon.svg", "favicon.png", "apple-touch-icon.png")
+
+
+def favicon_href(slug: str | None = None) -> str:
+    if slug:
+        from . import storage  # 局部导入，避免模块级循环依赖
+        for name in FAVICON_NAMES:
+            try:
+                target = storage.resolve_in_project(slug, name)
+            except Exception:  # noqa: BLE001 - 找不到就当没有
+                target = None
+            if target is not None and target.is_file():
+                return f"/p/{slug}/{name}"
+    return "/favicon.svg"
+
 
 def preview_page(p: dict, server_now: int, site_title: str) -> str:
     title = escape(p["title"])
@@ -49,6 +65,7 @@ def preview_page(p: dict, server_now: int, site_title: str) -> str:
     return f"""<!doctype html><html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="{favicon_href(p['slug'])}">
 <title>{title} · {escape(site_title)}</title>
 <style>
 {BASE_CSS}
@@ -703,6 +720,7 @@ def portal_page(
     who = _author_block(author)
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(site_title)}</title>
+<link rel="icon" href="/favicon.svg">
 <meta name="robots" content="noindex">
 <style>
 {BASE_CSS}
@@ -757,6 +775,7 @@ def error_page(code: int, title: str, desc: str, back: str = "/") -> str:
     accent = "#b45309" if code == 410 else "#14161a"
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{code} · {escape(title)}</title>
+<link rel="icon" href="/favicon.svg">
 <style>
 {BASE_CSS}
 body{{height:100vh;display:flex;align-items:center;justify-content:center;

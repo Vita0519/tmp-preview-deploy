@@ -19,10 +19,10 @@ from http.cookiejar import CookieJar
 PASS, FAIL = [], []
 
 
-def check(name: str, cond: bool, extra: str = "") -> None:
+def check(name: str, cond: bool, extra="") -> None:
     (PASS if cond else FAIL).append(name)
     mark = "✓" if cond else "✗"
-    print(f"  {mark} {name}{('  → ' + extra) if extra and not cond else ''}")
+    print(f"  {mark} {name}{('  → ' + str(extra)) if extra and not cond else ''}")
 
 
 class Client:
