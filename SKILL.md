@@ -72,6 +72,21 @@ python cli/agentctl.py rm <slug>
   也不会把最后一个管理员降级。老库里的 `role=agent` 启动时自动迁移成 `publisher`。
 - 每个成员一把 `pv_...` API Key，可在「成员」页轮换；命令行 `login` 后保存在
   `%APPDATA%\tmp-preview\config.json`（Linux/macOS: `~/.config/tmp-preview/config.json`）。
+- **一个账号只绑一个 Agent**：`users.api_key` 有 UNIQUE 约束；成员页每行可编辑
+  「绑定 Agent」（`key_label`），并显示尾号、`key_last_used_at`、`key_uses`。
+  轮换会刷新签发时间并把计数归零。注意账号密码可用 `POST /api/token` 换出同一把 Key，
+  所以密码也只能给这一个 Agent。
+
+## 可见性三档
+
+`portal` / `link` / `private` 的完整判定表见 [docs/visibility.md](docs/visibility.md)。
+速记：**门户与持链接在权限上完全一样（有 URL 就能看），只是门不进门户列表；
+私有不是「登录就能看」，而是「只有作者本人或管理员能看」。**
+
+## Agent 侧技能包
+
+给「用一把 Key 管理项目」的 Agent 用的操作手册在 [skills/tmp-preview-agent/SKILL.md](skills/tmp-preview-agent/SKILL.md)：
+凭据绑定规则、权限矩阵、部署/续期/改可见性/批量清理的调用示例、错误码、执行红线。
 
 ## 从 Cloudflare KV 迁移
 
@@ -96,6 +111,7 @@ docker compose start
 
 ```bash
 python tests/smoke_test.py --url http://127.0.0.1:8080   # 26 项端到端检查
+python tests/check_visibility.py                        # 41 项：三档可见性 + 批量切换 + Key 绑定
 python tests/check_portal.py                            # 41 项门户结构回归
 python tests/check_copy.py                              # 26 项复制按钮（需 chrome）
 ```
