@@ -27,3 +27,7 @@ Thumbs.db
 .wrangler.toml
 dist/
 build/
+
+# 本次推送用的临时脚本
+/.ghpush/
+/.push_via_api.py
