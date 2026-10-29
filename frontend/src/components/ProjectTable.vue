@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import Icon from './Icon.vue'
-import { fmtBytes, fmtDate, fmtRemain, initial, relTime, typeLabel } from '../format'
+import { fmtBytes, fmtDate, fmtRemain, initial, relTime, typeLabel, visHint, visLabel } from '../format'
 
 const props = defineProps({
   items: { type: Array, default: () => [] },
@@ -22,6 +22,7 @@ const maxViews = computed(() => Math.max(...props.items.map((i) => i.views || 0)
 const cols = [
   { key: 'title', label: '项目', sortable: true },
   { key: 'kind', label: '类型', sortable: false, cls: 'col-kind' },
+  { key: 'visibility', label: '可见性', sortable: false, cls: 'col-vis' },
   { key: 'owner', label: '归属', sortable: false, cls: 'col-owner' },
   { key: 'views', label: '访问', sortable: true, num: true, cls: 'col-views' },
   { key: 'size_bytes', label: '体积', sortable: true, num: true, cls: 'col-size' },
@@ -93,6 +94,7 @@ function copyLink(p) {
             <div class="skel" style="height: 9px; width: 34%; margin-top: 6px" />
           </td>
           <td class="col-kind" />
+          <td class="col-vis"><div class="skel" style="height: 10px; width: 46px" /></td>
           <td class="col-owner" />
           <td class="cell-num col-views"><div class="skel" style="height: 10px; width: 54px; margin-left: auto" /></td>
           <td class="cell-num col-size"><div class="skel" style="height: 10px; width: 54px; margin-left: auto" /></td>
@@ -128,7 +130,6 @@ function copyLink(p) {
                 <div class="pname">
                   <span class="truncate" style="max-width: 260px">{{ p.title }}</span>
                   <span v-if="!p.permanent && p.expired" class="badge danger">已到期</span>
-                  <span v-else-if="p.visibility === 'private'" class="badge">私有</span>
                 </div>
                 <div class="pslug truncate">
                   /{{ p.slug }}/<span v-if="p.tags?.length" class="dim"> · {{ p.tags.join(' · ') }}</span>
@@ -139,6 +140,14 @@ function copyLink(p) {
 
           <td class="col-kind">
             <span class="badge" :class="{ brand: p.kind === 'link' }">{{ typeLabel(p.kind) }}</span>
+          </td>
+
+          <td class="col-vis">
+            <span
+              class="badge"
+              :class="{ brand: p.visibility === 'portal', warn: p.visibility === 'private' }"
+              :title="visHint(p.visibility)"
+            >{{ visLabel(p.visibility) }}</span>
           </td>
 
           <td class="col-owner">

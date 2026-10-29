@@ -189,11 +189,15 @@ def _human(n: int) -> str:
 
 PORTAL_CSS = """
 body{background:linear-gradient(180deg,#fbfcfb,#f2f4f2 60%,#eef1ef);min-height:100vh}
-.wrap{max-width:1080px;margin:0 auto;padding:44px 20px 80px}
-header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 80px}
+/* 标签以上整体吸附：标题 + 作者名片 + 筛选条 + 标签 */
+.dock{position:sticky;top:0;z-index:20;margin:0 -20px;padding:18px 20px 0;
+background:rgba(250,251,250,.9);backdrop-filter:blur(12px) saturate(1.15);
+-webkit-backdrop-filter:blur(12px) saturate(1.15);border-bottom:1px solid rgba(20,22,26,.06)}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
 h1{margin:0;font-size:26px;letter-spacing:-.02em}
 .sub{color:#7b8189;font-size:12.5px;margin-top:5px}
-.author{display:flex;align-items:center;gap:11px;margin:0 0 18px;padding:11px 13px;background:#fff;
+.author{display:flex;align-items:center;gap:11px;margin:0 0 14px;padding:11px 13px;background:#fff;
 border:1px solid rgba(20,22,26,.08);border-radius:12px;box-shadow:0 1px 2px rgba(20,22,26,.03)}
 .author .ava{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
 background:#eff4f2;color:#0f766e;font-weight:650;font-size:14px;letter-spacing:-.02em;
@@ -224,6 +228,8 @@ border:1px solid rgba(20,22,26,.06)}
 font:600 12px/1 inherit;color:#5b636d;cursor:pointer;transition:background .16s,color .16s,box-shadow .16s}
 .seg button:hover{color:#14161a}
 .seg button.on{background:#fff;color:#14161a;box-shadow:0 1px 2px rgba(20,22,26,.1)}
+.seg.icons button{width:28px;padding:0;display:grid;place-items:center}
+.seg.icons svg{width:14px;height:14px}
 .tools .spacer{flex:1 1 auto}
 .search{height:30px;width:210px;padding:0 10px;border-radius:8px;border:1px solid rgba(20,22,26,.14);
 background:#fff;font-size:12.5px;color:#14161a;outline:none;transition:border-color .16s,box-shadow .16s}
@@ -232,20 +238,22 @@ background:#fff;font-size:12.5px;color:#14161a;outline:none;transition:border-co
 font-size:12.5px;color:#2a2f36;outline:none;cursor:pointer}
 .sort:focus{border-color:rgba(15,118,110,.5)}
 .cnt{font-size:11.5px;color:#8a9099;font-variant-numeric:tabular-nums;white-space:nowrap}
-.tagsbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 16px;min-height:0}
+.tagsbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px;min-height:0}
 .tagsbar:empty{display:none}
 .tagsbar button{height:22px;padding:0 8px;border-radius:6px;border:1px solid rgba(20,22,26,.08);
 background:#f4f6f4;color:#5b636d;font:600 11px/1 inherit;cursor:pointer;transition:.16s}
 .tagsbar button:hover{background:#eef2f0;color:#14161a}
 .tagsbar button.on{background:#0f766e;border-color:#0f766e;color:#fff}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch}
-.card{display:flex;flex-direction:column;background:#fff;border:1px solid rgba(20,22,26,.09);
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch;
+padding-top:14px}
+.grid[hidden]{display:none}
+.card{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid rgba(20,22,26,.09);
 border-radius:12px;padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
 .card[hidden]{display:none}
 .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(15,118,110,.32)}
-.top{display:flex;align-items:flex-start;gap:10px;min-width:0}
-.tinfo{flex:1 1 auto;min-width:0}
+.top{min-width:0;padding-right:52px}
+.tinfo{min-width:0}
 .name{display:flex;align-items:center;gap:6px;font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a;
 min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kind{flex:0 0 auto;font-size:10px;font-weight:600;color:#7b8189;background:#f3f5f3;
@@ -273,30 +281,96 @@ letter-spacing:-.01em;white-space:nowrap}
 .track > i{display:block;height:100%;border-radius:99px;background:#0f766e;transition:width .5s ease}
 .track.warn > i{background:#b45309}
 .track.dead > i{background:#b42318}
-.ring{position:relative;flex:0 0 auto;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+/* 访问圆环：整张卡片的右上角 */
+.ring{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;
+display:grid;place-items:center;
 background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef1ef 0)}
 .ring::after{content:'';position:absolute;inset:4px;border-radius:50%;background:#fff}
 .ring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:2px}
 .ring b{font-size:12px;font-weight:650;color:#14161a;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 .ring b.sm{font-size:9.5px}
 .ring i{font-style:normal;font-size:8px;color:#a3aab0;letter-spacing:.02em}
-.ring:hover{background:conic-gradient(#0d6a62 calc(var(--p,0) * 1%), #eef1ef 0)}
-.blank{grid-column:1/-1;text-align:center;color:#8a9099;padding:56px 0;
-border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
+.card:hover .ring{background:conic-gradient(#0d6a62 calc(var(--p,0) * 1%), #e9ecea 0)}
+/* ---------- 列表模式（独立结构，不复用卡片） ---------- */
+.rows{display:flex;flex-direction:column;gap:8px;padding-top:14px}
+.rows[hidden]{display:none}
+.row{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr) auto 36px 170px;
+grid-template-areas:"main desc tags ring foot";align-items:center;gap:14px;
+background:#fff;border:1px solid rgba(20,22,26,.09);border-radius:12px;padding:10px 14px;
+transition:border-color .16s,box-shadow .16s}
+.row[hidden]{display:none}
+.row:hover{border-color:rgba(15,118,110,.32);box-shadow:0 6px 18px -14px rgba(20,22,26,.42)}
+.rmain{grid-area:main;min-width:0}
+.rname{display:block;font-weight:650;font-size:13.5px;letter-spacing:-.01em;color:#14161a;
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rname .kind{margin-left:6px;vertical-align:1px}
+.rmeta{margin-top:3px;font-size:11.5px;color:#98a0a6;font-variant-numeric:tabular-nums;
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rdesc{grid-area:desc;margin:0;min-width:0;font-size:12px;color:#5b636d;line-height:1.5;
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtags{grid-area:tags;display:flex;gap:5px;flex-wrap:nowrap}
+.rring{grid-area:ring;position:relative;width:32px;height:32px;border-radius:50%;display:grid;
+place-items:center;background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef1ef 0)}
+.rring::after{content:'';position:absolute;inset:3px;border-radius:50%;background:#fff}
+.rring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
+.rring b{font-size:10.5px;font-weight:650;color:#14161a;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.rring b.sm{font-size:8.5px}
+.rring i{font-style:normal;font-size:6.5px;color:#a3aab0}
+.rfoot{grid-area:foot;min-width:0}
+.rfoot .cdrow{margin-bottom:5px}
+.rfoot .cd{font-size:12px}
+.rfoot .cdend{font-size:10px}
+@media (max-width:900px){
+  .row{grid-template-columns:minmax(0,1fr) 34px 152px;grid-template-areas:"main ring foot"}
+  .rdesc,.rtags{display:none}
+}
 @media (max-width:620px){
-  .wrap{padding:28px 14px 60px}
-  h1{font-size:22px}
-  .search{width:100%;order:9}
+  .row{grid-template-columns:minmax(0,1fr) 52px;grid-template-areas:"main ring" "foot foot";
+  gap:8px 10px;padding:11px 12px}
+  .rring{width:34px;height:34px;align-self:start}
+}
+.blank{margin-top:14px;text-align:center;color:#8a9099;padding:56px 0;
+border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
+@media (max-width:900px){
+  .grid.list .desc{display:none}
+}
+@media (max-width:620px){
+  .wrap{padding:0 14px 60px}
+  .dock{margin:0 -14px;padding:10px 14px 0}
+  h1{font-size:20px;line-height:1.25}
+  .sub{font-size:11.5px;margin-top:3px}
+  header{margin-bottom:10px}
+  .author{margin-bottom:10px;padding:8px 10px;gap:9px}
+  .author .am span{display:none}
+  .tools{margin-bottom:8px;gap:6px}
   .tools .spacer{display:none}
-  .grid{grid-template-columns:1fr}
+  .cnt{display:none}
+  .sort{order:2;flex:0 0 auto;height:28px}
+  .search{flex:1 1 110px;width:auto;order:3;height:28px}
+  .seg button{height:24px;padding:0 9px;font-size:11.5px}
+  .seg.icons button{width:26px}
+  /* 标签横向滚动，别把吸顶区撑高 */
+  .tagsbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;margin-bottom:8px;
+  padding-bottom:2px;scrollbar-width:none}
+  .tagsbar::-webkit-scrollbar{display:none}
+  .tagsbar button{flex:0 0 auto}
+  .grid{grid-template-columns:1fr;padding-top:10px}
+  .rows{padding-top:10px}
+  .grid.list .card{flex-wrap:wrap;gap:8px 10px;padding:11px 12px}
+  .grid.list .top{flex:1 1 100%;order:1}
+  .grid.list .tags{order:4;flex:1 1 100%}
+  .grid.list .ring{order:2;position:absolute;top:10px;right:10px;width:36px;height:36px}
+  .grid.list .foot{order:3;flex:1 1 100%}
 }
 """
 
 PORTAL_JS = """
 (function(){
   var NOW=__NOW__, off=0;
-  var grid=document.getElementById('grid');
+  var grid=document.getElementById('grid'), rows=document.getElementById('rows');
   var cards=[].slice.call(grid.querySelectorAll('.card'));
+  var rnodes=[].slice.call(rows.querySelectorAll('.row'));
+  var nodes=cards.concat(rnodes);
   var cnt=document.getElementById('cnt'), blank=document.getElementById('blank');
   var state={kind:'all',q:'',tag:'',sort:'created'};
   function pad(n){return n<10?'0'+n:''+n}
@@ -309,7 +383,7 @@ PORTAL_JS = """
   }
   function tick(){
     var now=Date.now()+off;
-    cards.forEach(function(c){
+    nodes.forEach(function(c){
       var exp=+c.dataset.exp; if(!exp) return;
       var left=exp-now, cd=c.querySelector('.cd'), bar=c.querySelector('.track');
       var warn=left>0&&left<2*3600e3, dead=left<=0;
@@ -332,17 +406,18 @@ PORTAL_JS = """
     return (+b.dataset.created||0)-(+a.dataset.created||0);
   }
   function apply(){
-    var q=state.q.toLowerCase(), shown=[];
-    cards.forEach(function(c){
+    var q=state.q.toLowerCase(), shown=[], shownCards=0;
+    nodes.forEach(function(c){
       var tags=(c.dataset.tags||'').split('|');
       var ok = (state.kind==='all'||c.dataset.kind===state.kind)
         && (!state.tag||tags.indexOf(state.tag)>=0)
         && (!q||(c.dataset.title+' '+tags.join(' ')).toLowerCase().indexOf(q)>=0);
-      c.hidden=!ok; if(ok) shown.push(c);
+      c.hidden=!ok;
+      if(ok){ shown.push(c); if(c.classList.contains('card')) shownCards++; }
     });
     shown.sort(cmp).forEach(function(c,i){ c.style.order=i; });
-    if(cnt) cnt.textContent=shown.length+' / '+cards.length+' 个';
-    if(blank) blank.hidden=shown.length>0||!cards.length;
+    if(cnt) cnt.textContent=shownCards+' / '+cards.length+' 个';
+    if(blank) blank.hidden=shownCards>0||!cards.length;
   }
   document.querySelectorAll('.seg[data-kind] button').forEach(function(b){
     b.onclick=function(){
@@ -355,6 +430,20 @@ PORTAL_JS = """
   if(q) q.oninput=function(){ state.q=q.value.trim(); apply(); };
   var s=document.getElementById('sort');
   if(s) s.onchange=function(){ state.sort=s.value; apply(); };
+  // 卡片 / 列表视图，选过的记在 localStorage
+  var vs=document.getElementById('viewseg');
+  function setView(v){
+    var list = v==='list';
+    grid.hidden = list; rows.hidden = !list;
+    if(vs) [].forEach.call(vs.children,function(x){ x.classList.toggle('on', x.dataset.view===v); });
+    try{ localStorage.setItem('pv_view', v); }catch(e){}
+  }
+  if(vs){
+    var saved='grid';
+    try{ saved=localStorage.getItem('pv_view')||'grid'; }catch(e){}
+    setView(saved==='list'?'list':'grid');
+    [].forEach.call(vs.children,function(b){ b.onclick=function(){ setView(b.dataset.view); }; });
+  }
   var tb=document.getElementById('tagsbar');
   if(tb){
     var seen={}, order=[];
@@ -462,7 +551,8 @@ def portal_page(
     author: dict | None = None,
 ) -> str:
     max_views = max([(p.get("views") or 0) for p in items] or [0]) or 1
-    cards = []
+    cards: list[str] = []
+    rows: list[str] = []
     for p in items:
         exp = p["expires_at"] or 0
         created = p.get("created_at") or server_now
@@ -484,18 +574,18 @@ def portal_page(
         size = _human(p["size_bytes"]) if p["kind"] != "link" else "外链"
         num_cls = "sm" if views >= 1000 else ""
         ends = "" if not exp else f"到期 {_fmt_day(exp)}"
+        data_attr = (
+            f'data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}" '
+            f'data-kind="{p["kind"]}" data-tags="{escape(chr(124).join(tags_list), quote=True)}" '
+            f'data-title="{escape(p["title"], quote=True)}"'
+        )
         cards.append(
             f"""<a class="card" href="/v/{p['slug']}" target="_blank" rel="noopener" style="order:0"
-   data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}"
-   data-kind="{p['kind']}" data-tags="{escape('|'.join(tags_list), quote=True)}"
-   data-title="{escape(p['title'], quote=True)}">
+   {data_attr}>
   <div class="top">
     <div class="tinfo">
       <div class="name">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
       <div class="byline"><span>{owner or '—'}</span><span class="dot"></span><span>{size}</span></div>
-    </div>
-    <div class="ring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
-      <span class="in"><b class="{num_cls}">{views}</b><i>访问</i></span>
     </div>
   </div>
   <p class="desc">{escape(p['description'] or '')}</p>
@@ -505,9 +595,32 @@ def portal_page(
       <span class="cdend">{ends}</span></div>
     <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
+  <div class="ring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
+    <span class="in"><b class="{num_cls}">{views}</b><i>访问</i></span>
+  </div>
 </a>"""
         )
-    body = "".join(cards) or '<div class="blank">暂无公开项目</div>'
+        rows.append(
+            f"""<a class="row" href="/v/{p['slug']}" target="_blank" rel="noopener" style="order:0"
+   {data_attr}>
+  <div class="rmain">
+    <span class="rname">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></span>
+    <div class="rmeta">{owner or '—'} · {size}</div>
+  </div>
+  <p class="rdesc">{escape(p['description'] or '—')}</p>
+  <div class="rtags">{tags}</div>
+  <div class="rring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
+    <span class="in"><b>{views}</b><i>访问</i></span>
+  </div>
+  <div class="rfoot">
+    <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span>
+      <span class="cdend">{ends}</span></div>
+    <div class="track"><i style="width:{pct:.1f}%"></i></div>
+  </div>
+</a>"""
+        )
+    body = "".join(cards) or ""
+    rowbody = "".join(rows)
     login = '<a class="btn ghost" href="/">进入控制台</a>' if logged_in else ""
     who = _author_block(author)
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
@@ -517,6 +630,7 @@ def portal_page(
 {BASE_CSS}
 {PORTAL_CSS}
 </style></head><body><div class="wrap">
+<div class="dock">
 <header><div><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div>{login}</header>
 {who}
 <div class="tools">
@@ -528,6 +642,19 @@ def portal_page(
   </div>
   <span class="spacer"></span>
   <span class="cnt" id="cnt">{len(items)} 个</span>
+  <div class="seg icons" id="viewseg" role="group" aria-label="显示方式">
+    <button data-view="grid" class="on" title="卡片视图" aria-label="卡片视图">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+        <rect x="1.6" y="1.6" width="5.4" height="5.4" rx="1.2"/><rect x="9" y="1.6" width="5.4" height="5.4" rx="1.2"/>
+        <rect x="1.6" y="9" width="5.4" height="5.4" rx="1.2"/><rect x="9" y="9" width="5.4" height="5.4" rx="1.2"/>
+      </svg>
+    </button>
+    <button data-view="list" title="列表视图" aria-label="列表视图">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M2 3.5h12M2 8h12M2 12.5h12"/>
+      </svg>
+    </button>
+  </div>
   <select class="sort" id="sort" aria-label="排序">
     <option value="created">最新创建</option>
     <option value="exp">最快到期</option>
@@ -537,8 +664,10 @@ def portal_page(
   <input class="search" id="q" type="search" placeholder="搜索名称或标签" aria-label="搜索">
 </div>
 <div class="tagsbar" id="tagsbar"></div>
+</div>
 <div class="grid" id="grid">{body}</div>
-<div class="blank" id="blank" hidden>没有匹配的项目，换个筛选条件试试</div>
+<div class="rows" id="rows" hidden>{rowbody}</div>
+<div class="blank" id="blank"{' hidden' if items else ''}>{'没有匹配的项目，换个筛选条件试试' if items else '暂无公开项目'}</div>
 </div>
 <script>
 {PORTAL_JS.replace("__NOW__", str(server_now))}

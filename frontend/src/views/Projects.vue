@@ -21,6 +21,7 @@ const filters = reactive({
   q: '',
   agent: '',
   kind: '',
+  visibility: '',
   status: 'online',
   tags: [],
   sort: 'updated_at',
@@ -54,6 +55,7 @@ const saved = (() => {
   }
 })()
 if (saved.status) filters.status = saved.status
+if (saved.visibility) filters.visibility = saved.visibility
 if (saved.sort) filters.sort = saved.sort
 if (saved.order) filters.order = saved.order
 if (saved.size) size.value = saved.size
@@ -66,6 +68,7 @@ async function load(keepSelection = false) {
       q: filters.q.trim(),
       agent: filters.agent,
       kind: filters.kind,
+      visibility: filters.visibility,
       status: filters.status,
       tag: filters.tags,
       sort: filters.sort,
@@ -105,12 +108,27 @@ function scheduleLoad() {
 
 watch(() => filters.q, scheduleLoad)
 watch(
-  () => [filters.agent, filters.kind, filters.status, filters.tags.join(','), filters.sort, filters.order, size.value],
+  () => [
+    filters.agent,
+    filters.kind,
+    filters.visibility,
+    filters.status,
+    filters.tags.join(','),
+    filters.sort,
+    filters.order,
+    size.value,
+  ],
   () => {
     if (page.value !== 1) page.value = 1
     localStorage.setItem(
       'pv_filters',
-      JSON.stringify({ status: filters.status, sort: filters.sort, order: filters.order, size: size.value })
+      JSON.stringify({
+        status: filters.status,
+        visibility: filters.visibility,
+        sort: filters.sort,
+        order: filters.order,
+        size: size.value,
+      })
     )
     load()
   }
@@ -135,6 +153,7 @@ function resetFilters() {
   filters.q = ''
   filters.agent = ''
   filters.kind = ''
+  filters.visibility = ''
   filters.status = 'online'
   filters.tags = []
   filters.sort = 'updated_at'
@@ -248,6 +267,13 @@ onBeforeUnmount(() => {
         <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
       </div>
 
+      <select v-model="filters.visibility" class="field" style="min-width: 112px" title="按可见性筛选">
+        <option value="">全部可见性</option>
+        <option value="portal">门户可见</option>
+        <option value="link">持链接可见</option>
+        <option value="private">仅自己可见</option>
+      </select>
+
       <select v-model="filters.status" class="field" style="min-width: 104px">
         <option value="online">仅在线</option>
         <option value="expired">已到期</option>
@@ -272,7 +298,7 @@ onBeforeUnmount(() => {
         <option :value="50">50 / 页</option>
         <option :value="100">100 / 页</option>
       </select>
-      <button v-if="filters.q || filters.tags.length || filters.agent || filters.kind" class="btn ghost sm" @click="resetFilters">
+      <button v-if="filters.q || filters.tags.length || filters.agent || filters.kind || filters.visibility" class="btn ghost sm" @click="resetFilters">
         清除筛选
       </button>
     </div>
