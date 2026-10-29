@@ -288,16 +288,19 @@ def build_zip_on_demand(slug: str) -> Path | None:
                     for fn in files:
                         full = Path(root) / fn
                         rel = full.relative_to(src).as_posix()
+                        # 源文件在打包过程中被替换/删除 → 跳过这一个，不影响整包
                         try:
                             st = full.stat()
-                            with open(full, "rb") as fh:
-                                payload = fh.read()
+                            fh = open(full, "rb")
                         except OSError:
-                            continue  # 打包过程中项目被替换/删除，跳过这个文件
-                        info = zipfile.ZipInfo(rel, date_time=time.localtime(st.st_mtime)[:6])
-                        info.compress_type = zipfile.ZIP_DEFLATED
-                        info.external_attr = 0o644 << 16
-                        z.writestr(info, payload)
+                            continue
+                        with fh:
+                            info = zipfile.ZipInfo(rel, date_time=time.localtime(st.st_mtime)[:6])
+                            info.compress_type = zipfile.ZIP_DEFLATED
+                            info.external_attr = 0o644 << 16
+                            # 流式写入：别把整个文件读进内存，否则一个 1GB 的视频就吃掉 1GB RSS
+                            with z.open(info, "w") as dst:
+                                shutil.copyfileobj(fh, dst, 1024 * 1024)
             _retry_fs(lambda: os.replace(tmp, dest))
         except OSError:
             try:
