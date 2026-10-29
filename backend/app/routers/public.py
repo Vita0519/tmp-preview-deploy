@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 
-from .. import config, defaults, pages, storage, views
+from .. import author, config, defaults, pages, storage, views
 from ..db import db, get_setting
 from ..security import now_ms, resolve_user
 
@@ -237,6 +237,7 @@ def portal(request: Request):
             config.SITE_SUBTITLE,
             now,
             bool(user),
+            author.load(),
         ),
         headers=NOINDEX,
     )
