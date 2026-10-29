@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from smoke_test import Client, multipart  # noqa: E402
 
-BASE = "http://127.0.0.1:8010"
+BASE = "http://127.0.0.1:8000"
 admin = Client(BASE)
 admin.login("admin", "admin123")
 

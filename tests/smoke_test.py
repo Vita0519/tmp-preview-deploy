@@ -3,8 +3,8 @@
 """端到端冒烟测试：不依赖第三方库，直接打本地服务。
 
 用法:
-  python tests/smoke_test.py --url http://127.0.0.1:8010
-  python tests/smoke_test.py --url http://127.0.0.1:8010 --user admin --password xxx
+  python tests/smoke_test.py --url http://127.0.0.1:8000
+  python tests/smoke_test.py --url http://127.0.0.1:8000 --user admin --password xxx
 """
 import argparse
 import io
@@ -81,7 +81,7 @@ def multipart(fields: dict, files: list[tuple[str, str, bytes]]):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url", default="http://127.0.0.1:8010")
+    ap.add_argument("--url", default="http://127.0.0.1:8000")
     ap.add_argument("--user", default="admin")
     ap.add_argument("--password", default="admin123")
     args = ap.parse_args()

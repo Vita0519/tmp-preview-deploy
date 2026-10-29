@@ -1,7 +1,7 @@
 """门户页验收：筛选/排序交互 + 桌面/移动截图。"""
 from playwright.sync_api import sync_playwright
 
-BASE = "http://127.0.0.1:8010"
+BASE = "http://127.0.0.1:8000"
 OUT = "C:/tmp/shots"
 
 with sync_playwright() as p:
