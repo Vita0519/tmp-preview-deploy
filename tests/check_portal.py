@@ -78,7 +78,8 @@ def main():
     inflow = re.findall(r'class="cbtn inflow"', html)
     check("每张卡片一个复制按钮", len(cbtns) == len(cards) and len(cards) > 0, f"cbtn={len(cbtns)} card={len(cards)}")
     check("每个列表行一个复制按钮", len(inflow) == len(rows), f"inflow={len(inflow)} row={len(rows)}")
-    check("按钮带 data-path", 'data-path="/v/' in first_card)
+    check("按钮带 data-path（预览外壳或外链地址）",
+          bool(re.search(r'data-path="(/v/|https?://)', first_card)), first_card[:80])
     check("卡片内有覆盖式链接 .hit", 'class="hit"' in first_card)
     check("按钮含「已复制」气泡", '<span class="tip">已复制</span>' in first_card)
     check("按钮含打勾图标", 'class="ic-done"' in first_card and 'class="ic-copy"' in first_card)

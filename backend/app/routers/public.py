@@ -13,6 +13,47 @@ router = APIRouter(tags=["public"])
 
 NOINDEX = {"X-Robots-Tag": "noindex, nofollow"}
 
+# 失效链接的落点：门户首页。门户本身有权限控制（未登录/不公开时会转去登录），
+# 所以这里无脑指 /portal 即可，不需要在跳转处再判一次权限，也不会泄露项目是否存在。
+PORTAL_HOME = "/portal?gone=1"
+
+
+def _wants_html(request: Request) -> bool:
+    """页面导航（顶层或 iframe）会带 text/html；图片/脚本这类子资源不会。"""
+    return "text/html" in (request.headers.get("accept") or "").lower()
+
+
+def _broken(request: Request):
+    """失效项目：子资源静默 404；页面导航回「能跳出 iframe」的失效页。"""
+    if not _wants_html(request):
+        return Response(status_code=404)
+    return HTMLResponse(
+        pages.gone_page(PORTAL_HOME),
+        status_code=404,
+        headers={**NOINDEX, "Cache-Control": "no-store"},
+    )
+
+
+def _entry_ok(row) -> bool:
+    """项目在磁盘上是否真的还有可展示的入口文件。"""
+    if row["kind"] != "static":
+        return True
+    rel = row["entry"] or "index.html"
+    target = storage.resolve_in_project(row["slug"], rel)
+    return bool(target and target.is_file())
+
+
+def _only_html(slug: str):
+    """根目录只有一个 html 文件时拿它当入口（不少单页站不叫 index.html）。"""
+    try:
+        base = storage.project_dir(slug)
+        if not base.is_dir():
+            return None
+        htmls = [f for f in base.iterdir() if f.is_file() and f.suffix.lower() in (".html", ".htm")]
+    except OSError:
+        return None
+    return htmls[0] if len(htmls) == 1 else None
+
 
 def _load(slug: str):
     with db() as conn:
@@ -94,18 +135,14 @@ def _serve_file(slug: str, rel: str, request: Request):
     row = _load(slug)
     user = resolve_user(request)
     visible, expired = _public_state(row, user)
-    if not visible:
-        return HTMLResponse(pages.error_page(404, "页面不存在", "链接可能有误，或该项目已被移除"), status_code=404)
-    if expired:
-        return HTMLResponse(
-            pages.error_page(410, "项目已到期", "该项目已超过设定的存活时长，访问已停止"),
-            status_code=410,
-        )
+    if not visible or expired:
+        return _broken(request)
     if row["kind"] == "link" and row["link_url"]:
         return RedirectResponse(row["link_url"], status_code=302)
 
     rel = storage.safe_rel(rel)
-    if rel in ("", "/"):
+    root_request = rel in ("", "/")
+    if root_request:
         rel = row["entry"] or "index.html"
 
     target = storage.resolve_in_project(slug, rel)
@@ -122,7 +159,15 @@ def _serve_file(slug: str, rel: str, request: Request):
                 if probe and probe.is_file():
                     target = probe
                     break
+        # 根路径但项目里只有一个 html（没叫 index.html）→ 就拿它当入口，别让整站打不开
+        if root_request and not target.is_file():
+            only = _only_html(slug)
+            if only is not None:
+                target = only
         if not target.is_file():
+            # 整个项目都没有可用入口 = 链接失效，把窗口带回门户而不是在 iframe 里显示 404
+            if not _entry_ok(row):
+                return _broken(request)
             return HTMLResponse(pages.error_page(404, "页面不存在", "该项目里找不到这个文件"), status_code=404)
 
     st = target.stat()
@@ -161,12 +206,8 @@ async def download(slug: str, request: Request):
     row = _load(slug)
     user = resolve_user(request)
     visible, expired = _public_state(row, user)
-    if not visible:
-        return HTMLResponse(pages.error_page(404, "项目不存在", "链接可能有误，或该项目已被移除"), status_code=404)
-    if expired:
-        return HTMLResponse(
-            pages.error_page(410, "项目已到期", "该项目已超过设定的存活时长，下载已停止"), status_code=410
-        )
+    if not visible or expired:
+        return RedirectResponse(PORTAL_HOME, status_code=302)
     if row["kind"] == "link":
         return RedirectResponse(row["link_url"] or "/", status_code=302)
     if not row["allow_download"]:
@@ -193,10 +234,15 @@ def preview(slug: str, request: Request):
     row = _load(slug)
     user = resolve_user(request)
     visible, expired = _public_state(row, user)
-    if not visible:
-        return HTMLResponse(
-            pages.error_page(404, "页面不存在", "链接可能有误，或该项目已被移除"), status_code=404
-        )
+    # 项目没了 / 到期了 / 没权限 → 直接回门户，不要再给一个「原地 404 + 倒计时」的四不像
+    if not visible or expired:
+        return RedirectResponse(PORTAL_HOME, status_code=302)
+    # 外链项目：不套外壳、不进 iframe，直接跳到目标站点
+    if row["kind"] == "link" and row["link_url"]:
+        return RedirectResponse(row["link_url"], status_code=302)
+    # 静态项目连入口文件都没有 → 同样是失效链接
+    if row["kind"] == "static" and not _entry_ok(row) and _only_html(slug) is None:
+        return RedirectResponse(PORTAL_HOME, status_code=302)
     data = _dict(row, "")
     data["expired"] = expired
     site_title = get_setting("site_title") or config.SITE_TITLE

@@ -38,6 +38,11 @@ def read_clipboard(pg):
     return pg.evaluate("navigator.clipboard.readText()")
 
 
+def full(p):
+    """data-path 可能是站内路径，也可能直接是外链项目的完整地址。"""
+    return p if p.startswith("http") else BASE.rstrip("/") + p
+
+
 with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome")
     ctx = b.new_context(viewport={"width": 1280, "height": 900}, device_scale_factor=2)
@@ -59,7 +64,10 @@ with sync_playwright() as p:
     print(f"卡片 {cards} / 列表行 {rows} / 卡片按钮 {btns} / 行内按钮 {rbtns}")
     chk("每张卡片都有复制按钮", cards > 0 and btns == cards, f"{btns}/{cards}")
     chk("每个列表行都有复制按钮", rows > 0 and rbtns == rows, f"{rbtns}/{rows}")
-    chk("卡片按钮带 data-path", pg.locator("#grid .cbtn[data-path^='/v/']").count() == cards)
+    chk("卡片按钮带 data-path", pg.locator("#grid .cbtn[data-path]").count() == cards)
+    # 外链项目的链接直接是外部地址，不该再套 /v/ 中转
+    paths = pg.eval_on_selector_all("#grid .cbtn", "els => els.map(e => e.dataset.path)")
+    chk("外链卡片指向外部站点", any(p.startswith("http") and "figma" in p for p in paths), paths[:3])
     chk("按钮默认无 done 类", pg.locator(".cbtn.done").count() == 0)
     chk("气泡文案为「已复制」", pg.locator("#grid .cbtn").first.locator(".tip").inner_text() == "已复制")
 
@@ -94,7 +102,7 @@ with sync_playwright() as p:
     chk("卡片按钮切换为打勾图标",
        btn.locator(".ic-done").is_visible() and not btn.locator(".ic-copy").is_visible())
     clip = read_clipboard(pg)
-    chk("剪贴板 = 完整直链", clip == BASE.rstrip("/") + path, clip)
+    chk("剪贴板 = 完整直链", clip == full(path), clip)
     pg.screenshot(path=f"{OUT}/30-copy-card.png", clip={"x": 0, "y": 0, "width": 1280, "height": 620})
     pg.wait_for_timeout(1700)
     chk("1.6s 后自动恢复", "done" not in (btn.get_attribute("class") or ""))
@@ -120,7 +128,7 @@ with sync_playwright() as p:
     chk("行内按钮出现 done 类", "done" in (lbtn.get_attribute("class") or ""))
     chk("行内气泡可见",
        lbtn.locator(".tip").evaluate("e => getComputedStyle(e).opacity") == "1")
-    chk("行内剪贴板正确", read_clipboard(pg) == BASE.rstrip("/") + lpath)
+    chk("行内剪贴板正确", read_clipboard(pg) == full(lpath))
     row_box = pg.locator("#rows .row").first.bounding_box()
     pg.screenshot(path=f"{OUT}/31-copy-list.png", clip={
         "x": 0, "y": 0, "width": 1280, "height": min(900, row_box["y"] + row_box["height"] + 90)})

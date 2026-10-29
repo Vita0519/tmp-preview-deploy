@@ -79,7 +79,8 @@ def main():
     for vis, slug in slugs.items():
         code, _ = guest.req("GET", f"/v/{slug}", raw=True)
         if vis == "private":
-            check("匿名打开 private → 404", code == 404, code)
+            gcode, gloc = guest.probe(f"/v/{slug}")
+            check("匿名打开 private → 302 回门户", gcode == 302 and gloc.startswith("/portal"), f"{gcode} {gloc}")
         else:
             check(f"匿名打开 {vis} → 200", code == 200, code)
 
@@ -99,8 +100,8 @@ def main():
     mate = Client(base)
     code, _ = mate.login(mate_name, mate_pw)
     check("成员登录", code == 200, code)
-    code, _ = mate.req("GET", f"/v/{slugs['private']}", raw=True)
-    check("其他 publisher 打开别人的 private → 404", code == 404, code)
+    code, loc = mate.probe(f"/v/{slugs['private']}")
+    check("其他 publisher 打开别人的 private → 302 回门户", code == 302 and loc.startswith("/portal"), f"{code} {loc}")
     code, _ = c.req("GET", f"/v/{slugs['private']}", raw=True)
     check("管理员打开 private → 200", code == 200, code)
     code, _ = mate.req("GET", f"/v/{slugs['link']}", raw=True)
@@ -118,8 +119,8 @@ def main():
     })
     check("批量设为仅自己", code == 200 and d.get("done") == 1, d)
     check("改为私有不影响 owner", c.req("GET", f"/v/{slugs['portal']}", raw=True)[0] == 200)
-    check("改为私有后匿名 404",
-          anon(base).req("GET", f"/v/{slugs['portal']}", raw=True)[0] == 404)
+    acode, aloc = anon(base).probe(f"/v/{slugs['portal']}")
+    check("改为私有后匿名 302 回门户", acode == 302 and aloc.startswith("/portal"), f"{acode} {aloc}")
 
     code, d = c.req("POST", "/api/projects/bulk", {
         "slugs": [slugs["portal"]], "action": "visibility", "visibility": "bogus",

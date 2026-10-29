@@ -50,8 +50,14 @@ function viewPct(p) {
   return Math.max(2, Math.round(((p.views || 0) / maxViews.value) * 100))
 }
 
+// 外链项目复制的是外部地址本身；否则复制 /v/<slug> 预览外壳
+function shareUrl(p) {
+  if (p.kind === 'link' && p.link_url) return p.link_url
+  return p.urls?.preview || `${location.origin}/v/${p.slug}`
+}
+
 function copyLink(p) {
-  const url = p.urls?.preview || `${location.origin}/v/${p.slug}`
+  const url = shareUrl(p)
   navigator.clipboard?.writeText(url).then(
     () => emit('action', { type: 'copied', item: p }),
     () => emit('action', { type: 'copy-failed', item: p })

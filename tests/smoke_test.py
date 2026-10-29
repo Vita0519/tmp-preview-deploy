@@ -25,6 +25,13 @@ def check(name: str, cond: bool, extra="") -> None:
     print(f"  {mark} {name}{('  → ' + str(extra)) if extra and not cond else ''}")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """不让 urllib 自动跟随 3xx，这样测试能看到真实的 302 + Location。"""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class Client:
     def __init__(self, base: str):
         self.base = base.rstrip("/")
@@ -32,7 +39,30 @@ class Client:
         self.opener = urllib.request.build_opener(
             urllib.request.ProxyHandler({}), urllib.request.HTTPCookieProcessor(self.jar)
         )
+        self.raw_opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}),
+            urllib.request.HTTPCookieProcessor(self.jar),
+            _NoRedirect,
+        )
         self.token = None
+
+    def fetch(self, path: str, accept: str = "text/html") -> tuple[int, str, str]:
+        """不跟随重定向，返回 (状态码, Location, 正文)。错误响应也给完整正文，便于断言页面内容。"""
+        hdrs = {"User-Agent": "smoke-test", "Accept": accept}
+        if self.token:
+            hdrs["Authorization"] = "Bearer " + self.token
+        req = urllib.request.Request(self.base + path, headers=hdrs)
+        try:
+            with self.raw_opener.open(req, timeout=30) as r:
+                return r.status, r.headers.get("Location") or "", r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            location = (e.headers.get("Location") or "") if e.headers else ""
+            return e.code, location, e.read().decode("utf-8", "replace")
+
+    def probe(self, path: str, accept: str = "text/html") -> tuple[int, str]:
+        """只关心状态码与 Location 时用这个。"""
+        code, location, _ = self.fetch(path, accept)
+        return code, location
 
     def req(self, method, path, body=None, headers=None, raw=False, ct="application/json"):
         url = self.base + path
@@ -182,8 +212,8 @@ def main() -> int:
     print("\n[清理]")
     code, d = admin.req("DELETE", f"/api/projects/{slug}")
     check("删除项目", code == 200, str(d))
-    code, _ = admin.req("GET", f"/v/{slug}", raw=True)
-    check("删除后 404", code == 404, str(code))
+    code, loc = admin.probe(f"/v/{slug}")
+    check("删除后预览链接 302 回门户", code == 302 and loc.startswith("/portal"), f"{code} {loc}")
     aid = _agent_id(admin, agent_name)
     if aid:
         code, d = admin.req("DELETE", f"/api/agents/{aid}")

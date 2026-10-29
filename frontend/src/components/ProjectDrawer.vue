@@ -29,9 +29,13 @@ const remaining = computed(() => {
   return { text: fmtRemain(ms), cls: ms < 6 * 3600e3 ? 'warn' : '', pct: Math.min(100, (ms / total) * 100) }
 })
 
-const previewUrl = computed(() =>
-  detail.value ? `${location.origin}/v/${detail.value.slug}` : ''
-)
+// 外链项目没有预览外壳，分享/复制都应该指向外部地址本身
+const previewUrl = computed(() => {
+  const d = detail.value
+  if (!d) return ''
+  if (d.kind === 'link' && d.link_url) return d.link_url
+  return `${location.origin}/v/${d.slug}`
+})
 
 async function load() {
   loading.value = true
