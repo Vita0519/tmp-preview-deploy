@@ -9,8 +9,27 @@ const items = ref([])
 const loading = ref(true)
 const createOpen = ref(false)
 const created = ref(null)
-const form = reactive({ username: '', display_name: '', password: '', role: 'agent' })
+const form = reactive({ username: '', display_name: '', password: '', role: 'publisher' })
 const busy = ref(false)
+
+const ROLES = [
+  { key: 'viewer', label: '仅门户', short: '访客', desc: '只能浏览访客门户，不能看项目' },
+  { key: 'publisher', label: '可发布', short: '发布者', desc: '能上传并管理自己的项目' },
+  { key: 'admin', label: '管理员', short: '管理员', desc: '可管理全部成员、项目与设置' },
+]
+const roleOf = (k) => ROLES.find((r) => r.key === k) || ROLES[0]
+
+async function setRole(item, role) {
+  if (role === item.role) return
+  try {
+    await api.patch(`/api/agents/${item.id}`, { role })
+    toast(`已改为「${roleOf(role).label}」`)
+    load()
+  } catch (e) {
+    toast(e.message || '修改失败', 'err')
+    load()
+  }
+}
 
 async function load() {
   loading.value = true
@@ -145,7 +164,16 @@ onMounted(load)
               </div>
             </td>
             <td>
-              <span class="badge" :class="{ brand: a.role === 'admin' }">{{ a.role === 'admin' ? '管理员' : '成员' }}</span>
+              <select
+                class="rolesel"
+                :class="'r-' + a.role"
+                :value="a.role"
+                :disabled="a.id === store.user?.id"
+                :title="a.id === store.user?.id ? '不能修改自己的角色' : roleOf(a.role).desc"
+                @change="setRole(a, $event.target.value)"
+              >
+                <option v-for="r in ROLES" :key="r.key" :value="r.key">{{ r.label }}</option>
+              </select>
             </td>
             <td class="cell-num tabular">{{ a.projects }} <span class="dim">/ {{ a.online }}</span></td>
             <td class="cell-num tabular">{{ fmtNum(a.views) }}</td>
@@ -185,8 +213,21 @@ onMounted(load)
               <b class="truncate">{{ a.display_name }}</b>
               <span class="truncate">@{{ a.username }}</span>
             </div>
-            <span class="badge" :class="{ brand: a.role === 'admin' }">{{ a.role === 'admin' ? '管理员' : '成员' }}</span>
             <span v-if="!a.active" class="badge">停用</span>
+          </div>
+          <div class="acard-role">
+            <span class="rl-lab">角色</span>
+            <select
+              class="rolesel wide"
+              :class="'r-' + a.role"
+              :value="a.role"
+              :disabled="a.id === store.user?.id"
+              :title="a.id === store.user?.id ? '不能修改自己的角色' : roleOf(a.role).desc"
+              @change="setRole(a, $event.target.value)"
+            >
+              <option v-for="r in ROLES" :key="r.key" :value="r.key">{{ r.label }}</option>
+            </select>
+            <span class="rl-hint">{{ roleOf(a.role).desc }}</span>
           </div>
           <div class="acard-stats">
             <span><b>{{ a.projects }}</b> 项目</span>
@@ -243,10 +284,23 @@ onMounted(load)
         </div>
         <div class="frow">
           <label>角色</label>
-          <select v-model="form.role" class="input">
-            <option value="agent">成员（只看自己的项目）</option>
-            <option value="admin">管理员（看全部）</option>
-          </select>
+          <div class="rolepick">
+            <button
+              v-for="r in ROLES"
+              :key="r.key"
+              type="button"
+              class="rp"
+              :class="{ on: form.role === r.key }"
+              @click="form.role = r.key"
+            >
+              <span class="rp-dot" />
+              <span class="rp-txt">
+                <b>{{ r.label }}</b>
+                <em>{{ r.desc }}</em>
+              </span>
+            </button>
+          </div>
+          <span class="hint">创建后仍可在列表里随时改。</span>
         </div>
       </div>
     </div>
@@ -287,3 +341,102 @@ onMounted(load)
     </div>
   </div>
 </template>
+
+<style scoped>
+/* ---------- 角色切换下拉：三档，按角色着色 ---------- */
+.rolesel {
+  appearance: none;
+  -webkit-appearance: none;
+  width: auto;
+  max-width: 124px;
+  padding: 2px 22px 2px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background-color: var(--surface-3);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%237b8189' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease), background-color 0.16s var(--ease);
+}
+.rolesel:hover:not(:disabled) { border-color: var(--ink-4); }
+.rolesel:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+.rolesel:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.rolesel.r-viewer { color: var(--ink-3); background-color: var(--surface-3); border-color: var(--line); }
+.rolesel.r-publisher { color: var(--brand); background-color: var(--brand-soft); border-color: var(--brand-line); }
+.rolesel.r-admin {
+  color: #fff;
+  background-color: var(--brand);
+  border-color: transparent;
+  font-weight: 650;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+}
+
+/* 窄屏卡片里的角色行 */
+.acard-role {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.rl-lab { flex: 0 0 auto; font-size: 11.5px; color: var(--ink-4); }
+.rolesel.wide { flex: 1 1 84px; min-width: 0; max-width: none; padding-top: 3px; padding-bottom: 3px; }
+.rl-hint { flex: 1 1 100%; font-size: 11px; color: var(--ink-4); line-height: 1.45; }
+
+/* ---------- 创建对话框的角色单选 ---------- */
+.rolepick { display: flex; flex-direction: column; gap: 6px; }
+.rp {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s var(--ease), background-color 0.16s var(--ease);
+}
+.rp:hover { border-color: var(--ink-4); background: var(--surface-2); }
+.rp.on { border-color: var(--brand); background: var(--brand-soft); }
+.rp-dot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin-top: 3px;
+  border: 1.5px solid var(--line-2);
+  border-radius: 50%;
+  transition: border-color 0.16s var(--ease);
+}
+.rp.on .rp-dot { border-color: var(--brand); }
+.rp.on .rp-dot::after {
+  content: '';
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.rp-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rp-txt b { font-size: 12.5px; font-weight: 650; color: var(--ink); }
+.rp-txt em { font-style: normal; font-size: 11.5px; color: var(--ink-4); }
+</style>

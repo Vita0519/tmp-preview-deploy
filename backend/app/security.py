@@ -11,6 +11,17 @@ from .db import db, tx
 
 PBKDF2_ROUNDS = 120_000
 
+# 三种角色：只能看门户 / 能发布自己的项目 / 管理员
+ROLES = ("viewer", "publisher", "admin")
+ROLE_LABELS = {"viewer": "仅门户访客", "publisher": "可发布项目", "admin": "管理员"}
+
+
+def norm_role(raw: str | None) -> str:
+    """兼容老库里的 'agent'（等同于 publisher）。"""
+    if raw == "agent":
+        return "publisher"
+    return raw if raw in ROLES else "viewer"
+
 
 def now_ms() -> int:
     return int(time.time() * 1000)
@@ -42,7 +53,7 @@ def _user_dict(row) -> dict:
         "id": row["id"],
         "username": row["username"],
         "display_name": row["display_name"] or row["username"],
-        "role": row["role"],
+        "role": norm_role(row["role"]),
         "active": bool(row["active"]),
         "created_at": row["created_at"],
         "last_login_at": row["last_login_at"],
@@ -119,6 +130,13 @@ def current_user(request: Request) -> dict:
 def admin_user(user: dict = Depends(current_user)) -> dict:
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="需要管理员权限")
+    return user
+
+
+def publisher_user(user: dict = Depends(current_user)) -> dict:
+    """能发布/管理项目的人（publisher 及以上）。viewer 只能看门户。"""
+    if user["role"] == "viewer":
+        raise HTTPException(status_code=403, detail="当前账号只能浏览访客门户")
     return user
 
 
