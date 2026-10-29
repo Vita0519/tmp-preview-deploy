@@ -5,7 +5,15 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..db import db, log_event, tx
-from ..security import admin_user, hash_password, new_api_key, now_ms, user_by_id
+from ..security import (
+    ROLES,
+    admin_user,
+    hash_password,
+    new_api_key,
+    norm_role,
+    now_ms,
+    user_by_id,
+)
 from ..storage import remove_project_files
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -51,7 +59,7 @@ async def create_agent(request: Request, user: dict = Depends(admin_user)):
         raise HTTPException(status_code=400, detail="账号需为 2-32 位小写字母/数字/._-")
     password = str(body.get("password") or "").strip() or secrets.token_urlsafe(8)
     display = str(body.get("display_name") or username).strip()[:40]
-    role = "admin" if body.get("role") == "admin" else "agent"
+    role = body.get("role") if body.get("role") in ROLES else "publisher"
     key = new_api_key()
     with tx() as conn:
         if conn.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
@@ -90,6 +98,22 @@ async def patch_agent(agent_id: int, request: Request, user: dict = Depends(admi
         sets.append("api_key=?")
         args.append(key)
         out["api_key"] = key
+    if "role" in body:
+        role = body["role"]
+        if role not in ROLES:
+            raise HTTPException(status_code=400, detail="角色不合法")
+        if agent_id == user["id"]:
+            raise HTTPException(status_code=400, detail="不能修改自己的角色")
+        if role != "admin":
+            with db() as conn:
+                row = conn.execute("SELECT role FROM users WHERE id=?", (agent_id,)).fetchone()
+                admins = conn.execute(
+                    "SELECT COUNT(*) c FROM users WHERE role='admin' AND active=1"
+                ).fetchone()["c"]
+            if row and norm_role(row["role"]) == "admin" and admins <= 1:
+                raise HTTPException(status_code=400, detail="至少要保留一个管理员")
+        sets.append("role=?")
+        args.append(role)
     if not sets:
         raise HTTPException(status_code=400, detail="没有要更新的内容")
     args.append(agent_id)

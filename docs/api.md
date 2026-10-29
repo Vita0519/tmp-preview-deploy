@@ -5,7 +5,9 @@
 - 浏览器：`pv_sid` HttpOnly Cookie（`POST /api/auth/login` 下发，7 天）
 - 机器调用：`Authorization: Bearer <api_key>` 或 `X-API-Key: <api_key>`
 
-标记含义：🟢 公开 · 👤 需登录 · 🛡 仅管理员
+标记含义：🟢 公开 · 👤 需登录 · ✍ 需 `publisher` 及以上 · 🛡 仅管理员
+
+角色三档：`viewer`（仅门户）/ `publisher`（可发布项目）/ `admin`（管理员）。老的 `agent` 角色在启动迁移时会自动转成 `publisher`。
 
 ## 认证
 
@@ -21,15 +23,15 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/projects` | 👤 | 列表。参数：`q`、`agent`、`tag`(可重复)、`kind`、`status`(online/expired/permanent/all)、`visibility`、`expiring_hours`、`sort`、`order`、`limit`、`offset`。返回 `items`、`total`、`stats`、`facets`、`server_now` |
-| GET | `/api/projects/{slug}` | 👤 | 详情：含 `files[]`、`daily_views[]`、`events[]` |
-| POST | `/api/projects` | 👤 | 上传（multipart）：`slug,title,description,tags,hours,forever,expire_action,allow_download,visibility,files[],zip,owner(管理员)`。`hours` 省略时按可见性取默认时长 |
-| POST | `/api/projects/link` | 👤 | 登记外链：`{link_url,title,slug,description,tags,hours,forever,visibility}` |
-| PATCH | `/api/projects/{slug}` | 👤 | 改属性：`title,description,tags[],visibility,allow_download,expire_action,hours,permanent,expires_at,slug(改名),revive` |
-| DELETE | `/api/projects/{slug}` | 👤 | 删除项目与文件 |
-| POST | `/api/projects/bulk` | 👤 | `{slugs[], action}`，action ∈ `delete, expire, permanent, extend, allow_download, deny_download, visibility, tag_add` |
-| POST | `/api/projects/{slug}/reset-views` | 👤 | 访问计数清零 |
-| GET | `/api/stats/trend` | 👤 | 近 N 天访问趋势（默认 14） |
+| GET | `/api/projects` | ✍ | 列表。参数：`q`、`agent`、`tag`(可重复)、`kind`、`status`(online/expired/permanent/all)、`visibility`、`expiring_hours`、`sort`、`order`、`limit`、`offset`。返回 `items`、`total`、`stats`、`facets`、`server_now` |
+| GET | `/api/projects/{slug}` | ✍ | 详情：含 `files[]`、`daily_views[]`、`events[]` |
+| POST | `/api/projects` | ✍ | 上传（multipart）：`slug,title,description,tags,hours,forever,expire_action,allow_download,visibility,files[],zip,owner(管理员)`。`hours` 省略时按可见性取默认时长 |
+| POST | `/api/projects/link` | ✍ | 登记外链：`{link_url,title,slug,description,tags,hours,forever,visibility}` |
+| PATCH | `/api/projects/{slug}` | ✍ | 改属性：`title,description,tags[],visibility,allow_download,expire_action,hours,permanent,expires_at,slug(改名),revive` |
+| DELETE | `/api/projects/{slug}` | ✍ | 删除项目与文件 |
+| POST | `/api/projects/bulk` | ✍ | `{slugs[], action}`，action ∈ `delete, expire, permanent, extend, allow_download, deny_download, visibility, tag_add` |
+| POST | `/api/projects/{slug}/reset-views` | ✍ | 访问计数清零 |
+| GET | `/api/stats/trend` | ✍ | 近 N 天访问趋势（默认 14） |
 
 ## 成员
 
@@ -37,7 +39,7 @@
 |---|---|---|---|
 | GET | `/api/agents` | 🛡 | 成员列表（含项目数、在线数、访问数、Key 末 6 位） |
 | POST | `/api/agents` | 🛡 | 创建：`{username, display_name, password, role}` → 返回 password/api_key |
-| PATCH | `/api/agents/{id}` | 🛡 | `{display_name, active, password, rotate_key}` |
+| PATCH | `/api/agents/{id}` | 🛡 | `{display_name, active, password, rotate_key, role}`。`role` ∈ `viewer/publisher/admin`，不能改自己，也不会让管理员数量归零 |
 | DELETE | `/api/agents/{id}` | 🛡 | 删除成员及其全部项目 |
 | GET | `/api/agents/{id}/key` | 🛡 | 查看完整 API Key |
 

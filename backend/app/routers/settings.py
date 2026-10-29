@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 
 from .. import author, config, defaults
 from ..db import all_settings, db, get_setting, set_setting
+from ..pages import ICONS
 from ..security import admin_user
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -36,7 +37,8 @@ def read_settings(user: dict = Depends(admin_user)):
         "public_portal": s.get("public_portal") == "1",
         "author": author.load(),
         "author_types": [
-            {"key": k, "label": v["label"]} for k, v in author.TYPE_META.items()
+            {"key": k, "label": v["label"], "paths": ICONS.get(v["icon"], "")}
+            for k, v in author.TYPE_META.items()
         ],
         "runtime": {
             "data_dir": str(config.DATA_DIR),

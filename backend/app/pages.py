@@ -244,9 +244,10 @@ border-radius:12px;padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
 .card[hidden]{display:none}
 .card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(15,118,110,.32)}
-.top{display:flex;align-items:center;gap:8px;min-width:0}
-.name{font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a;min-width:0;
-overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.tinfo{flex:1 1 auto;min-width:0}
+.name{display:flex;align-items:center;gap:6px;font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a;
+min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .kind{flex:0 0 auto;font-size:10px;font-weight:600;color:#7b8189;background:#f3f5f3;
 border:1px solid rgba(20,22,26,.06);border-radius:5px;padding:1px 5px}
 .byline{margin-top:5px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:#98a0a6;
@@ -259,9 +260,7 @@ font-variant-numeric:tabular-nums;min-width:0}
 .tags:empty{display:none}
 .tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:#f3f5f3;color:#5b636d;
 border:1px solid rgba(20,22,26,.06)}
-.foot{display:flex;align-items:flex-end;gap:12px;margin-top:auto;padding-top:11px;
-border-top:1px solid rgba(20,22,26,.06)}
-.cdwrap{flex:1 1 auto;min-width:0;padding-bottom:2px}
+.foot{margin-top:auto;padding-top:10px}
 .cdrow{display:flex;align-items:baseline;gap:5px;margin-bottom:6px}
 .cdlab{font-size:10.5px;color:#98a0a6}
 .cd{font-size:12.5px;font-weight:650;color:#0f766e;font-variant-numeric:tabular-nums;
@@ -269,11 +268,12 @@ letter-spacing:-.01em;white-space:nowrap}
 .cd.perm{color:#3a4a63}
 .cd.warn{color:#b45309}
 .cd.dead{color:#b42318}
+.cdend{margin-left:auto;font-size:10.5px;color:#a3aab0;font-variant-numeric:tabular-nums;white-space:nowrap}
 .track{height:3px;border-radius:99px;background:#eef1ef;overflow:hidden}
 .track > i{display:block;height:100%;border-radius:99px;background:#0f766e;transition:width .5s ease}
 .track.warn > i{background:#b45309}
 .track.dead > i{background:#b42318}
-.ring{position:relative;flex:0 0 auto;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
+.ring{position:relative;flex:0 0 auto;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
 background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef1ef 0)}
 .ring::after{content:'';position:absolute;inset:4px;border-radius:50%;background:#fff}
 .ring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:2px}
@@ -447,6 +447,12 @@ def _remain_text(ms: int) -> str:
     return f"剩余 {h}:{(s % 3600) // 60:02d}:{s % 60:02d}"
 
 
+def _fmt_day(ts: int) -> str:
+    from datetime import datetime
+
+    return datetime.fromtimestamp(ts / 1000).strftime("%m-%d %H:%M")
+
+
 def portal_page(
     items: list[dict],
     site_title: str,
@@ -477,24 +483,27 @@ def portal_page(
         owner = escape((p.get("owner") or {}).get("display_name") or "")
         size = _human(p["size_bytes"]) if p["kind"] != "link" else "外链"
         num_cls = "sm" if views >= 1000 else ""
+        ends = "" if not exp else f"到期 {_fmt_day(exp)}"
         cards.append(
             f"""<a class="card" href="/v/{p['slug']}" target="_blank" rel="noopener" style="order:0"
    data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}"
    data-kind="{p['kind']}" data-tags="{escape('|'.join(tags_list), quote=True)}"
    data-title="{escape(p['title'], quote=True)}">
-  <div class="top"><span class="name">{escape(p['title'])}</span>
-    <span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
-  <div class="byline"><span>{owner or '—'}</span><span class="dot"></span><span>{size}</span></div>
-  <p class="desc">{escape(p['description'] or '')}</p>
-  <div class="tags">{tags}</div>
-  <div class="foot">
-    <div class="cdwrap">
-      <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span></div>
-      <div class="track"><i style="width:{pct:.1f}%"></i></div>
+  <div class="top">
+    <div class="tinfo">
+      <div class="name">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
+      <div class="byline"><span>{owner or '—'}</span><span class="dot"></span><span>{size}</span></div>
     </div>
     <div class="ring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
       <span class="in"><b class="{num_cls}">{views}</b><i>访问</i></span>
     </div>
+  </div>
+  <p class="desc">{escape(p['description'] or '')}</p>
+  <div class="tags">{tags}</div>
+  <div class="foot">
+    <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span>
+      <span class="cdend">{ends}</span></div>
+    <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
 </a>"""
         )

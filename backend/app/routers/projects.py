@@ -11,10 +11,13 @@ from fastapi.responses import JSONResponse
 
 from .. import config, defaults, storage, views
 from ..db import db, get_setting, log_event, set_tags, tx
-from ..security import current_user, now_ms
+from ..security import current_user, now_ms, publisher_user
 from ..serializers import PROJECT_SELECT, project_dict
 
-router = APIRouter(prefix="/api", tags=["projects"])
+# viewer 只能浏览门户，整个项目模块都进不来
+router = APIRouter(
+    prefix="/api", tags=["projects"], dependencies=[Depends(publisher_user)]
+)
 
 SORT_FIELDS = {
     "views": "p.views",

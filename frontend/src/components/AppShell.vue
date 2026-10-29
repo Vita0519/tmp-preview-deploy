@@ -10,8 +10,13 @@ const router = useRouter()
 
 const user = computed(() => store.user)
 const isAdmin = computed(() => store.user?.role === 'admin')
+const isViewer = computed(() => store.user?.role === 'viewer')
+const roleLabel = computed(() => {
+  const map = { viewer: '仅门户访客', publisher: '发布者', admin: '管理员' }
+  return map[store.user?.role] || '发布者'
+})
 const nav = computed(() => [
-  { name: 'projects', label: '项目', icon: 'folder', show: true },
+  { name: 'projects', label: '项目', icon: 'folder', show: !isViewer.value },
   { name: 'agents', label: '成员', icon: 'users', show: isAdmin.value },
   { name: 'settings', label: '设置', icon: 'sliders', show: isAdmin.value },
 ])
@@ -45,7 +50,7 @@ function closeNav() {
         </div>
       </div>
 
-      <nav class="nav">
+      <nav v-if="nav.some((n) => n.show)" class="nav">
         <div class="nav-label">工作区</div>
         <router-link
           v-for="item in nav.filter((n) => n.show)"
@@ -69,7 +74,7 @@ function closeNav() {
           <span class="avatar">{{ (user?.display_name || user?.username || '?').slice(0, 1) }}</span>
           <span class="who">
             <b>{{ user?.display_name || user?.username }}</b>
-            <span>{{ isAdmin ? '管理员' : '成员 Agent' }}</span>
+            <span>{{ roleLabel }}</span>
           </span>
           <span style="margin-left: auto; color: var(--ink-4)"><Icon name="logout" :size="14" /></span>
         </button>
@@ -77,7 +82,27 @@ function closeNav() {
     </aside>
 
     <main class="main">
-      <slot />
+      <template v-if="isViewer">
+        <header class="topbar">
+          <h1>受限账号</h1>
+          <span class="sub">仅可浏览访客门户</span>
+        </header>
+        <div class="content">
+          <div class="panel" style="padding: 34px 24px; text-align: center">
+            <div class="avatar" style="width: 42px; height: 42px; margin: 0 auto 12px; font-size: 16px">
+              {{ (user?.display_name || user?.username || '?').slice(0, 1) }}
+            </div>
+            <h2 style="margin: 0 0 6px; font-size: 15px">这个账号只能看门户</h2>
+            <p class="muted" style="margin: 0 auto 18px; max-width: 380px; font-size: 12.5px">
+              你的角色是「仅门户访客」，可以浏览已发布的内容，但没有上传、管理项目的权限。需要发布请联系管理员调整角色。
+            </p>
+            <a class="btn primary" href="/portal" target="_blank" rel="noopener">
+              <Icon name="eye" :size="13" /> 打开访客门户
+            </a>
+          </div>
+        </div>
+      </template>
+      <slot v-else />
     </main>
   </div>
 </template>

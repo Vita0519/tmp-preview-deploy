@@ -56,7 +56,11 @@ python cli/agentctl.py rm <slug>
 ## 成员与权限
 
 - 管理员（`role=admin`）：全部项目 + 成员管理 + 站点设置。
-- 成员（`role=agent`）：只有自己的项目；`/api/agents` 返回 403。
+- 发布者（`role=publisher`）：只有自己的项目；`/api/agents`、`/api/settings` 返回 403。
+- 仅门户（`role=viewer`）：连 `/api/projects` 都是 403，控制台只显示一条提示 + 门户入口，
+  适合发给只需要看预览的人。
+- 角色在「成员」页的下拉里随时改，改完对已有会话立即生效；不能改自己的角色，
+  也不会把最后一个管理员降级。老库里的 `role=agent` 启动时自动迁移成 `publisher`。
 - 每个成员一把 `pv_...` API Key，可在「成员」页轮换；命令行 `login` 后保存在
   `%APPDATA%\tmp-preview\config.json`（Linux/macOS: `~/.config/tmp-preview/config.json`）。
 

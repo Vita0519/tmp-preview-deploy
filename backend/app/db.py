@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   username      TEXT NOT NULL UNIQUE,
   display_name  TEXT NOT NULL DEFAULT '',
-  role          TEXT NOT NULL DEFAULT 'agent' CHECK (role IN ('admin','agent')),
+  role          TEXT NOT NULL DEFAULT 'publisher'
+                CHECK (role IN ('viewer','publisher','admin')),
   password_hash TEXT NOT NULL,
   api_key       TEXT UNIQUE,
   active        INTEGER NOT NULL DEFAULT 1,
@@ -147,8 +148,90 @@ def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with db() as conn:
         conn.executescript(SCHEMA)
+        _migrate_roles(conn)
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
+
+
+def _migrate_roles(conn) -> None:
+    """老库的 users.role 只有 admin/agent 且带 CHECK 约束，加不了 viewer。
+
+    SQLite 改不了 CHECK，只能重建表：agent → publisher，其余原样搬过去。
+    """
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'"
+    ).fetchone()
+    sql = (row["sql"] or "") if row else ""
+    if "publisher" in sql:
+        _repair_dangling_refs(conn)
+        return
+    print("[migrate] 重建 users 表：agent → publisher，放开 viewer 角色", flush=True)
+    conn.execute("PRAGMA foreign_keys=OFF")
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        # 顺序很重要：先建新表 → 搬数据 → 删旧表 → 最后把新表改名回 users。
+        # 反过来先 ALTER TABLE users RENAME TO users_old 的话，SQLite 会把 projects
+        # 等表里的 REFERENCES users(id) 一起改写成 REFERENCES users_old(id)，
+        # 旧表一删，插项目就报 no such table: main.users_old。
+        conn.execute(
+            """
+            CREATE TABLE users_new (
+              id            INTEGER PRIMARY KEY AUTOINCREMENT,
+              username      TEXT NOT NULL UNIQUE,
+              display_name  TEXT NOT NULL DEFAULT '',
+              role          TEXT NOT NULL DEFAULT 'publisher'
+                            CHECK (role IN ('viewer','publisher','admin')),
+              password_hash TEXT NOT NULL,
+              api_key       TEXT UNIQUE,
+              active        INTEGER NOT NULL DEFAULT 1,
+              created_at    INTEGER NOT NULL,
+              last_login_at INTEGER
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO users_new(id, username, display_name, role, password_hash, api_key, active, created_at, last_login_at) "
+            "SELECT id, username, display_name, "
+            "CASE role WHEN 'agent' THEN 'publisher' WHEN 'admin' THEN 'admin' ELSE 'publisher' END, "
+            "password_hash, api_key, active, created_at, last_login_at FROM users"
+        )
+        conn.execute("DROP TABLE users")
+        conn.execute("ALTER TABLE users_new RENAME TO users")
+        conn.execute("COMMIT")
+    except Exception:
+        try:
+            conn.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON")
+
+
+def _repair_dangling_refs(conn) -> None:
+    """修掉早期版本留下的 REFERENCES "users_old"（那张表已经不在了）。
+
+    只改 sqlite_master 里的建表语句文本，不动数据；改完把 schema_version 加一，
+    让同库的其它连接重新解析 schema。
+    """
+    rows = conn.execute(
+        "SELECT name, sql FROM sqlite_master WHERE type='table' AND sql LIKE '%users_old%'"
+    ).fetchall()
+    if not rows:
+        return
+    print(f"[migrate] 修正悬空外键 users_old → users：{[r['name'] for r in rows]}", flush=True)
+    conn.execute("PRAGMA writable_schema=ON")
+    try:
+        for r in rows:
+            fixed = (r["sql"] or "").replace("users_old", "users")
+            conn.execute(
+                "UPDATE sqlite_master SET sql=? WHERE type='table' AND name=?", (fixed, r["name"])
+            )
+        ver = conn.execute("PRAGMA schema_version").fetchone()[0]
+        conn.execute(f"PRAGMA schema_version={int(ver) + 1}")
+    finally:
+        conn.execute("PRAGMA writable_schema=OFF")
+    conn.execute("PRAGMA writable_schema=RESET")
 
 
 def get_setting(key: str, default: str = "") -> str:
