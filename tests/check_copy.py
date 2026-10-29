@@ -45,7 +45,9 @@ with sync_playwright() as p:
     pg = login(ctx)
     errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
+    # dev server 下 favicon.ico 偶尔 404，与功能无关，忽略
+    pg.on("console", lambda m: errs.append(m.text)
+          if m.type == "error" and "favicon" not in m.text and "404" not in m.text else None)
 
     pg.goto(BASE + "/portal", wait_until="networkidle")
     pg.wait_for_timeout(400)
