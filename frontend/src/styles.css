@@ -377,6 +377,7 @@ td.cell-num, th.cell-num { text-align: right; }
 }
 
 .col-kind { width: 88px; }
+.col-vis { width: 96px; }
 .col-owner { width: 112px; }
 .col-views { width: 96px; }
 .col-size { width: 96px; }
@@ -535,6 +536,7 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
 @media (max-width: 1240px) { .col-owner { display: none; } }
 
 @media (max-width: 1080px) {
+  .col-vis { display: none; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .stat:nth-child(3) { border-left: 0; }
   .stat:nth-child(n + 3) { border-top: 1px solid var(--line); }

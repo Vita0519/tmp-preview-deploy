@@ -57,6 +57,18 @@ export function hoursLabel(h) {
   return `${(h / 24).toFixed(h % 24 === 0 ? 0 : 1)} 天`
 }
 
+export function visLabel(v) {
+  return { portal: '门户可见', link: '持链接', private: '仅自己' }[v] || v || '—'
+}
+
+export function visHint(v) {
+  return {
+    portal: '出现在访客门户列表，任何人可看',
+    link: '不列出，拿到链接就能打开',
+    private: '只有自己登录后才能看',
+  }[v] || ''
+}
+
 export function typeLabel(kind) {
   return { static: '静态站', zip: '压缩包', link: '外链' }[kind] || kind
 }
