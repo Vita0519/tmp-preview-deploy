@@ -9,7 +9,7 @@ const items = ref([])
 const loading = ref(true)
 const createOpen = ref(false)
 const created = ref(null)
-const form = reactive({ username: '', display_name: '', password: '', role: 'publisher' })
+const form = reactive({ username: '', display_name: '', password: '', role: 'publisher', key_label: '' })
 const busy = ref(false)
 
 const ROLES = [
@@ -24,6 +24,19 @@ async function setRole(item, role) {
   try {
     await api.patch(`/api/agents/${item.id}`, { role })
     toast(`已改为「${roleOf(role).label}」`)
+    load()
+  } catch (e) {
+    toast(e.message || '修改失败', 'err')
+    load()
+  }
+}
+
+async function setKeyLabel(item, value) {
+  const label = (value || '').trim()
+  if (label === (item.key_label || '')) return
+  try {
+    await api.patch(`/api/agents/${item.id}`, { key_label: label })
+    toast(label ? `Key 已绑定到「${label}」` : '已清空绑定名称')
     load()
   } catch (e) {
     toast(e.message || '修改失败', 'err')
@@ -53,6 +66,7 @@ async function submit() {
     form.username = ''
     form.display_name = ''
     form.password = ''
+    form.key_label = ''
     load()
     toast('成员已创建')
   } catch (e) {
@@ -131,7 +145,7 @@ onMounted(load)
     <h1>成员</h1>
     <span class="sub">{{ items.length }} 个账号</span>
     <div class="grow" />
-    <span class="dim hide-sm" style="font-size: 12px">每个成员用自己的 API Key 上传，互不可见</span>
+    <span class="dim hide-sm" style="font-size: 12px">一个账号 = 一个 Agent = 一把 API Key，互相看不到对方项目</span>
     <button class="btn primary" @click="createOpen = true"><Icon name="plus" :size="13" /> 添加成员</button>
   </header>
 
@@ -144,7 +158,7 @@ onMounted(load)
             <th>角色</th>
             <th class="cell-num">项目 / 在线</th>
             <th class="cell-num">访问</th>
-            <th class="hide-sm">Key</th>
+            <th class="hide-sm">绑定 Agent / Key</th>
             <th>最近登录</th>
             <th class="cell-num">操作</th>
           </tr>
@@ -178,7 +192,22 @@ onMounted(load)
             <td class="cell-num tabular">{{ a.projects }} <span class="dim">/ {{ a.online }}</span></td>
             <td class="cell-num tabular">{{ fmtNum(a.views) }}</td>
             <td class="hide-sm">
-              <span class="mono dim">…{{ a.api_key_tail }}</span>
+              <div class="keycell">
+                <input
+                  class="keylab"
+                  :value="a.key_label"
+                  maxlength="40"
+                  placeholder="绑给哪个 agent"
+                  title="一个账号只允许绑一个 agent，改名不会影响 Key 本身"
+                  @change="setKeyLabel(a, $event.target.value)"
+                  @keydown.enter="$event.target.blur()"
+                />
+                <div class="keymeta" :title="`这把 Key 累计被调用 ${a.key_uses || 0} 次`">
+                  <span class="mono">…{{ a.api_key_tail }}</span>
+                  <span v-if="a.key_last_used_at">· {{ relTime(a.key_last_used_at) }}用过</span>
+                  <span v-else>· 尚未使用</span>
+                </div>
+              </div>
             </td>
             <td>
               <span class="tabular" style="font-size: 12px">{{ a.last_login_at ? relTime(a.last_login_at) : '从未' }}</span>
@@ -235,6 +264,22 @@ onMounted(load)
             <span><b>{{ fmtNum(a.views) }}</b> 访问</span>
             <span>登录 <b>{{ a.last_login_at ? relTime(a.last_login_at) : '从未' }}</b></span>
           </div>
+          <div class="acard-bind">
+            <span class="rl-lab">绑定 Agent</span>
+            <input
+              class="keylab"
+              :value="a.key_label"
+              maxlength="40"
+              placeholder="绑给哪个 agent"
+              @change="setKeyLabel(a, $event.target.value)"
+              @keydown.enter="$event.target.blur()"
+            />
+            <span class="bindmeta">
+              <span class="mono">…{{ a.api_key_tail }}</span>
+              <span v-if="a.key_last_used_at">· {{ relTime(a.key_last_used_at) }}用过</span>
+              <span v-else>· 尚未使用</span>
+            </span>
+          </div>
           <div class="acard-ops">
             <button class="btn sm" @click="resetPassword(a)">重置密码</button>
             <button class="btn sm" @click="rotateKey(a)"><Icon name="key" :size="12" /> 轮换 Key</button>
@@ -281,6 +326,11 @@ onMounted(load)
         <div class="frow">
           <label>初始密码</label>
           <input v-model="form.password" class="input" placeholder="留空自动生成" />
+        </div>
+        <div class="frow">
+          <label>绑定 Agent</label>
+          <input v-model="form.key_label" class="input" placeholder="留空则用显示名，如 claude-code" />
+          <span class="hint">一个账号只绑一个 agent：Key 与账号一一对应，轮换会让旧 Key 立即失效。</span>
         </div>
         <div class="frow">
           <label>角色</label>
@@ -439,4 +489,48 @@ onMounted(load)
 .rp-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .rp-txt b { font-size: 12.5px; font-weight: 650; color: var(--ink); }
 .rp-txt em { font-style: normal; font-size: 11.5px; color: var(--ink-4); }
+/* ---------- 绑定 Agent（一个账号只绑一把 Key） ---------- */
+/* 多了这一列后成员名会被压窄，账号不能折行拆成两行 */
+table .pcell { min-width: 128px; }
+table .pslug { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.keycell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.keylab {
+  width: 100%;
+  max-width: 158px;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  transition: border-color 0.16s var(--ease), background-color 0.16s var(--ease);
+}
+.keylab::placeholder { color: var(--ink-4); font-weight: 400; }
+.keylab:hover { border-color: var(--line-2); background: var(--surface-2); }
+.keylab:focus {
+  outline: none;
+  border-color: var(--brand);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+.keymeta {
+  display: flex;
+  gap: 4px;
+  padding-left: 7px;
+  font-size: 10.5px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.acard-bind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.acard-bind .keylab { flex: 1 1 96px; max-width: none; }
+.bindmeta { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-4); }
 </style>

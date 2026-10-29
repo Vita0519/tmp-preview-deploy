@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS users (
                 CHECK (role IN ('viewer','publisher','admin')),
   password_hash TEXT NOT NULL,
   api_key       TEXT UNIQUE,
+  key_label     TEXT,
+  key_created_at INTEGER,
+  key_last_used_at INTEGER,
+  key_uses      INTEGER NOT NULL DEFAULT 0,
   active        INTEGER NOT NULL DEFAULT 1,
   created_at    INTEGER NOT NULL,
   last_login_at INTEGER
@@ -149,8 +153,40 @@ def init_db() -> None:
     with db() as conn:
         conn.executescript(SCHEMA)
         _migrate_roles(conn)
+        _add_user_key_cols(conn)
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
+
+
+def _add_user_key_cols(conn) -> None:
+    """给 users 补上 API Key 的绑定信息（一个账号只绑一个 agent，得看得见绑给了谁）。
+
+    key_label      这把 key 绑给哪个 agent / 机器（管理员填，默认同账号名）
+    key_created_at 这把 key 的签发时间（轮换会刷新）
+    key_last_used_at 最近一次用这把 key 调接口的时间（按 60s 粒度回写）
+    key_uses       累计调用次数，用来发现「一把 key 被多个 agent 共用」
+    """
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    for col, ddl in (
+        ("key_label", "ALTER TABLE users ADD COLUMN key_label TEXT"),
+        ("key_created_at", "ALTER TABLE users ADD COLUMN key_created_at INTEGER"),
+        ("key_last_used_at", "ALTER TABLE users ADD COLUMN key_last_used_at INTEGER"),
+        ("key_uses", "ALTER TABLE users ADD COLUMN key_uses INTEGER NOT NULL DEFAULT 0"),
+    ):
+        if col in have:
+            continue
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError as exc:
+            print(f"[migrate] 跳过 users.{col}：{exc}", flush=True)
+    # 老库的 key 没有签发时间，用账号创建时间兜底，避免前端显示「—」
+    conn.execute(
+        "UPDATE users SET key_created_at=created_at "
+        "WHERE api_key IS NOT NULL AND key_created_at IS NULL"
+    )
+    conn.execute(
+        "UPDATE users SET key_label=username WHERE key_label IS NULL OR key_label=''"
+    )
 
 
 def _migrate_roles(conn) -> None:

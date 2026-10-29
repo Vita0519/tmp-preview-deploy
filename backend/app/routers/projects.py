@@ -557,8 +557,10 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
     action = str(body.get("action") or "")
     if not slugs:
         raise HTTPException(status_code=400, detail="未选择项目")
+    if action == "visibility" and str(body.get("visibility") or "") not in VISIBILITY:
+        raise HTTPException(status_code=400, detail="可见性只能是 portal / link / private")
     now = now_ms()
-    done, skipped = 0, 0
+    done, skipped, expired = 0, 0, 0
     with db() as conn:
         rows = conn.execute(
             f"SELECT p.* FROM projects p WHERE p.slug IN ({','.join('?' * len(slugs))})", slugs
@@ -599,10 +601,12 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
                 )
         elif action == "visibility":
             v = body.get("visibility")
-            if v in VISIBILITY:
-                with db() as conn:
-                    conn.execute("UPDATE projects SET visibility=?, updated_at=? WHERE id=?",
-                                 (v, now, row["id"]))
+            with db() as conn:
+                conn.execute("UPDATE projects SET visibility=?, updated_at=? WHERE id=?",
+                             (v, now, row["id"]))
+            # 已到期的项目就算设成门户可见也不会出现在列表里，单独报个数提醒用户续期
+            if row["status"] == "expired" or (row["expires_at"] and row["expires_at"] <= now):
+                expired += 1
         elif action == "tag_add":
             names = _parse_tags(body.get("tags"))
             with db() as conn:
@@ -618,7 +622,7 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
             raise HTTPException(status_code=400, detail="未知操作")
         done += 1
     log_event("bulk", user["id"], None, f"{action} x{done}")
-    return {"ok": True, "done": done, "skipped": skipped}
+    return {"ok": True, "done": done, "skipped": skipped, "expired": expired}
 
 
 @router.post("/projects/{slug}/reset-views")

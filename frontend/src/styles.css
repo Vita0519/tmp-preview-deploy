@@ -509,6 +509,28 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
 .bulkbar .btn { background: rgba(255, 255, 255, 0.12); border-color: transparent; color: #fff; }
 .bulkbar .btn:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
 .bulkbar .btn.danger { background: rgba(180, 35, 24, 0.9); }
+/* 批量条不换行：否则「已选 2 项」「门户可见性」会被压成两行 */
+.bulkbar > span,
+.bulkbar .bulklab,
+.bulkbar .btn { white-space: nowrap; flex: 0 0 auto; }
+.bulkbar .bulksep {
+  width: 1px; height: 18px; flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.18);
+}
+.bulkbar .bulklab {
+  font-style: normal; font-size: 11.5px; letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.6);
+}
+.bulkbar .btn.vis-p { background: rgba(15, 118, 110, 0.95); }
+.bulkbar .btn.vis-p:hover { background: rgba(13, 106, 98, 1); }
+@media (max-width: 980px) {
+  .bulkbar {
+    left: 12px; right: 12px; transform: none; bottom: 12px;
+    flex-wrap: wrap; justify-content: center; padding: 10px; row-gap: 8px;
+  }
+  .bulkbar .bulksep,
+  .bulkbar .bulklab { display: none; }
+}
 
 /* ---------------- 登录 ---------------- */
 

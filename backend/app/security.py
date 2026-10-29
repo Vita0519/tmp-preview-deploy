@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import secrets
+import sqlite3
 import time
 
 from fastapi import Depends, HTTPException, Request
@@ -92,7 +93,34 @@ def _by_api_key(key: str) -> dict | None:
         row = conn.execute(
             "SELECT * FROM users WHERE api_key=? AND active=1", (key,)
         ).fetchone()
-    return _user_dict(row) if row else None
+    if not row:
+        return None
+    _touch_key(key, row["id"])
+    return _user_dict(row)
+
+
+# 一把 key 只该被一个 agent 用，所以记下「谁在用、用了几次」。
+# 每个请求都写库太浪费，同一把 key 60 秒内只回写一次。
+_KEY_TOUCH: dict[str, int] = {}
+
+
+def _touch_key(key: str, user_id: int) -> None:
+    t = now_ms()
+    if _KEY_TOUCH.get(key, 0) > t - 60_000:
+        return
+    _KEY_TOUCH[key] = t
+    if len(_KEY_TOUCH) > 512:
+        _KEY_TOUCH.clear()
+        _KEY_TOUCH[key] = t
+    try:
+        with db() as conn:
+            conn.execute(
+                "UPDATE users SET key_last_used_at=?, key_uses=COALESCE(key_uses,0)+1 "
+                "WHERE id=? AND api_key=?",
+                (t, user_id, key),
+            )
+    except sqlite3.Error:
+        pass
 
 
 def _by_session(token: str) -> dict | None:

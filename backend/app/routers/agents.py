@@ -45,6 +45,10 @@ def list_agents(user: dict = Depends(admin_user)):
                 "online": r["online"],
                 "views": r["views"],
                 "api_key_tail": (r["api_key"] or "")[-6:],
+                "key_label": r["key_label"] or r["username"],
+                "key_created_at": r["key_created_at"],
+                "key_last_used_at": r["key_last_used_at"],
+                "key_uses": r["key_uses"] or 0,
             }
             for r in rows
         ]
@@ -60,18 +64,21 @@ async def create_agent(request: Request, user: dict = Depends(admin_user)):
     password = str(body.get("password") or "").strip() or secrets.token_urlsafe(8)
     display = str(body.get("display_name") or username).strip()[:40]
     role = body.get("role") if body.get("role") in ROLES else "publisher"
+    # 一个账号只绑一个 agent：这把 key 的用途写清楚，方便以后审计
+    key_label = str(body.get("key_label") or display).strip()[:40]
     key = new_api_key()
     with tx() as conn:
         if conn.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
             raise HTTPException(status_code=409, detail="账号已存在")
         cur = conn.execute(
-            "INSERT INTO users(username, display_name, role, password_hash, api_key, active, created_at) "
-            "VALUES(?,?,?,?,?,1,?)",
-            (username, display, role, hash_password(password), key, now_ms()),
+            "INSERT INTO users(username, display_name, role, password_hash, api_key, "
+            "key_label, key_created_at, key_uses, active, created_at) "
+            "VALUES(?,?,?,?,?,?,?,0,1,?)",
+            (username, display, role, hash_password(password), key, key_label, now_ms(), now_ms()),
         )
         uid = cur.lastrowid
-    log_event("agent_create", user["id"], None, username)
-    return {"id": uid, "username": username, "password": password, "api_key": key}
+    log_event("agent_create", user["id"], None, f"{username} key={key_label}")
+    return {"id": uid, "username": username, "password": password, "api_key": key, "key_label": key_label}
 
 
 @router.patch("/{agent_id}")
@@ -93,10 +100,14 @@ async def patch_agent(agent_id: int, request: Request, user: dict = Depends(admi
         sets.append("password_hash=?")
         args.append(hash_password(pw))
         out["password"] = pw
+    if "key_label" in body:
+        label = str(body["key_label"] or "").strip()[:40]
+        sets.append("key_label=?")
+        args.append(label)
     if body.get("rotate_key"):
         key = new_api_key()
-        sets.append("api_key=?")
-        args.append(key)
+        sets += ["api_key=?", "key_created_at=?", "key_last_used_at=NULL", "key_uses=0"]
+        args += [key, now_ms()]
         out["api_key"] = key
     if "role" in body:
         role = body["role"]

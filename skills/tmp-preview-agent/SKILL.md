@@ -1,0 +1,189 @@
+---
+name: tmp-preview-agent
+description: 以「一个账号 = 一个 Agent = 一把 API Key」的身份，用脚本或命令行管理自托管临时预览站上的项目：部署目录/静态站、建外链、改可见性（门户/持链接/仅自己）、续期、打标签、批量清理、查访问量，以及管理员如何管成员与权限。当用户说「把 dist 部署到预览站」「续期这个预览链接」「改成只有我能看」「这个预览站有哪些项目」「轮换 key」「加个成员」「批量删除过期项目」时使用。重点是权限边界与 Key 的一对一绑定。
+---
+
+# 以 Agent 身份管理预览站
+
+这套服务里没有「机器人账号」这种独立概念：**成员账号本身就是 Agent**。
+一个账号配一把 `pv_...` 的 API Key，这把 Key 就是该账号的全部身份。
+
+```
+账号 (users) 1 ──── 1 API Key   1 ──── 1 Agent（写清楚绑给谁：key_label）
+   │
+   └── 1 ── N 项目（publisher 只看自己名下的；admin 看全部）
+```
+
+## 一、凭据：一个账号只能有一个 Agent
+
+| 规则 | 说明 |
+|---|---|
+| 一对一 | `users.api_key` 有 UNIQUE 约束，一个账号只可能有一把 Key |
+| 绑定可追溯 | 成员页每行能编辑「绑定 Agent」（`key_label`，如 `claude-code`），并显示 `…尾号 · 最近使用时间` |
+| 不可共享 | 两套脚本共用一个 Key = 两条执行流共用一个身份，出问题无法归因。要第二个 Agent，就再开一个成员 |
+| 轮换即失效 | 轮换后旧 Key 立刻 401，`key_uses` 归零重新计数 |
+| 停用即断 | 成员停用后 Key 立即失效（`active=0` 直接查不到用户） |
+
+**怎么拿到 Key**：管理员在「成员」页创建成员时填「绑定 Agent」，创建成功弹窗里只显示一次
+`API Key` 和密码；之后可用 `GET /api/agents/{id}/key`（仅管理员）取回，或用轮换重新生成。
+
+**怎么用**：
+
+```bash
+# 方式一：CLI 一次性登录，凭据存本地
+python cli/agentctl.py login --url https://preview.example.com --username alice --password xxx
+python cli/agentctl.py deploy ./dist --title "落地页 v3" --ttl 24 --tags 前端,v3
+
+# 方式二：账号密码直接换 Key（CLI 内部就是这一步）
+curl -X POST -d '{"username":"alice","password":"xxx"}' https://<站点>/api/token
+
+# 方式三：直接打 API（脚本 / Agent 里最常用）
+curl -H "Authorization: Bearer pv_xxx" https://preview.example.com/api/projects
+```
+
+> **账号密码和 Key 等权**：`POST /api/token` 能用密码换出同一把 Key，
+> 所以「一个 agent 一个账号」意味着**密码也只能给这一个 agent**。
+> 把密码同时交给两个 Agent，等于让两个执行流共用一个身份，同样无法归因。
+
+> Key 等价于密码。不要写进 git、不要打印到日志、不要放进前端的可读位置。
+> 本地配置在 `%APPDATA%\tmp-preview\config.json`（Linux/macOS 是 `~/.config/tmp-preview/config.json`），权限 600。
+
+## 二、权限矩阵
+
+| 能力 | `viewer`（仅门户） | `publisher`（可发布） | `admin`（管理员） |
+|---|---|---|---|
+| 打开门户 `/portal` | ✅ | ✅ | ✅ |
+| 打开 `link` / `portal` 项目 | ✅ | ✅ | ✅ |
+| 打开别人的 `private` 项目 | ❌ 404 | ❌ 404 | ✅ |
+| `GET /api/projects`（项目列表） | ❌ 403 | ✅ 只返回自己的 | ✅ 全部 |
+| 上传 / 建外链 / 改 / 删 项目 | ❌ 403 | ✅ 仅自己名下 | ✅ 任意 |
+| 批量操作别人的项目 | ❌ | 计入 `skipped`，不报错 | ✅ |
+| `GET /api/agents`、成员增删改、取 Key | ❌ 403 | ❌ 403 | ✅ |
+| 站点设置 `/api/settings` | ❌ | ❌ 403 | ✅ |
+
+判定实现：`backend/app/security.py`（`admin_user` / `publisher_user`）+
+`projects.py::can_edit`（`admin` 或 `owner_id == 自己`）。
+`viewer` 的 Key 能读**访客侧**（`/v/<slug>`、`/portal`），但进不了 `/api/projects`。
+
+管理员给自己的 Key 就带着管理员权限——**这是最危险的一把钥匙**，
+建议日常跑脚本用 `publisher` 账号，只有需要管成员时才用管理员 Key。
+
+## 三、常见任务的调用方式
+
+### 1. 部署一个目录
+
+```bash
+# CLI（会自动打包成 zip 上传，跳过 node_modules/.git 等）
+python cli/agentctl.py deploy ./dist --title "落地页 v3" --ttl 24 --tags 前端,v3 --visibility link
+```
+
+```bash
+# 原始 API（multipart，注意 files 可重复）
+curl -H "Authorization: Bearer pv_xxx" \
+  -F "slug=landing-v3" -F "title=落地页 v3" -F "hours=24" \
+  -F "visibility=link" -F "tags=前端,v3" \
+  -F "files=@dist/index.html" \
+  -F "files=@dist/assets/app.js" \
+  https://<站点>/api/projects
+```
+
+- `visibility`：`portal`（进门户）/ `link`（不进门户但可转发）/ `private`（只有自己）
+- 不传 `hours` 时按可见性给默认寿命：门户 6h / 持链接 12h / 私有永久
+- 同名 `slug` 再传一次 = 覆盖更新（保留原到期时间与归属）
+
+### 2. 只登记一个外链（不发文件）
+
+```bash
+curl -X POST -H "Authorization: Bearer pv_xxx" -H "Content-Type: application/json" \
+  -d '{"link_url":"https://figma.com/proto/xxx","title":"设计稿","hours":12,"visibility":"link"}' \
+  https://<站点>/api/projects/link
+```
+
+`/v/<slug>` 会 302 跳到该外链。
+
+### 3. 改可见性 / 续期 / 打标签
+
+```bash
+# 单个
+curl -X PATCH -H "Authorization: Bearer pv_xxx" -H "Content-Type: application/json" \
+  -d '{"visibility":"private"}' https://<站点>/api/projects/landing-v3
+
+# 续 48 小时 / 转永久
+curl -X PATCH ... -d '{"hours":48}'  ...
+curl -X PATCH ... -d '{"permanent":true}' ...
+
+# 批量（最多 500 个 slug）
+curl -X POST -H "Authorization: Bearer pv_xxx" -H "Content-Type: application/json" \
+  -d '{"slugs":["a","b","c"],"action":"extend","hours":24}' \
+  https://<站点>/api/projects/bulk
+```
+
+`action` 取值：`delete` / `expire` / `block` / `permanent` / `extend` / `allow_download` /
+`deny_download` / `visibility` / `tag_add`。
+
+返回 `{"done":N,"skipped":M,"expired":K}`：`skipped` 是无权操作的项目数，
+`expired` 是被改成门户可见但已经到期的项目数（需先续期才会出现在门户）。
+
+### 4. 查自己的项目 / 访问量
+
+```bash
+GET /api/projects?status=online&visibility=portal&sort=views&order=desc&limit=50
+GET /api/projects/{slug}          # 详情：文件清单、14 天访问、事件流水
+GET /api/stats/trend?days=14      # 访问趋势
+```
+
+`status`：`online`（默认，在用）/ `expired` / `permanent` / `deleted` / `all`。
+`sort`：`created_at` / `updated_at` / `expires_at` / `views` / `downloads` / `size_bytes` / `title`。
+
+### 5. 删除
+
+```bash
+DELETE /api/projects/{slug}     # 文件、zip、访问记录一起清
+```
+
+删除是不可恢复的，批量删之前先用 `GET /api/projects?status=expired` 确认清单。
+
+### 6. 管理员：管成员
+
+```bash
+GET    /api/agents                     # 列表（含 key_label / key_last_used_at / key_uses）
+POST   /api/agents                     # {"username","display_name","role","key_label","password"}
+PATCH  /api/agents/{id}                # display_name / role / active / password / rotate_key / key_label
+DELETE /api/agents/{id}                # 连同其名下项目一起删
+GET    /api/agents/{id}/key            # 取回完整 Key
+```
+
+护栏：
+- 不能改自己的角色，也不能删自己；
+- 不会把最后一个管理员降级或停用；
+- 非法角色返回 400；
+- 删除成员会连带删除他名下全部项目文件。
+
+## 四、错误码速查
+
+| 状态码 | 含义 | 处理 |
+|---|---|---|
+| 401 | Key 无效 / 已轮换 / 成员被停用 | 检查 `key_label` 与 `key_last_used_at`，重新取 Key |
+| 403 | 角色不够（`viewer` 摸项目接口、非管理员摸成员接口） | 换账号或提权 |
+| 404 | 项目不存在，**或你没权限看这个私有项目** | 私有项目只对作者和管理员开放 |
+| 409 | slug 冲突 / 账号已存在 | 换个 slug 或直接覆盖更新 |
+| 410 | 项目已到期 | 续期后访问恢复 |
+| 413 | 单项目超过 `MAX_UPLOAD_MB` | 拆包或调大上限 |
+
+## 五、Agent 执行时的红线
+
+1. **不要猜 Key**：拿不到就停下问人，别去翻 `config.json` 之外的路径。
+2. **不要跨账号**：一把 Key 只干一个账号的事。需要管理员操作就单独要管理员 Key，
+   不要用 publisher 的 Key 去试越权接口（会拿到 403，没有意义）。
+3. **默认用 `link` 而不是 `portal`**：进门户意味着所有人都能逛到。
+4. **交付前确认到期时间**：脚本部署完打印 `preview_url` 与 `expires_at`，
+   客户验收场景建议 ≥ 24h。
+5. **批量操作先 dry-run**：先用 `GET /api/projects?...` 拉清单确认命中范围，
+   再发 `bulk`。`delete` 立刻生效、不可恢复。
+6. **Key 泄漏的第一步是轮换**，不是改密码：`PATCH /api/agents/{id} {"rotate_key": true}`。
+
+## 六、相关文档
+
+- `docs/visibility.md`：三档可见性的完整判定表（谁能看、私有链接怎么打开）
+- `docs/api.md`：接口一览
+- `SKILL.md`：把这套服务部署起来（运维侧）

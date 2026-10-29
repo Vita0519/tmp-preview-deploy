@@ -172,7 +172,7 @@ function toggleAll(on) {
   selected.value = on ? data.items.map((i) => i.slug) : []
 }
 
-async function bulk(action, extra = {}) {
+async function bulk(action, extra = {}, label = '') {
   if (!selected.value.length) return
   if (action === 'delete') {
     const ok = await confirmAction({
@@ -185,13 +185,37 @@ async function bulk(action, extra = {}) {
   }
   try {
     const d = await api.post('/api/projects/bulk', { slugs: selected.value, action, ...extra })
-    toast(`已处理 ${d.done} 个项目`)
+    const extraBits = []
+    if (d.expired) extraBits.push(`${d.expired} 个已到期（需先续期才会出现在门户）`)
+    if (d.skipped) extraBits.push(`${d.skipped} 个无权操作已跳过`)
+    toast(
+      (label ? `${label} · ` : '') +
+        `已处理 ${d.done} 个项目` +
+        (extraBits.length ? `，${extraBits.join('，')}` : ''),
+    )
     selected.value = []
     load()
     loadTrend()
   } catch (e) {
     toast(e.message || '操作失败', 'err')
   }
+}
+
+const VIS_LABEL = { portal: '门户可见', link: '持链接可见', private: '仅自己可见' }
+
+async function bulkVisibility(v) {
+  if (!selected.value.length) return
+  if (v === 'private') {
+    const ok = await confirmAction({
+      title: `把 ${selected.value.length} 个项目改为「仅自己可见」`,
+      message:
+        '已发出去的链接对其他人立即失效（打开是 404），同时从访客门户下架。' +
+        '只有你自己或管理员在登录状态下的浏览器能打开。',
+      confirmText: '改为仅自己',
+    })
+    if (!ok) return
+  }
+  await bulk('visibility', { visibility: v }, VIS_LABEL[v])
 }
 
 function onCreated(d) {
@@ -356,6 +380,18 @@ onBeforeUnmount(() => {
 
   <div v-if="selected.length" class="bulkbar">
     <span>已选 {{ selected.length }} 项</span>
+    <span class="bulksep" aria-hidden="true"></span>
+    <em class="bulklab">门户可见性</em>
+    <button class="btn sm vis-p" title="出现在访客门户列表里" @click="bulkVisibility('portal')">
+      门户可见
+    </button>
+    <button class="btn sm" title="不出现在门户，但知道链接的人能打开" @click="bulkVisibility('link')">
+      持链接
+    </button>
+    <button class="btn sm" title="只有你和管理员登录后能打开（外部一律 404）" @click="bulkVisibility('private')">
+      仅自己
+    </button>
+    <span class="bulksep" aria-hidden="true"></span>
     <button class="btn sm" @click="bulk('extend', { hours: 24 })">+24 小时</button>
     <button class="btn sm" @click="bulk('permanent')">设为永久</button>
     <button class="btn sm" @click="bulk('allow_download')">开放下载</button>
