@@ -109,6 +109,8 @@ DEFAULT_SETTINGS = {
     "default_ttl_private": "",
     "public_portal": "0",
     "default_expire_action": "block",
+    # 配色系列：classic / tech / macaron / morandi / ink / minimal
+    "theme_series": "classic",
 }
 
 

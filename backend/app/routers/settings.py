@@ -18,6 +18,19 @@ def _num(raw, fallback: float) -> float:
         return fallback
 
 
+def _theme_payload(s: dict | None = None) -> dict:
+    """主题：当前主色 + 派生的整套中性色 + 全部配色系列（设置页直接按真实配色渲染卡片）。"""
+    s = s if s is not None else all_settings()
+    key = theme.series_of(s.get("theme_series")).get("key")
+    accent = theme.normalize(s.get("theme_accent") or theme.BY_KEY[key]["accent"])
+    p = theme.palette(accent, key)
+    p["presets"] = [{"name": n, "value": v} for n, v in theme.PRESETS]
+    p["series_list"] = theme.series_payload()
+    # 主色被手改过（不等于任何一套系列的主色）→ 前端把「自定义」标为选中
+    p["custom"] = theme.series_by_accent(accent) is None
+    return p
+
+
 @router.get("")
 def read_settings(user: dict = Depends(admin_user)):
     s = all_settings()
@@ -35,8 +48,7 @@ def read_settings(user: dict = Depends(admin_user)):
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": s.get("default_expire_action") or "block",
         "public_portal": s.get("public_portal") == "1",
-        "theme": {**theme.palette(s.get("theme_accent") or theme.DEFAULT),
-                  "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
+        "theme": _theme_payload(s),
         "site_icon": _icon_payload(),
         "tags": _tags_payload(),
         "author": author.load(),
@@ -78,6 +90,13 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         set_setting("public_portal", "1" if payload["public_portal"] else "0")
     if "author" in payload:
         author.save(payload["author"])
+    # 换系列：主色跟着换（除非这次请求同时指定了主色，那就以主色为准——允许选完系列再微调）
+    if payload.get("theme_series"):
+        key = theme.series_of(payload["theme_series"]).get("key")
+        set_setting("theme_series", key)
+        if "theme_accent" not in payload:
+            set_setting("theme_accent", theme.BY_KEY[key]["accent"])
+        theme.reset_cache()
     if "theme_accent" in payload:
         set_setting("theme_accent", theme.normalize(payload["theme_accent"]))
         theme.reset_cache()
@@ -89,8 +108,7 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": get_setting("default_expire_action") or "block",
         "public_portal": get_setting("public_portal", "0") == "1",
-        "theme": {**theme.palette(get_setting("theme_accent") or theme.DEFAULT),
-                  "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
+        "theme": _theme_payload(),
         "site_icon": _icon_payload(),
         "tags": _tags_payload(),
         "author": author.load(),

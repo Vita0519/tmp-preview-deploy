@@ -34,11 +34,39 @@ def hex2rgb(h):
 
 def brand_vars(body: str) -> dict:
     m = re.search(r":root\{--brand:([^;]+);--brand-hover:([^;]+);--brand-soft:([^;]+);"
-                  r"--brand-line:([^;]+);--brand-deep:([^;]+);--brand-light:([^;]+);--brand-rgb:([^}]+)\}", body)
+                  r"--brand-line:([^;]+);--brand-deep:([^;]+);--brand-light:([^;]+);"
+                  r"--brand-rgb:([0-9,]+)", body)
     if not m:
         return {}
     keys = ("brand", "hover", "soft", "line", "deep", "light", "rgb")
     return dict(zip(keys, [x.strip() for x in m.groups()]))
+
+
+def neutral_vars(body: str) -> dict:
+    """从 :root 里取整套中性色变量（--bg / --ink / --line …）。"""
+    m = re.search(r":root\{(.*?)\}", body, re.S)
+    if not m:
+        return {}
+    out = {}
+    for k, v in re.findall(r"--((?:bg|surface|ink|line)[a-z0-9-]*):([^;}]+)", m.group(1)):
+        out[k] = v.strip()
+    return out
+
+
+def contrast_ok(hex_color: str, minimum: float = 3.0) -> bool:
+    """主色跟白底的对比度是否达标（跟前端 theme.js 的 readable 同一把尺子）。"""
+    if not hex_color or not re.fullmatch(r"#[0-9a-f]{6}", hex_color):
+        return False
+
+    def lum(c):
+        def ch(v):
+            v /= 255
+            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+
+        r, g, b = hex2rgb(c)
+        return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+
+    return (1.05) / (lum(hex_color) + 0.05) >= minimum
 
 
 def main() -> int:
@@ -64,6 +92,8 @@ def main() -> int:
     check("设置接口可取", code == 200, settings)
     t = settings.get("theme") or {}
     orig = str(t.get("accent") or DEFAULT)
+    # 用户填的原值（可能因为太浅被 readable 压深），还原时要还原这个
+    orig_raw = str(t.get("raw") or orig)
     check("主色是合法 hex", bool(re.fullmatch(r"#[0-9a-f]{6}", orig)), orig)
     presets = t.get("presets") or []
     check("下发 8 个预设", len(presets) == 8, len(presets))
@@ -99,16 +129,19 @@ def main() -> int:
     code, _, err = admin.fetch(f"/download/{slug}")
     check("错误页也带上变量", code == 403 and "--brand:" in err, f"{code} {'--brand:' in err}")
 
-    print("[4] 非法输入")
+    print("[4] 非法输入（看 raw，实际生效值会被可读性兜底压深）")
     for raw, expect in (("#3b5bdb", "#3b5bdb"), ("3b5bdb", "#3b5bdb"), ("#3b5", "#33bb55"),
                         ("#zzz", DEFAULT), ("", DEFAULT), ("red", DEFAULT)):
         code, d = admin.req("PATCH", "/api/settings", {"theme_accent": raw})
-        got = (d.get("theme") or {}).get("accent")
+        th = d.get("theme") or {}
+        got = th.get("raw")
         check(f"{raw!r} → {expect}", code == 200 and got == expect, f"{code} {got}")
+        # 不管填什么，落到 --brand 上的颜色都得在白底上看得见
+        check(f"{raw!r} 生效色可读", contrast_ok(th.get("accent")), th.get("accent"))
 
     print("[5] 还原进来时的主色（不覆盖管理员的选择）")
-    code, d = admin.req("PATCH", "/api/settings", {"theme_accent": orig})
-    check("还原成功", (d.get("theme") or {}).get("accent") == orig, d.get("theme"))
+    code, d = admin.req("PATCH", "/api/settings", {"theme_accent": orig_raw})
+    check("还原成功", (d.get("theme") or {}).get("raw") == orig_raw, d.get("theme"))
     code, _, portal = admin.fetch("/portal")
     check("门户也回到原色", brand_vars(portal).get("brand") == orig, brand_vars(portal).get("brand"))
 

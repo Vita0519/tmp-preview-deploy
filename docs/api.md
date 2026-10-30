@@ -60,7 +60,7 @@
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
 | GET | `/api/settings` | 🛡 | 站点配置 + `ttl_defaults` + `theme` + `site_icon` + `author` + `author_types` + 运行信息 + 最近操作 |
-| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_accent, author}` |
+| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_series, theme_accent, author}` |
 | POST | `/api/settings/icon` | 🛡 | `multipart/form-data` 上传站点图标，字段名 `file`；同时间只留一份 |
 | DELETE | `/api/settings/icon` | 🛡 | 删除自定义图标，回到内置沙漏图标 |
 | POST | `/api/settings/tags/prune` | 🛡 | 清理没有任何项目在用的标签，返回剩余占用 |
@@ -134,15 +134,31 @@
 - 预览页 `/v/{slug}` 顶栏：带 `.deltag` 徽章（窄屏只留图标）；
 - 卡片上还有 `data-act="delete|block"`，方便脚本按到期动作筛。
 
-**主题色**
+**配色系列 / 主题色**
 
-`GET /api/meta` 与 `GET /api/settings` 都带 `theme` 字段（`accent` + 派生色 `hover/soft/line/deep/light/rgb`）；
-`GET/PATCH /api/settings` 还带 `tags`（规则 + 占用：`max_per_project / max_len / pool_max / used /
-orphans / tagged_projects`），设置页据此显示「全站 17 / 300 个（6%）」。
+`GET /api/meta` 与 `GET /api/settings` 都带 `theme` 字段：
 
-`PATCH /api/settings {"theme_accent": "#3b5bdb"}` 改主色，接受 `#abc` / `abc` 简写，非法值静默回落 `#0f766e`。
-服务端渲染的页面直接把变量写进 `:root`，控制台启动时用 `/api/meta` 的同一份色板覆盖 `--brand*`。
-设置页另有 8 个预设色（`theme.presets`），点一下即时预览，不保存则离开页面自动回滚。
+| 字段 | 说明 |
+|---|---|
+| `accent` | 实际生效的主色（可能是被压深后的值，见 `adjusted`） |
+| `raw` | 用户填的原值 |
+| `adjusted` | `accent != raw`，浅色被可读性兜底压深过 |
+| `hover/soft/line/deep/light/rgb` | 由 `accent` 派生（与 `frontend/src/theme.js` 同公式） |
+| `neutral` | 整套中性色：`bg` `bg-2` `bg-deep` `surface-2` `surface-3` `ink` `ink-2` `ink-3` `ink-4` `line` `line-2` `ink-rgb` `bg-rgb` |
+| `series` / `series_name` | 当前系列 key 与名字 |
+| `custom` | 主色不属于任何一套系列（手改过） |
+| `series_list` | 全部 6 套系列，每套带 `key/name/desc/use/accent/neutral` |
+
+`PATCH /api/settings {"theme_series": "tech"}` 换整套配色：系列决定中性色画布，并把主色换成该系列的
+（除非同一请求里也给了 `theme_accent`，那就以 `theme_accent` 为准——允许选完系列再微调）。
+`theme_accent` 接受 `#abc` / `abc` 简写，非法值静默回落 `#0f766e`。未知的 `theme_series` 回落 `classic`。
+
+服务端渲染的页面把变量写进 `:root`（`--brand*` + `--bg/--ink/--line` 一整套），控制台启动时用
+`/api/meta` 的同一份色板覆盖。设置页的 6 张系列卡就是按 `series_list` 里每套的真实配色渲染的缩略图，
+点一下即时预览，不保存则离开页面自动回滚。
+
+主色只当强调色用，**跟白底的对比度低于 3:1 会等比压深**（色相不变，见 `theme.readable()`），
+避免选个淡黄导致按钮上的白字和浅底上的主色文字一起看不见。
 
 **站点图标**
 
