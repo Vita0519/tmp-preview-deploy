@@ -1,7 +1,7 @@
-"""系统设置（站点标题、按可见性的默认时长、到期策略、门户可见性）。"""
-from fastapi import APIRouter, Depends
+"""系统设置（站点标题、主题色、站点图标、按可见性的默认时长、到期策略、门户可见性）。"""
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from .. import author, config, defaults, theme
+from .. import author, branding, config, defaults, theme
 from ..db import all_settings, db, get_setting, set_setting
 from ..pages import ICONS
 from ..security import admin_user
@@ -37,6 +37,7 @@ def read_settings(user: dict = Depends(admin_user)):
         "public_portal": s.get("public_portal") == "1",
         "theme": {**theme.palette(s.get("theme_accent") or theme.DEFAULT),
                   "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
+        "site_icon": _icon_payload(),
         "author": author.load(),
         "author_types": [
             {"key": k, "label": v["label"], "paths": ICONS.get(v["icon"], "")}
@@ -89,5 +90,28 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         "public_portal": get_setting("public_portal", "0") == "1",
         "theme": {**theme.palette(get_setting("theme_accent") or theme.DEFAULT),
                   "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
+        "site_icon": _icon_payload(),
         "author": author.load(),
     }
+
+
+def _icon_payload() -> dict:
+    return branding.payload()
+
+
+@router.post("/icon")
+async def upload_icon(file: UploadFile = File(...), user: dict = Depends(admin_user)):
+    """上传站点图标。同一时间只保留一份，换格式会替换掉旧的。"""
+    data = await file.read()
+    try:
+        cur = branding.save(file.filename or "", data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"ok": True, "site_icon": _icon_payload(), "url": cur.get("url", "")}
+
+
+@router.delete("/icon")
+def delete_icon(user: dict = Depends(admin_user)):
+    """删掉自定义图标，回到内置的沙漏套装。"""
+    branding.remove()
+    return {"ok": True, "site_icon": _icon_payload()}

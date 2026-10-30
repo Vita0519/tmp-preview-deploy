@@ -1,7 +1,7 @@
 """服务端渲染的轻页面：访客预览外壳 / 门户 / 错误页（无框架，首屏快）。"""
 from html import escape
 
-from . import theme
+from . import branding, theme
 
 FONT = (
     '-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",'
@@ -22,7 +22,17 @@ FAVICON_NAMES = ("favicon.ico", "favicon.svg", "favicon.png", "apple-touch-icon.
 
 # 站点自己的图标套装（与 frontend/public 下由 tools/gen_icons.py 生成的产物对应）
 def site_icon_links(accent: str | None = None) -> str:
+    """站点图标声明：管理员上传过就用它，否则用内置的沙漏套装。"""
     color = theme.palette(accent)["accent"]
+    custom = branding.current()
+    if custom:
+        url = escape(custom["url"], quote=True)
+        return (
+            f'<link rel="icon" href="{url}">'
+            f'<link rel="apple-touch-icon" href="{url}">'
+            '<link rel="manifest" href="/site.webmanifest">'
+            f'<meta name="theme-color" content="{color}">'
+        )
     return (
         '<link rel="icon" href="/favicon.svg" type="image/svg+xml">'
         '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">'
@@ -71,12 +81,14 @@ def favicon_href(slug: str | None = None) -> str:
 
 
 def icon_head(slug: str | None = None, accent: str | None = None) -> str:
-    """预览页的图标声明：项目自带优先，否则用站点图标套装。"""
+    """预览页的图标声明：项目自带优先，其次自定义站点图标，最后内置套装。"""
     own = favicon_href(slug)
     if own:
+        custom = branding.current()
+        touch = custom["url"] if custom else "/apple-touch-icon.png"
         return (
             f'<link rel="icon" href="{own}">'
-            '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+            f'<link rel="apple-touch-icon" href="{escape(touch, quote=True)}">'
             f'<meta name="theme-color" content="{theme.palette(accent)["accent"]}">'
         )
     return site_icon_links(accent)
@@ -260,7 +272,8 @@ def _human(n: int) -> str:
 
 PORTAL_CSS = """
 body{background:linear-gradient(180deg,#fbfcfb,#f2f4f2 60%,#eef1ef);min-height:100vh}
-.wrap{max-width:1080px;margin:0 auto;padding:0 20px 80px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 28px;
+display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box}
 /* 标签以上整体吸附：标题 + 作者名片 + 筛选条 + 标签 */
 .dock{position:sticky;top:0;z-index:20;margin:0 -20px;padding:18px 20px 0;
 background:rgba(250,251,250,.9);backdrop-filter:blur(12px) saturate(1.15);
@@ -325,7 +338,7 @@ background:#f4f6f4;color:#5b636d;font:600 11px/1 inherit;cursor:pointer;transiti
 .tagsbar button:hover{background:#eef2f0;color:#14161a}
 .tagsbar button.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch;
-padding-top:14px}
+padding-top:14px;margin-bottom:34px}
 .grid[hidden]{display:none}
 .card{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid rgba(20,22,26,.09);
 border-radius:12px;padding:14px 15px 12px;
@@ -392,7 +405,7 @@ pointer-events:none;transition:opacity .16s,transform .16s;z-index:4}
 .cbtn.done .tip{opacity:1;transform:scale(1)}
 .cbtn.fail .tip{background:#b42318;opacity:1;transform:scale(1)}
 /* ---------- 列表模式（独立结构，不复用卡片） ---------- */
-.rows{display:flex;flex-direction:column;gap:8px;padding-top:14px}
+.rows{display:flex;flex-direction:column;gap:8px;padding-top:14px;margin-bottom:34px}
 .rows[hidden]{display:none}
 .row{position:relative;display:grid;
 grid-template-columns:minmax(0,240px) minmax(0,1fr) auto 36px 170px 28px;
@@ -471,6 +484,20 @@ border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
   .grid.list .ring{order:2;position:absolute;top:10px;right:10px;width:36px;height:36px}
   .grid.list .foot{order:3;flex:1 1 100%}
 }
+/* ---------- 页脚（站点标识 / 订阅） ---------- */
+.pfoot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+margin:auto 0 0;padding-top:15px;border-top:1px solid rgba(20,22,26,.08);
+color:#8b9298;font-size:12px;line-height:1.5}
+.pfoot .fleft{display:flex;align-items:center;gap:7px;min-width:0}
+.pfoot .fleft .mark{width:15px;height:15px;border-radius:23.75%;flex:0 0 auto;box-shadow:none}
+.pfoot b{font-weight:600;color:#4a5057}
+.pfoot .sep{color:#c4c9ce}
+.flinks{display:flex;align-items:center;gap:16px}
+.flink{display:inline-flex;align-items:center;gap:5px;color:#77808a;font-size:12px;
+font-weight:500;transition:color .16s}
+.flink:hover{color:var(--brand)}
+.flink svg{opacity:.85;flex:0 0 auto}
+@media (max-width:560px){.pfoot{justify-content:flex-start;gap:10px}}
 """
 
 PORTAL_JS = """
@@ -793,8 +820,24 @@ def portal_page(
         )
     body = "".join(cards) or ""
     rowbody = "".join(rows)
-    rss_link = '<a class="btn ghost" href="/rss.xml" title="订阅门户更新">RSS</a>'
-    login = rss_link + ('<a class="btn ghost" href="/">进入控制台</a>' if logged_in else "")
+    login = '<a class="btn ghost" href="/">进入控制台</a>' if logged_in else ""
+    # RSS 放在页脚：顶栏塞两个幽灵按钮太挤，订阅入口也本来就该在页面末尾
+    rss_icon = (
+        '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">'
+        '<circle cx="3.5" cy="12.5" r="1.7"/>'
+        '<path d="M2.6 7.2a6.2 6.2 0 0 1 6.2 6.2h-2.2a4 4 0 0 0-4-4V7.2Z"/>'
+        '<path d="M2.6 2.4a11 11 0 0 1 11 11h-2.2A8.8 8.8 0 0 0 2.6 4.6V2.4Z"/></svg>'
+    )
+    foot_right = (
+        f'<a class="flink" href="/rss.xml" title="用阅读器订阅门户更新">{rss_icon}<span>RSS 订阅</span></a>'
+    )
+    foot = (
+        '<footer class="pfoot">'
+        f'<div class="fleft">{brand_mark(accent, 15)}<b>{escape(site_title)}</b>'
+        f'<span class="sep">·</span><span>{len(items)} 个公开项目</span></div>'
+        f'<div class="flinks">{foot_right}</div>'
+        '</footer>'
+    )
     who = _author_block(author)
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(site_title)}</title>
@@ -848,6 +891,7 @@ def portal_page(
 <div class="grid" id="grid">{body}</div>
 <div class="rows" id="rows" hidden>{rowbody}</div>
 <div class="blank" id="blank"{' hidden' if items else ''}>{'没有匹配的项目，换个筛选条件试试' if items else '暂无公开项目'}</div>
+{foot}
 </div>
 <script>
 {PORTAL_JS.replace("__NOW__", str(server_now))}

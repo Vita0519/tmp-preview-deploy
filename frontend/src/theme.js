@@ -77,3 +77,24 @@ export function applyPalette(p) {
 export function applyAccent(accent) {
   applyPalette(palette(accent))
 }
+
+/** 站点图标：换成自定义图标，或回落到内置那套 */
+export function applySiteIcon(info) {
+  const url = (info && info.url) || ''
+  document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]').forEach((n) => n.remove())
+  const add = (rel, href, sizes) => {
+    const l = document.createElement('link')
+    l.rel = rel
+    l.href = href
+    if (sizes) l.sizes = sizes
+    document.head.appendChild(l)
+  }
+  if (url) {
+    add('icon', url)
+    add('apple-touch-icon', url)
+    return
+  }
+  add('icon', '/favicon.svg')
+  add('icon', '/favicon.ico', '16x16 32x32 48x48')
+  add('apple-touch-icon', '/apple-touch-icon.png')
+}

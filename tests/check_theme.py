@@ -3,15 +3,18 @@
 """主题色：一个主色驱动控制台 / 门户 / 访客页，派生色与回落都要对。
 
 覆盖：
-  1. 默认主色是墨绿，/api/meta 与 /api/settings 都下发整套色板
+  1. /api/meta 与 /api/settings 下发整套色板，且两者一致；预设里含默认墨绿
   2. PATCH theme_accent 后，门户、预览页、错误页、theme-color 全部跟着变
   3. 派生色由主色算出（hover 更深、soft 更浅、line 带主色 rgb）
   4. 非法值（非 hex / 缺 # / #abc 简写 / 空串）→ 规范化或回落到默认
-  5. 恢复默认后全站回到墨绿
+  5. 跑完把主色还原成进来时的值（不覆盖管理员自己选的色）
+  6. 站点图标：上传 / 校验 / /site-icon 回落 / webmanifest 跟随
 
 用法: python tests/check_theme.py [--url http://127.0.0.1:8000]
 """
 import argparse
+import base64
+import json
 import re
 import sys
 import time
@@ -56,21 +59,24 @@ def main() -> int:
                          [("files", "index.html", HTML)])
     admin.req("POST", "/api/projects", body, ct=ct, raw=True)
 
-    print("[1] 默认色素")
-    _ = admin.patch if False else None
+    print("[1] 当前色板")
     code, settings = admin.req("GET", "/api/settings")
     check("设置接口可取", code == 200, settings)
     t = settings.get("theme") or {}
-    check("默认主色墨绿", t.get("accent") == DEFAULT, t.get("accent"))
-    check("下发 8 个预设", len(t.get("presets") or []) == 8, len(t.get("presets") or []))
+    orig = str(t.get("accent") or DEFAULT)
+    check("主色是合法 hex", bool(re.fullmatch(r"#[0-9a-f]{6}", orig)), orig)
+    presets = t.get("presets") or []
+    check("下发 8 个预设", len(presets) == 8, len(presets))
+    check("预设里含默认墨绿", any(p.get("value") == DEFAULT for p in presets),
+          [p.get("value") for p in presets[:3]])
     code, meta = admin.req("GET", "/api/meta")
-    check("/api/meta 也带主题", (meta.get("theme") or {}).get("accent") == DEFAULT, meta.get("theme"))
+    check("/api/meta 与设置同色", (meta.get("theme") or {}).get("accent") == orig, meta.get("theme"))
 
     print("[2] 派生色")
     p = t or {}
-    check("hover 比主色深", sum(hex2rgb(p.get("hover", "#000"))) < sum(hex2rgb(DEFAULT)), p.get("hover"))
-    check("soft 比主色浅", sum(hex2rgb(p.get("soft", "#000"))) > sum(hex2rgb(DEFAULT)), p.get("soft"))
-    r, g, b = hex2rgb(DEFAULT)
+    r, g, b = hex2rgb(orig)
+    check("hover 比主色深", sum(hex2rgb(p.get("hover", "#000"))) < sum(hex2rgb(orig)), p.get("hover"))
+    check("soft 比主色浅", sum(hex2rgb(p.get("soft", "#000"))) > sum(hex2rgb(orig)), p.get("soft"))
     check("line 用主色 rgb", f"rgba({r},{g},{b}," in str(p.get("line")), p.get("line"))
     check("rgb 字段正确", p.get("rgb") == f"{r},{g},{b}", p.get("rgb"))
 
@@ -100,11 +106,75 @@ def main() -> int:
         got = (d.get("theme") or {}).get("accent")
         check(f"{raw!r} → {expect}", code == 200 and got == expect, f"{code} {got}")
 
-    print("[5] 恢复默认")
-    code, d = admin.req("PATCH", "/api/settings", {"theme_accent": DEFAULT})
-    check("回到墨绿", (d.get("theme") or {}).get("accent") == DEFAULT, d.get("theme"))
+    print("[5] 还原进来时的主色（不覆盖管理员的选择）")
+    code, d = admin.req("PATCH", "/api/settings", {"theme_accent": orig})
+    check("还原成功", (d.get("theme") or {}).get("accent") == orig, d.get("theme"))
     code, _, portal = admin.fetch("/portal")
-    check("门户也回到墨绿", brand_vars(portal).get("brand") == DEFAULT, brand_vars(portal).get("brand"))
+    check("门户也回到原色", brand_vars(portal).get("brand") == orig, brand_vars(portal).get("brand"))
+
+    print("[6] 站点图标")
+    png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+    svg = b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16"/></svg>'
+
+    def post_icon(name: str, data: bytes):
+        b, ct = multipart({}, [("file", name, data)])
+        code, payload = admin.req("POST", "/api/settings/icon", b, ct=ct, raw=True)
+        # 成功时 raw 回字节，报错时回已解析的 dict，这里统一成 dict
+        if isinstance(payload, bytes):
+            try:
+                payload = json.loads(payload or b"{}")
+            except json.JSONDecodeError:
+                payload = {"raw": payload[:200].decode("utf-8", "replace")}
+        return code, payload
+
+    code, d = post_icon("site-icon.png", png)
+    check("上传 png 成功", code == 200 and (d.get("site_icon") or {}).get("custom") is True, d)
+    check("返回 /site-icon 地址", "/site-icon" in str((d.get("site_icon") or {}).get("url")), d.get("url"))
+
+    code, hdr, raw = admin.fetch_bytes("/site-icon")
+    check("/site-icon 可取到图", code == 200 and raw == png, f"{code} {len(raw)}B")
+    check("/site-icon 类型对", "image/png" in str(hdr.get("content-type", "")), hdr.get("content-type"))
+    check("/site-icon 允许缓存", "max-age" in str(hdr.get("cache-control", "")), hdr.get("cache-control"))
+
+    code, meta = admin.req("GET", "/api/meta")
+    check("/api/meta 带自定义图标", (meta.get("site_icon") or {}).get("custom") is True, meta.get("site_icon"))
+    check("/api/meta 图标结构与设置一致",
+          set(meta.get("site_icon") or {}) == set((d.get("site_icon") or {})),
+          sorted((meta.get("site_icon") or {}).keys()))
+
+    code, _, manifest = admin.fetch("/site.webmanifest")
+    check("webmanifest 图标指向 /site-icon", "/site-icon" in manifest, manifest[:120])
+    check("webmanifest theme_color 跟随主色", f'"theme_color":"{orig}"' in manifest, manifest[-120:])
+
+    code, _, portal = admin.fetch("/portal")
+    check("门户 <link rel=icon> 用自定义图标", "/site-icon" in portal)
+
+    code, d = post_icon("note.txt", b"hello")
+    check("非图片后缀 → 422", code == 422, d)
+    code, d = post_icon("empty.png", b"")
+    check("空文件 → 422", code == 422, d)
+    code, d = post_icon("fake.svg", b"\x00\x01\x02not-svg")
+    check("假 SVG → 422", code == 422, d)
+    code, d = post_icon("big.png", png + b"\x00" * (513 * 1024))
+    check("超过 512KB → 422", code == 422, d)
+    code, d = post_icon("after-bad.png", png)
+    check("失败后原图标没被破坏", code == 200 and (d.get("site_icon") or {}).get("custom") is True, d)
+
+    code, d = post_icon("site-icon.svg", svg)
+    check("换格式成 svg 成功", code == 200 and (d.get("site_icon") or {}).get("ext") == "svg", d.get("site_icon"))
+    code, _, raw = admin.fetch("/site-icon")
+    check("/site-icon 换成 svg 内容", code == 200 and raw == svg.decode(), f"{code} {raw[:20]}")
+
+    code, d = admin.req("DELETE", "/api/settings/icon")
+    check("删除后回到内置", code == 200 and (d.get("site_icon") or {}).get("custom") is False, d)
+    code, _, _ = admin.fetch("/site-icon")
+    check("没有自定义图标时 /site-icon 404", code == 404, code)
+    code, _, portal = admin.fetch("/portal")
+    check("门户回到内置图标", "/site-icon" not in portal)
+    code, meta = admin.req("GET", "/api/meta")
+    check("/api/meta 无自定义图标时给空壳", (meta.get("site_icon") or {}).get("custom") is False
+          and not (meta.get("site_icon") or {}).get("url"), meta.get("site_icon"))
 
     print("[清理]")
     c, _ = admin.req("DELETE", f"/api/projects/{slug}")
