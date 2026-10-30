@@ -154,6 +154,8 @@ curl -H "Authorization: Bearer pv_xxx" \
   https://<站点>/api/projects
 ```
 
+- **入口规则**：只有 1 个文件时，那个文件就是入口（叫 `report.html` 也无所谓）；多个文件时根目录必须有
+  `index.html`（或 `index.htm`），否则接口直接返回 `422`。别等部署完才发现打开是空白。
 - `visibility`：`portal`（进门户）/ `link`（不进门户但可转发）/ `private`（只有自己）
 - 不传 `hours` 时按可见性给默认寿命：门户 6h / 持链接 12h / 私有永久
 - 同名 `slug` 再传一次 = 覆盖更新（保留原到期时间与归属）
@@ -169,8 +171,9 @@ curl -X POST -H "Authorization: Bearer pv_xxx" -H "Content-Type: application/jso
   https://<站点>/api/projects/link
 ```
 
-`/v/<slug>` 与 `/p/<slug>/` 都会 302 跳到该外链；门户卡片和「复制链接」拿到的就是外链本身，
-不经过 `/v/` 中转，所以点开即目标站，不会出现「再点一下跳转」的空壳页。
+`/v/<slug>` 与 `/p/<slug>/` 都会 302 跳到该外链，**跳之前记一次访问**，所以外链项目的访问数也有。
+分享出去请给 `/v/<slug>` 短链（门户卡片和「复制链接」给的就是它）：直接给源站地址就统计不到了。
+对访客而言仍然是一次跳转，没有中间页，也没有 iframe 空壳。
 
 ### 3. 改可见性 / 续期 / 打标签
 

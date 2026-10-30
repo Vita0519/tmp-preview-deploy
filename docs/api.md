@@ -77,10 +77,11 @@
 |---|---|---|---|
 | GET | `/api/meta` | 🟢 | 站点标题 / 在线项目数（SPA 启动用） |
 | GET | `/api/public/p/{slug}` | 🟢 | 项目公开信息 + `server_now` |
-| GET | `/v/{slug}` | 🟢 | 预览外壳（倒计时、下载、复制链接）；外链项目 **302 直达目标站**，失效/无权访问 **302 回 `/portal?gone=1`** |
+| GET | `/v/{slug}` | 🟢 | 预览外壳（倒计时、下载、复制链接）；外链项目 **记一次访问后 302 直达目标站**，失效/无权访问 **302 回 `/portal?gone=1`** |
 | GET | `/p/{slug}/{path}` | 🟢 | 项目文件；无扩展名补 `index.html`；SPA 回退到 `entry` |
 | GET | `/download/{slug}` | 🟢 | zip 下载（需项目开启 `allow_download`）；失效同样 302 回门户 |
 | GET | `/portal` | 🟢/👤 | 门户列表（`PUBLIC_PORTAL=1` 或已登录） |
+| GET | `/rss.xml`、`/feed.xml` | 🟢/👤 | 门户 RSS（最近 50 个门户可见且未过期项目）；门户不公开且未登录 → 404 |
 | GET | `/api/health` | 🟢 | 健康检查（容器探针） |
 
 **失效与权限一律用「跳转」表达，不再用 404 页：**
@@ -88,4 +89,20 @@
 - 项目不存在 / 已删除 / 已过期 / 无权访问 → `302 /portal?gone=1`。门户本身若需要登录，会继续 302 到 `/login`，因此**不会通过 URL 泄露项目是否存在**。
 - `/p/{slug}/{path}` 在 iframe 里被引用时（`Accept: text/html`）→ 返回一张只做一件事的失效页：`window.top.location.replace()` + `<meta refresh>`，把**顶层**窗口带走，不在 iframe 里显示 404。
 - 子资源请求（css/js/png，`Accept` 不含 `text/html`）→ 静默 `404`，避免图片被跳成一张 HTML 页。
-- `kind=link` 的项目：`/v/{slug}`、`/p/{slug}/` 都直接 `302` 到 `link_url`；门户卡片与复制按钮拿到的就是外部地址本身，不再经过 `/v/` 中转。
+- `kind=link` 的项目：`/v/{slug}`、`/p/{slug}/` 都直接 `302` 到 `link_url`，**并在 `302` 之前记一次访问**（`Accept: text/html` 的 GET 才算），所以门户卡片、复制按钮给的都是本站短链 `/v/{slug}`——转发出去照样统计得到。
+
+**入口文件规则**
+
+| 上传内容 | 入口 `entry` | 结果 |
+|---|---|---|
+| 只有 1 个文件（任意名字、任意类型） | 该文件 | `/v/` 的 iframe 直接指向它 |
+| 多个文件 + 根目录 `index.html`/`index.htm` | `index.html` | 正常 |
+| 多个文件 + 没有 `index.html` | — | **422**，提示改名、拆单文件或改用 zip 上传 |
+
+历史项目（`entry` 为空）仍按「根目录唯一 html」兜底，不会被判成失效。
+
+**主题色**
+
+`GET /api/meta` 与 `GET /api/settings` 都带 `theme` 字段（`accent` + 派生色 `hover/soft/line/deep/light/rgb`）；
+`PATCH /api/settings {"theme_accent": "#3b5bdb"}` 改主色，接受 `#abc` / `abc` 简写，非法值静默回落 `#0f766e`。
+服务端渲染的页面直接把变量写进 `:root`，控制台启动时用 `/api/meta` 的同一份色板覆盖 `--brand*`。

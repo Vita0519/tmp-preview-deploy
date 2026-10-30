@@ -27,9 +27,9 @@ const shineId = computed(() => `pvShine-${uid}`)
   >
     <defs v-if="!mono">
       <linearGradient :id="tileId" x1="2" y1="0" x2="30" y2="32" gradientUnits="userSpaceOnUse">
-        <stop offset="0" stop-color="#17bca9" />
-        <stop offset=".48" stop-color="#0f766e" />
-        <stop offset="1" stop-color="#095651" />
+        <stop offset="0" style="stop-color: var(--brand-light, #17bca9)" />
+        <stop offset=".48" style="stop-color: var(--brand, #0f766e)" />
+        <stop offset="1" style="stop-color: var(--brand-deep, #095651)" />
       </linearGradient>
       <linearGradient :id="shineId" x1="16" y1="0" x2="16" y2="19" gradientUnits="userSpaceOnUse">
         <stop offset="0" stop-color="#ffffff" stop-opacity=".2" />
@@ -58,6 +58,6 @@ const shineId = computed(() => `pvShine-${uid}`)
   display: block;
   flex: 0 0 auto;
   border-radius: 23.75%;
-  box-shadow: 0 6px 14px -8px rgba(15, 118, 110, 0.7);
+  box-shadow: 0 6px 14px -8px rgba(var(--brand-rgb),0.7);
 }
 </style>

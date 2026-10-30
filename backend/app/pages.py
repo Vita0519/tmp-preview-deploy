@@ -1,6 +1,8 @@
 """服务端渲染的轻页面：访客预览外壳 / 门户 / 错误页（无框架，首屏快）。"""
 from html import escape
 
+from . import theme
+
 FONT = (
     '-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",'
     '"Microsoft YaHei","Segoe UI",Roboto,sans-serif'
@@ -11,7 +13,7 @@ BASE_CSS = f"""
 *{{box-sizing:border-box}}
 html,body{{margin:0;padding:0}}
 body{{font-family:{FONT};color:#14161a;background:#f6f7f5;-webkit-font-smoothing:antialiased}}
-a{{color:#0f766e;text-decoration:none}}
+a{{color:var(--brand);text-decoration:none}}
 .num{{font-variant-numeric:tabular-nums}}
 """
 
@@ -19,31 +21,39 @@ a{{color:#0f766e;text-decoration:none}}
 FAVICON_NAMES = ("favicon.ico", "favicon.svg", "favicon.png", "apple-touch-icon.png")
 
 # 站点自己的图标套装（与 frontend/public 下由 tools/gen_icons.py 生成的产物对应）
-SITE_ICON_LINKS = (
-    '<link rel="icon" href="/favicon.svg" type="image/svg+xml">'
-    '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">'
-    '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
-    '<link rel="manifest" href="/site.webmanifest">'
-    '<meta name="theme-color" content="#0f766e">'
-)
+def site_icon_links(accent: str | None = None) -> str:
+    color = theme.palette(accent)["accent"]
+    return (
+        '<link rel="icon" href="/favicon.svg" type="image/svg+xml">'
+        '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">'
+        '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+        '<link rel="manifest" href="/site.webmanifest">'
+        f'<meta name="theme-color" content="{color}">'
+    )
 
-# 门户页顶部的品牌标记（与 favicon.svg 同一份路径数据；沙漏 = 限时可用）
-BRAND_MARK = (
-    '<svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">'
-    '<defs>'
-    '<linearGradient id="pvMarkG" x1="2" y1="0" x2="30" y2="32" gradientUnits="userSpaceOnUse">'
-    '<stop offset="0" stop-color="#17bca9"/><stop offset=".48" stop-color="#0f766e"/>'
-    '<stop offset="1" stop-color="#095651"/></linearGradient>'
-    '<linearGradient id="pvMarkS" x1="16" y1="0" x2="16" y2="19" gradientUnits="userSpaceOnUse">'
-    '<stop offset="0" stop-color="#fff" stop-opacity=".2"/>'
-    '<stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
-    '</defs>'
-    '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkG)"/>'
-    '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkS)"/>'
-    '<path fill="#fff" d="M12.1 7.4H19.9C21 7.4 21.7 8 21.7 8.9V9.2L17.2 15.2V16.8'
-    'L21.7 22.8V23.1C21.7 24 21 24.6 19.9 24.6H12.1C11 24.6 10.3 24 10.3 23.1V22.8'
-    'L14.8 16.8V15.2L10.3 9.2V8.9C10.3 8 11 7.4 12.1 7.4Z"/></svg>'
-)
+
+def brand_mark(accent: str | None = None, size: int = 30) -> str:
+    """门户/预览页顶部的品牌标记（与 favicon.svg 同一份路径数据；沙漏 = 限时可用）。
+
+    渐变跟着主题色走，换主色时标记不会还是墨绿。
+    """
+    p = theme.palette(accent)
+    return (
+        f'<svg class="mark" viewBox="0 0 32 32" width="{size}" height="{size}" aria-hidden="true">'
+        '<defs>'
+        '<linearGradient id="pvMarkG" x1="2" y1="0" x2="30" y2="32" gradientUnits="userSpaceOnUse">'
+        f'<stop offset="0" stop-color="{p["light"]}"/><stop offset=".48" stop-color="{p["accent"]}"/>'
+        f'<stop offset="1" stop-color="{p["deep"]}"/></linearGradient>'
+        '<linearGradient id="pvMarkS" x1="16" y1="0" x2="16" y2="19" gradientUnits="userSpaceOnUse">'
+        '<stop offset="0" stop-color="#fff" stop-opacity=".2"/>'
+        '<stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
+        '</defs>'
+        '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkG)"/>'
+        '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkS)"/>'
+        '<path fill="#fff" d="M12.1 7.4H19.9C21 7.4 21.7 8 21.7 8.9V9.2L17.2 15.2V16.8'
+        'L21.7 22.8V23.1C21.7 24 21 24.6 19.9 24.6H12.1C11 24.6 10.3 24 10.3 23.1V22.8'
+        'L14.8 16.8V15.2L10.3 9.2V8.9C10.3 8 11 7.4 12.1 7.4Z"/></svg>'
+    )
 
 
 def favicon_href(slug: str | None = None) -> str:
@@ -60,28 +70,31 @@ def favicon_href(slug: str | None = None) -> str:
     return ""
 
 
-def icon_head(slug: str | None = None) -> str:
+def icon_head(slug: str | None = None, accent: str | None = None) -> str:
     """预览页的图标声明：项目自带优先，否则用站点图标套装。"""
     own = favicon_href(slug)
     if own:
         return (
             f'<link rel="icon" href="{own}">'
             '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
-            '<meta name="theme-color" content="#0f766e">'
+            f'<meta name="theme-color" content="{theme.palette(accent)["accent"]}">'
         )
-    return SITE_ICON_LINKS
+    return site_icon_links(accent)
 
 
-def preview_page(p: dict, server_now: int, site_title: str) -> str:
+def preview_page(p: dict, server_now: int, site_title: str, accent: str | None = None) -> str:
+    accent = accent or theme.current()
     title = escape(p["title"])
     owner = escape((p.get("owner") or {}).get("display_name") or "")
     kind = p["kind"]
     allow_dl = bool(p["allow_download"])
     expires = p["expires_at"] or 0
-    raw = f"/p/{p['slug']}/"
+    # 入口不一定是 index.html：单文件项目上传时就把那个文件名当 entry
+    entry = (p.get("entry") or "").strip()
+    raw = f"/p/{p['slug']}/{entry}" if entry else f"/p/{p['slug']}/"
     size = _human(p["size_bytes"])
     expired = bool(p["expired"])
-    missing_entry = kind == "static" and not p["entry"]
+    missing_entry = kind == "static" and not entry
 
     body = ""
     if kind == "link":
@@ -91,7 +104,7 @@ def preview_page(p: dict, server_now: int, site_title: str) -> str:
             "压缩包项目", f"{size} · 仅提供下载", f"/download/{p['slug']}" if allow_dl else "", "下载压缩包" if allow_dl else ""
         )
     elif missing_entry:
-        body = _empty_state("没有入口页面", "该项目缺少 index.html，无法直接预览", raw, "浏览目录")
+        body = _empty_state("没有入口页面", "该项目缺少可展示的 HTML 入口，无法直接预览", raw, "浏览文件")
     elif expired:
         body = _empty_state("项目已到期", "该项目已超过设定的存活时长，访问已停止", "", "")
     else:
@@ -105,23 +118,24 @@ def preview_page(p: dict, server_now: int, site_title: str) -> str:
     return f"""<!doctype html><html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-{icon_head(p['slug'])}
+{icon_head(p['slug'], accent)}
 <title>{title} · {escape(site_title)}</title>
 <style>
+{theme.css_vars(accent)}
 {BASE_CSS}
 body{{height:100vh;display:flex;flex-direction:column;overflow:hidden}}
 .bar{{flex:0 0 auto;height:52px;display:flex;align-items:center;gap:10px;padding:0 14px;
 background:rgba(255,255,255,.86);backdrop-filter:blur(14px) saturate(180%);
 border-bottom:1px solid rgba(20,22,26,.08);position:relative;z-index:5}}
 .mark{{width:26px;height:26px;border-radius:23.75%;flex:0 0 auto;
-box-shadow:0 6px 14px -9px rgba(15,118,110,.85)}}
+box-shadow:0 6px 14px -9px rgba(var(--brand-rgb),.85)}}
 .ttl{{min-width:0;display:flex;flex-direction:column;gap:1px}}
 .ttl b{{font-size:13.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}}
 .ttl span{{font-size:11.5px;color:#7b8189;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 .spacer{{flex:1 1 auto}}
 .pill{{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;
-font-size:12px;font-weight:600;background:#eff4f2;color:#0f766e;border:1px solid rgba(15,118,110,.16);white-space:nowrap}}
-.pill .dot{{width:6px;height:6px;border-radius:50%;background:#0f766e;animation:pulse 2.4s ease-in-out infinite}}
+font-size:12px;font-weight:600;background:var(--brand-soft);color:var(--brand);border:1px solid rgba(var(--brand-rgb),.16);white-space:nowrap}}
+.pill .dot{{width:6px;height:6px;border-radius:50%;background:var(--brand);animation:pulse 2.4s ease-in-out infinite}}
 @keyframes pulse{{0%,100%{{opacity:1}}50%{{opacity:.35}}}}
 .pill.warn{{background:#fdf3e7;color:#b45309;border-color:rgba(180,83,9,.18)}}
 .pill.warn .dot{{background:#b45309}}
@@ -133,8 +147,8 @@ transition:background .16s,border-color .16s,transform .16s}}
 .btn svg{{display:block;flex:0 0 auto}}
 .btn:hover{{background:#f7f8f7;border-color:rgba(20,22,26,.26)}}
 .btn:active{{transform:translateY(1px)}}
-.btn.primary{{background:#0f766e;border-color:#0f766e;color:#fff}}
-.btn.primary:hover{{background:#0d6a62}}
+.btn.primary{{background:var(--brand);border-color:var(--brand);color:#fff}}
+.btn.primary:hover{{background:var(--brand-hover)}}
 .btn.ghost{{border-color:transparent;background:transparent;color:#5b636d}}
 .btn.ghost:hover{{background:rgba(20,22,26,.05);border-color:transparent}}
 .icon{{width:28px;justify-content:center;padding:0}}
@@ -157,7 +171,7 @@ background:radial-gradient(120% 90% at 50% 0%,#fbfcfb 0%,#f1f3f1 100%);padding:2
 </style></head>
 <body>
 <div class="bar">
-  {BRAND_MARK.replace('width="30" height="30"', 'width="26" height="26"')}
+  {brand_mark(accent, 26)}
   <div class="ttl"><b>{title}</b><span>{owner + ' · ' if owner else ''}{size}{' · ' + str(p['file_count']) + ' 个文件' if p['file_count'] else ''}</span></div>
   <div class="spacer"></div>
   <span class="pill {'dead' if expired else ('perm' if not expires else '')}" id="pill"><span class="dot"></span><span id="cd">{'已到期' if expired else ('永久' if not expires else '—')}</span></span>
@@ -259,15 +273,15 @@ background:#fdf4e8;border:1px solid rgba(180,83,9,.22);color:#8a5210;font-size:1
 .gonebar b{font-weight:650}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
 .hgroup{display:flex;align-items:center;gap:12px;min-width:0}
-.hgroup .mark{flex:0 0 auto;border-radius:23.75%;box-shadow:0 9px 20px -12px rgba(15,118,110,.9)}
+.hgroup .mark{flex:0 0 auto;border-radius:23.75%;box-shadow:0 9px 20px -12px rgba(var(--brand-rgb),.9)}
 .htext{min-width:0}
 h1{margin:0;font-size:26px;letter-spacing:-.02em}
 .sub{color:#7b8189;font-size:12.5px;margin-top:5px}
 .author{display:flex;align-items:center;gap:11px;margin:0 0 14px;padding:11px 13px;background:#fff;
 border:1px solid rgba(20,22,26,.08);border-radius:12px;box-shadow:0 1px 2px rgba(20,22,26,.03)}
 .author .ava{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
-background:#eff4f2;color:#0f766e;font-weight:650;font-size:14px;letter-spacing:-.02em;
-border:1px solid rgba(15,118,110,.14)}
+background:var(--brand-soft);color:var(--brand);font-weight:650;font-size:14px;letter-spacing:-.02em;
+border:1px solid rgba(var(--brand-rgb),.14)}
 .author .am{min-width:0;flex:1 1 auto}
 .author .am b{display:block;font-size:13.5px;letter-spacing:-.01em;color:#14161a}
 .author .am span{display:block;margin-top:2px;font-size:11.5px;color:#8a9099;line-height:1.45;
@@ -276,7 +290,7 @@ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .alink{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;border-radius:8px;
 border:1px solid rgba(20,22,26,.1);background:#fff;color:#5b636d;font-size:11.5px;font-weight:600;
 transition:color .16s,border-color .16s,background .16s}
-.alink:hover{color:#0f766e;border-color:rgba(15,118,110,.38);background:#f6fbfa}
+.alink:hover{color:var(--brand);border-color:rgba(var(--brand-rgb),.38);background:#f6fbfa}
 .alink svg{width:13px;height:13px;flex:0 0 auto}
 .alink.only-icon{padding:0;width:28px;justify-content:center}
 @media (max-width:620px){
@@ -299,17 +313,17 @@ font:600 12px/1 inherit;color:#5b636d;cursor:pointer;transition:background .16s,
 .tools .spacer{flex:1 1 auto}
 .search{height:30px;width:210px;padding:0 10px;border-radius:8px;border:1px solid rgba(20,22,26,.14);
 background:#fff;font-size:12.5px;color:#14161a;outline:none;transition:border-color .16s,box-shadow .16s}
-.search:focus{border-color:rgba(15,118,110,.5);box-shadow:0 0 0 3px rgba(15,118,110,.1)}
+.search:focus{border-color:rgba(var(--brand-rgb),.5);box-shadow:0 0 0 3px rgba(var(--brand-rgb),.1)}
 .sort{height:30px;padding:0 8px;border-radius:8px;border:1px solid rgba(20,22,26,.14);background:#fff;
 font-size:12.5px;color:#2a2f36;outline:none;cursor:pointer}
-.sort:focus{border-color:rgba(15,118,110,.5)}
+.sort:focus{border-color:rgba(var(--brand-rgb),.5)}
 .cnt{font-size:11.5px;color:#8a9099;font-variant-numeric:tabular-nums;white-space:nowrap}
 .tagsbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px;min-height:0}
 .tagsbar:empty{display:none}
 .tagsbar button{height:22px;padding:0 8px;border-radius:6px;border:1px solid rgba(20,22,26,.08);
 background:#f4f6f4;color:#5b636d;font:600 11px/1 inherit;cursor:pointer;transition:.16s}
 .tagsbar button:hover{background:#eef2f0;color:#14161a}
-.tagsbar button.on{background:#0f766e;border-color:#0f766e;color:#fff}
+.tagsbar button.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch;
 padding-top:14px}
 .grid[hidden]{display:none}
@@ -317,7 +331,7 @@ padding-top:14px}
 border-radius:12px;padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
 .card[hidden]{display:none}
-.card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(15,118,110,.32)}
+.card:hover{transform:translateY(-2px);box-shadow:0 12px 28px -18px rgba(20,22,26,.42);border-color:rgba(var(--brand-rgb),.32)}
 .top{min-width:0;padding-right:90px}
 .tinfo{min-width:0}
 .name{display:flex;align-items:center;gap:6px;font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:#14161a;
@@ -337,37 +351,37 @@ border:1px solid rgba(20,22,26,.06)}
 .foot{margin-top:auto;padding-top:10px}
 .cdrow{display:flex;align-items:baseline;gap:5px;margin-bottom:6px}
 .cdlab{font-size:10.5px;color:#98a0a6}
-.cd{font-size:12.5px;font-weight:650;color:#0f766e;font-variant-numeric:tabular-nums;
+.cd{font-size:12.5px;font-weight:650;color:var(--brand);font-variant-numeric:tabular-nums;
 letter-spacing:-.01em;white-space:nowrap}
 .cd.perm{color:#3a4a63}
 .cd.warn{color:#b45309}
 .cd.dead{color:#b42318}
 .cdend{margin-left:auto;font-size:10.5px;color:#a3aab0;font-variant-numeric:tabular-nums;white-space:nowrap}
 .track{height:3px;border-radius:99px;background:#eef1ef;overflow:hidden}
-.track > i{display:block;height:100%;border-radius:99px;background:#0f766e;transition:width .5s ease}
+.track > i{display:block;height:100%;border-radius:99px;background:var(--brand);transition:width .5s ease}
 .track.warn > i{background:#b45309}
 .track.dead > i{background:#b42318}
 /* 访问圆环：整张卡片的右上角 */
 .ring{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;
 display:grid;place-items:center;
-background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef1ef 0)}
+background:conic-gradient(var(--brand) calc(var(--p,0) * 1%), #eef1ef 0)}
 .ring::after{content:'';position:absolute;inset:4px;border-radius:50%;background:#fff}
 .ring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:2px}
 .ring b{font-size:12px;font-weight:650;color:#14161a;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 .ring b.sm{font-size:9.5px}
 .ring i{font-style:normal;font-size:8px;color:#a3aab0;letter-spacing:.02em}
-.card:hover .ring{background:conic-gradient(#0d6a62 calc(var(--p,0) * 1%), #e9ecea 0)}
+.card:hover .ring{background:conic-gradient(var(--brand-deep) calc(var(--p,0) * 1%), #e9ecea 0)}
 /* 整卡可点：一层覆盖式链接，复制按钮浮在上面 */
 .hit{position:absolute;inset:0;z-index:1;border-radius:inherit}
 .cbtn{position:absolute;z-index:3;top:11px;right:61px;width:26px;height:26px;padding:0;
 display:grid;place-items:center;border:1px solid transparent;border-radius:8px;background:transparent;
 color:#9aa1a8;cursor:pointer;transition:color .16s,background .16s,border-color .16s}
-.cbtn:hover{color:#0f766e;background:#f1f5f3;border-color:rgba(15,118,110,.2)}
+.cbtn:hover{color:var(--brand);background:#f1f5f3;border-color:rgba(var(--brand-rgb),.2)}
 .cbtn:active{transform:scale(.94)}
-.cbtn:focus-visible{outline:2px solid rgba(15,118,110,.45);outline-offset:2px}
+.cbtn:focus-visible{outline:2px solid rgba(var(--brand-rgb),.45);outline-offset:2px}
 .cbtn svg{width:13px;height:13px;display:block}
 .cbtn .ic-done{display:none;stroke-width:2.2}
-.cbtn.done{color:#0f766e;background:#e9f3f0;border-color:rgba(15,118,110,.26)}
+.cbtn.done{color:var(--brand);background:#e9f3f0;border-color:rgba(var(--brand-rgb),.26)}
 .cbtn.done .ic-copy{display:none}
 .cbtn.done .ic-done{display:block}
 .cbtn.fail{color:#b42318;background:#fdeceb;border-color:rgba(180,35,24,.24)}
@@ -386,7 +400,7 @@ grid-template-areas:"main desc tags ring foot copy";align-items:center;gap:14px;
 background:#fff;border:1px solid rgba(20,22,26,.09);border-radius:12px;padding:10px 14px;
 transition:border-color .16s,box-shadow .16s}
 .row[hidden]{display:none}
-.row:hover{border-color:rgba(15,118,110,.32);box-shadow:0 6px 18px -14px rgba(20,22,26,.42)}
+.row:hover{border-color:rgba(var(--brand-rgb),.32);box-shadow:0 6px 18px -14px rgba(20,22,26,.42)}
 .rmain{grid-area:main;min-width:0}
 .rname{display:block;font-weight:650;font-size:13.5px;letter-spacing:-.01em;color:#14161a;
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -397,7 +411,7 @@ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rtags{grid-area:tags;display:flex;gap:5px;flex-wrap:nowrap}
 .rring{grid-area:ring;position:relative;width:32px;height:32px;border-radius:50%;display:grid;
-place-items:center;background:conic-gradient(#0f766e calc(var(--p,0) * 1%), #eef1ef 0)}
+place-items:center;background:conic-gradient(var(--brand) calc(var(--p,0) * 1%), #eef1ef 0)}
 .rring::after{content:'';position:absolute;inset:3px;border-radius:50%;background:#fff}
 .rring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
 .rring b{font-size:10.5px;font-weight:650;color:#14161a;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
@@ -693,7 +707,9 @@ def portal_page(
     server_now: int,
     logged_in: bool,
     author: dict | None = None,
+    accent: str | None = None,
 ) -> str:
+    accent = accent or theme.current()
     max_views = max([(p.get("views") or 0) for p in items] or [0]) or 1
     cards: list[str] = []
     rows: list[str] = []
@@ -718,10 +734,10 @@ def portal_page(
         size = _human(p["size_bytes"]) if p["kind"] != "link" else "外链"
         num_cls = "sm" if views >= 1000 else ""
         ends = "" if not exp else f"到期 {_fmt_day(exp)}"
-        # 外链项目直接指向外部站点：不套预览外壳，也不先进 iframe 再跳一次
-        is_ext = p["kind"] == "link" and bool(p.get("link_url"))
-        target_url = p["link_url"] if is_ext else f"/v/{p['slug']}"
-        ext_attr = ' rel="noopener noreferrer"' if is_ext else ' rel="noopener"'
+        # 外链项目也走本地短链 /v/<slug>：点开时先记一次访问再 302 到源站，
+        # 圆环才有数据；页面上仍然是一次跳转，不会出现 iframe 空壳。
+        target_url = f"/v/{p['slug']}"
+        ext_attr = ' rel="noopener"'
         data_attr = (
             f'data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}" '
             f'data-kind="{p["kind"]}" data-tags="{escape(chr(124).join(tags_list), quote=True)}" '
@@ -777,13 +793,16 @@ def portal_page(
         )
     body = "".join(cards) or ""
     rowbody = "".join(rows)
-    login = '<a class="btn ghost" href="/">进入控制台</a>' if logged_in else ""
+    rss_link = '<a class="btn ghost" href="/rss.xml" title="订阅门户更新">RSS</a>'
+    login = rss_link + ('<a class="btn ghost" href="/">进入控制台</a>' if logged_in else "")
     who = _author_block(author)
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(site_title)}</title>
-{SITE_ICON_LINKS}
+{site_icon_links(accent)}
+<link rel="alternate" type="application/rss+xml" title="{escape(site_title)} · 最新项目" href="/rss.xml">
 <meta name="robots" content="noindex">
 <style>
+{theme.css_vars(accent)}
 {BASE_CSS}
 {PORTAL_CSS}
 </style></head><body><div class="wrap">
@@ -792,7 +811,7 @@ def portal_page(
 <span>你打开的那个预览链接已经失效（可能已到期或被移除），这里是站点门户。</span>
 </div>
 <div class="dock">
-<header><div class="hgroup">{BRAND_MARK}<div class="htext"><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div></div>{login}</header>
+<header><div class="hgroup">{brand_mark(accent)}<div class="htext"><h1>{escape(site_title)}</h1><div class="sub">{escape(subtitle)}</div></div></div>{login}</header>
 {who}
 <div class="tools">
   <div class="seg" data-kind>
@@ -850,11 +869,12 @@ def gone_page(target: str = "/portal?gone=1") -> str:
 <meta http-equiv="refresh" content="0;url={url}">
 <title>正在前往门户…</title>
 <style>
+{theme.css_vars(theme.current())}
 html,body{{margin:0;height:100%}}
 body{{display:flex;align-items:center;justify-content:center;background:#f6f7f5;
 font:13px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#7b8189}}
 p{{margin:0}}
-a{{color:#0f766e;font-weight:600;text-decoration:none}}
+a{{color:var(--brand);font-weight:600;text-decoration:none}}
 </style></head><body>
 <p>链接已失效，正在前往 <a href="{url}">站点门户</a>…</p>
 <script>
@@ -867,23 +887,25 @@ a{{color:#0f766e;font-weight:600;text-decoration:none}}
 
 
 def error_page(code: int, title: str, desc: str, back: str = "/") -> str:
-    accent = "#b45309" if code == 410 else "#14161a"
+    warn = code in (410, 403)
+    tint = "#b45309" if warn else theme.current()
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{code} · {escape(title)}</title>
-{SITE_ICON_LINKS}
+{site_icon_links(theme.current())}
 <style>
+{theme.css_vars(theme.current())}
 {BASE_CSS}
 body{{height:100vh;display:flex;align-items:center;justify-content:center;
 background:radial-gradient(120% 90% at 50% 0%,#fbfcfb,#eff1ef)}}
 .box{{text-align:center;padding:40px 44px;background:#fff;border:1px solid rgba(20,22,26,.08);
 border-radius:14px;box-shadow:0 24px 60px -40px rgba(20,22,26,.5);max-width:420px}}
-.code{{font:600 40px/1 {MONO};color:{accent};letter-spacing:-.03em}}
+.code{{font:600 40px/1 {MONO};color:{tint};letter-spacing:-.03em}}
 .box .mark{{margin:0 auto 18px;border-radius:23.75%;display:block;width:38px;height:38px}}
 h1{{font-size:16px;margin:14px 0 6px;letter-spacing:-.01em}}
 p{{color:#7b8189;font-size:13px;line-height:1.6;margin:0 0 18px}}
 a{{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:8px;background:#14161a;
 color:#fff;font-size:12.5px;font-weight:600}}
 </style></head><body><div class="box">
-{BRAND_MARK}
+{brand_mark(theme.current(), 38)}
 <div class="code">{code}</div><h1>{escape(title)}</h1><p>{escape(desc)}</p><a href="{escape(back)}">返回</a>
 </div></body></html>"""

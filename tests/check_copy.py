@@ -65,9 +65,9 @@ with sync_playwright() as p:
     chk("每张卡片都有复制按钮", cards > 0 and btns == cards, f"{btns}/{cards}")
     chk("每个列表行都有复制按钮", rows > 0 and rbtns == rows, f"{rbtns}/{rows}")
     chk("卡片按钮带 data-path", pg.locator("#grid .cbtn[data-path]").count() == cards)
-    # 外链项目的链接直接是外部地址，不该再套 /v/ 中转
+    # 外链项目也走本地短链（先计数再 302），所以 data-path 应当全是站内 /v/
     paths = pg.eval_on_selector_all("#grid .cbtn", "els => els.map(e => e.dataset.path)")
-    chk("外链卡片指向外部站点", any(p.startswith("http") and "figma" in p for p in paths), paths[:3])
+    chk("复制按钮都是站内短链", all(p.startswith("/v/") for p in paths), paths[:3])
     chk("按钮默认无 done 类", pg.locator(".cbtn.done").count() == 0)
     chk("气泡文案为「已复制」", pg.locator("#grid .cbtn").first.locator(".tip").inner_text() == "已复制")
 

@@ -1,7 +1,7 @@
 """系统设置（站点标题、按可见性的默认时长、到期策略、门户可见性）。"""
 from fastapi import APIRouter, Depends
 
-from .. import author, config, defaults
+from .. import author, config, defaults, theme
 from ..db import all_settings, db, get_setting, set_setting
 from ..pages import ICONS
 from ..security import admin_user
@@ -35,6 +35,8 @@ def read_settings(user: dict = Depends(admin_user)):
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": s.get("default_expire_action") or "block",
         "public_portal": s.get("public_portal") == "1",
+        "theme": {**theme.palette(s.get("theme_accent") or theme.DEFAULT),
+                  "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
         "author": author.load(),
         "author_types": [
             {"key": k, "label": v["label"], "paths": ICONS.get(v["icon"], "")}
@@ -74,6 +76,9 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         set_setting("public_portal", "1" if payload["public_portal"] else "0")
     if "author" in payload:
         author.save(payload["author"])
+    if "theme_accent" in payload:
+        set_setting("theme_accent", theme.normalize(payload["theme_accent"]))
+        theme.reset_cache()
 
     return {
         "ok": True,
@@ -82,5 +87,7 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": get_setting("default_expire_action") or "block",
         "public_portal": get_setting("public_portal", "0") == "1",
+        "theme": {**theme.palette(get_setting("theme_accent") or theme.DEFAULT),
+                  "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
         "author": author.load(),
     }

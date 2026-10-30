@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { api } from '../api'
 import { store, toast } from '../store'
 import { fmtBytes, relTime } from '../format'
+import { PRESETS, applyAccent, normalize } from '../theme'
 import Icon from '../components/Icon.vue'
 
 const data = ref(null)
@@ -24,6 +25,18 @@ const ACTION_LABEL = {
   settings: '修改设置',
 }
 const actionLabel = (a) => ACTION_LABEL[a] || a
+
+// 主题色：选色即时预览，保存后才算数
+const accent = ref('#0f766e')
+const accentInput = ref('#0f766e')
+let savedAccent = '#0f766e'
+
+function pickAccent(v) {
+  const hex = normalize(v)
+  accent.value = hex
+  accentInput.value = hex
+  applyAccent(hex)
+}
 
 const form = reactive({
   site_title: '',
@@ -113,6 +126,10 @@ async function load() {
     form.ttl = { ...form.ttl, ...(d.ttl_defaults || {}) }
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
+    const hex = normalize(d.theme?.accent || '#0f766e')
+    accent.value = hex
+    accentInput.value = hex
+    savedAccent = hex
     if (Array.isArray(d.author_types) && d.author_types.length) authorTypes.value = d.author_types
     const a = d.author || {}
     form.author = {
@@ -148,6 +165,7 @@ async function save() {
       },
       default_expire_action: form.default_expire_action,
       public_portal: form.public_portal,
+      theme_accent: accent.value,
       author: {
         name: form.author.name,
         bio: form.author.bio,
@@ -177,6 +195,8 @@ async function changePassword() {
 }
 
 onMounted(load)
+// 没保存就离开：把预览色退回去，别留下一个「只在这次会话有效」的主题
+onUnmounted(() => applyAccent(savedAccent))
 </script>
 
 <template>
@@ -289,6 +309,68 @@ onMounted(load)
             允许未登录访客浏览门户列表
           </label>
           <span class="hint" style="margin-top: -4px">关闭时 /portal 需要登录，直链预览不受影响</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 主题色 -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>主题色</h2>
+        <span class="dim">控制台、门户、访客预览页共用一套</span>
+      </div>
+      <div class="panel-body">
+        <div class="form">
+          <div class="frow">
+            <label>预设色板</label>
+            <div class="swatches">
+              <button
+                v-for="p in PRESETS"
+                :key="p.value"
+                type="button"
+                class="swatch"
+                :class="{ on: accent === p.value }"
+                :style="{ background: p.value }"
+                :title="`${p.name} ${p.value}`"
+                :aria-label="p.name"
+                @click="pickAccent(p.value)"
+              ></button>
+            </div>
+            <span class="hint">hover、浅底、描边、渐变深色都由主色自动派生，不用手调</span>
+          </div>
+          <div class="frow">
+            <label>自定义</label>
+            <div class="colorrow">
+              <input
+                type="color"
+                class="colorpick"
+                :value="accent"
+                aria-label="取色器"
+                @input="pickAccent($event.target.value)"
+              />
+              <input
+                v-model="accentInput"
+                class="input mono"
+                style="max-width: 132px"
+                maxlength="7"
+                spellcheck="false"
+                @blur="pickAccent(accentInput)"
+                @keyup.enter="pickAccent(accentInput)"
+              />
+              <button type="button" class="btn ghost sm" @click="pickAccent('#0f766e')">恢复默认</button>
+            </div>
+            <span class="hint">支持 #0f766e 或 #0f7 写法，非法值会自动回落到墨绿</span>
+          </div>
+          <div class="frow">
+            <label>效果</label>
+            <div class="themepre">
+              <span class="tp-pill">门户可见</span>
+              <span class="tp-link">示例链接</span>
+              <button type="button" class="tp-btn">主按钮</button>
+              <span class="tp-ring"><i></i></span>
+            </div>
+            <span class="hint">保存后立即生效，门户与访客页刷新即可看到</span>
+          </div>
         </div>
       </div>
     </section>
@@ -413,6 +495,98 @@ onMounted(load)
 </template>
 
 <style scoped>
+/* ---- 主题色 ---- */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid rgba(20, 22, 26, 0.1);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: transform 0.14s var(--ease), box-shadow 0.14s var(--ease);
+}
+.swatch:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -8px rgba(20, 22, 26, 0.6); }
+.swatch.on {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand);
+  transform: translateY(-1px);
+}
+.colorrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.colorpick {
+  width: 42px;
+  height: 32px;
+  padding: 2px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line-2, var(--line));
+  background: var(--surface);
+  cursor: pointer;
+}
+.colorpick::-webkit-color-swatch-wrapper { padding: 0; }
+.colorpick::-webkit-color-swatch { border: 0; border-radius: 5px; }
+.themepre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.tp-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
+}
+.tp-link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tp-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tp-ring {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--brand) 62%, var(--surface-3) 0);
+}
+.tp-ring i {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
 .setgrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -455,8 +629,8 @@ onMounted(load)
 }
 .ts-btn:hover { border-color: var(--line-3, #d6dad7); }
 .typesel.open .ts-btn {
-  border-color: rgba(15, 118, 110, 0.55);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+  border-color: rgba(var(--brand-rgb),0.55);
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb),0.1);
 }
 .ts-ico { width: 13px; height: 13px; flex: 0 0 auto; color: var(--ink-3); }
 .ts-lbl { flex: 1 1 auto; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

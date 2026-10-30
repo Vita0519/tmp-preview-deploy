@@ -215,7 +215,7 @@ async function submitLink() {
             @drop.prevent="onDrop"
           >
             <div style="font-weight: 600; color: var(--ink-2); margin-bottom: 2px">拖入文件夹，或点击选择</div>
-            <div>支持整个目录，自动保留相对路径；入口需为 index.html</div>
+            <div>支持整个目录，自动保留相对路径；单文件不限文件名，多文件需有根目录 index.html</div>
             <div style="margin-top: 9px; display: flex; gap: 6px; justify-content: center">
               <button class="btn sm" @click.stop="$refs.dir.click()">选择文件夹</button>
               <button class="btn sm" @click.stop="$refs.files.click()">选择文件</button>
@@ -248,7 +248,7 @@ async function submitLink() {
         <div v-else class="frow">
           <label>目标地址</label>
           <input v-model="form.link_url" class="input" placeholder="https://example.com/demo" />
-          <span class="hint">只登记链接，不复制内容；点击卡片直接跳转</span>
+          <span class="hint">只登记链接，不复制内容；点开经本地短链跳转，能统计访问</span>
         </div>
 
         <div class="frow two">

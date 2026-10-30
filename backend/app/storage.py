@@ -151,6 +151,34 @@ def resolve_in_project(slug: str, rel: str) -> Path | None:
     return target
 
 
+class EntryConflict(ValueError):
+    """多文件项目缺根目录 index.html：入口不唯一，拒绝上传。"""
+
+
+def decide_entry(names: list[str]) -> tuple[str | None, str | None]:
+    """决定入口文件，返回 (entry, 错误说明)。
+
+    规则：
+      1. 只有一个文件 → 就是它，不管叫 index.html 还是 report.html，也不管什么类型；
+      2. 多个文件 → 根目录必须有 index.html / index.htm；
+      3. 其余（多个文件却没有 index.html）→ 拒绝。没有入口的项目打开就是一片空白，
+         传上去也是「能下载但打不开」，不如当场说清楚；只想分享文件包就走 zip 上传。
+    """
+    files = [n for n in names if n]
+    if not files:
+        return None, None
+    if len(files) == 1:
+        return files[0], None
+    for cand in ("index.html", "index.htm"):
+        if cand in files:
+            return cand, None
+    if any(n.lower().endswith((".html", ".htm")) for n in files):
+        extra = "（如果只有一个 HTML 页面，可以只上传那一个文件，名字随意）"
+    else:
+        extra = "（如果只是想分享一堆文件，请改用 zip 上传）"
+    return None, f"多文件项目需要根目录有一个 index.html 作为入口{extra}"
+
+
 async def write_uploads(slug: str, uploads) -> tuple[int, int, str | None]:
     """把上传文件写进临时目录后原子替换；返回 (文件数, 总字节, 入口文件)。
 
@@ -159,6 +187,11 @@ async def write_uploads(slug: str, uploads) -> tuple[int, int, str | None]:
       2. 替换阶段按 slug 上锁 + 重试，避免 Windows 上 os.replace 撞到占用中的句柄。
     """
     import asyncio
+
+    # 先按文件名把入口定下来，规则不满足就直接拒绝——此时还没写盘，不用清理残留
+    entry, entry_error = decide_entry([safe_rel(getattr(u, "filename", "") or "") for u in uploads])
+    if entry_error:
+        raise EntryConflict(entry_error)
 
     FILES_DIR.mkdir(parents=True, exist_ok=True)
     tmp = FILES_DIR / f".tmp-{slug}-{uuid.uuid4().hex[:8]}"
@@ -202,7 +235,6 @@ async def write_uploads(slug: str, uploads) -> tuple[int, int, str | None]:
             raise
         _rm_tree(old)
 
-    entry = "index.html" if "index.html" in names else ("index.htm" if "index.htm" in names else None)
     return count, total, entry
 
 

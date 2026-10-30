@@ -1,11 +1,12 @@
-"""访客侧：项目文件直出、zip 下载、预览外壳、门户列表。"""
+"""访客侧：项目文件直出、zip 下载、预览外壳、门户列表、RSS。"""
 import os
+from html import escape
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 
-from .. import author, config, defaults, pages, storage, views
+from .. import author, config, defaults, pages, storage, theme, views
 from ..db import db, get_setting
 from ..security import now_ms, resolve_user
 
@@ -237,8 +238,11 @@ def preview(slug: str, request: Request):
     # 项目没了 / 到期了 / 没权限 → 直接回门户，不要再给一个「原地 404 + 倒计时」的四不像
     if not visible or expired:
         return RedirectResponse(PORTAL_HOME, status_code=302)
-    # 外链项目：不套外壳、不进 iframe，直接跳到目标站点
+    # 外链项目：走本地短链，先记一次访问再 302 到源站。
+    # 对访客来说仍然是一次跳转，没有中间页，也不会套 iframe；好处是圆环能统计到访问。
     if row["kind"] == "link" and row["link_url"]:
+        if request.method == "GET" and _wants_html(request):
+            views.bump(row["id"])
         return RedirectResponse(row["link_url"], status_code=302)
     # 静态项目连入口文件都没有 → 同样是失效链接
     if row["kind"] == "static" and not _entry_ok(row) and _only_html(slug) is None:
@@ -284,9 +288,105 @@ def portal(request: Request):
             now,
             bool(user),
             author.load(),
+            theme.current(),
         ),
         headers=NOINDEX,
     )
+
+
+@router.get("/rss.xml")
+@router.get("/feed.xml")
+def rss(request: Request):
+    """门户的 RSS：只收门户可见且还没过期的项目。
+
+    门户不公开且访客没登录时直接 404——给阅读器一个 HTML 登录页没有意义。
+    """
+    user = resolve_user(request)
+    if not (config.PUBLIC_PORTAL or get_setting("public_portal", "0") == "1" or user):
+        return Response(status_code=404)
+
+    now = now_ms()
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM projects WHERE visibility='portal' AND status='active' "
+            "AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 50",
+            (now,),
+        ).fetchall()
+
+    base = _base_url(request)
+    site_title = get_setting("site_title") or config.SITE_TITLE
+    items = []
+    for r in rows:
+        link = f"{base}/v/{r['slug']}"
+        desc = (r["description"] or "").strip() or _rss_desc(r)
+        tags = "".join(
+            f"<category>{escape(t)}</category>" for t in _row_tags(r)[:5]
+        )
+        items.append(
+            "<item>"
+            f"<title>{escape(r['title'])}</title>"
+            f"<link>{escape(link)}</link>"
+            f"<guid isPermaLink=\"true\">{escape(link)}</guid>"
+            f"<pubDate>{_rfc822(r['created_at'])}</pubDate>"
+            f"<description>{escape(desc)}</description>"
+            f"{tags}"
+            "</item>"
+        )
+
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">'
+        "<channel>"
+        f"<title>{escape(site_title)}</title>"
+        f"<link>{escape(base + '/portal')}</link>"
+        f"<description>{escape(config.SITE_SUBTITLE or site_title)}</description>"
+        "<language>zh-CN</language>"
+        f"<lastBuildDate>{_rfc822(now)}</lastBuildDate>"
+        f'<atom:link href="{escape(base + "/rss.xml")}" rel="self" type="application/rss+xml"/>'
+        f'<generator>tmp-preview</generator>'
+        + "".join(items)
+        + "</channel></rss>"
+    )
+    return Response(
+        content=body,
+        media_type="application/rss+xml; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=120", **NOINDEX},
+    )
+
+
+def _rss_desc(row) -> str:
+    """没写简介时给一句有信息量的默认描述。"""
+    kind = row["kind"]
+    if kind == "link":
+        return "外链项目"
+    size = row["size_bytes"] or 0
+    human = f"{size / 1024 / 1024:.1f} MB" if size >= 1024 * 1024 else f"{max(1, size // 1024)} KB"
+    count = row["file_count"] or 0
+    exp = row["expires_at"]
+    tail = "长期有效" if not exp else f"到期 {_short_day(exp)}"
+    return f"{count} 个文件 · {human} · {tail}"
+
+
+def _rfc822(ts_ms: int) -> str:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.fromtimestamp(ts_ms / 1000, ZoneInfo(config.TZ_NAME)).strftime(
+        "%a, %d %b %Y %H:%M:%S %z"
+    )
+
+
+def _short_day(ts_ms: int) -> str:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.fromtimestamp(ts_ms / 1000, ZoneInfo(config.TZ_NAME)).strftime("%m-%d %H:%M")
+
+
+def _base_url(request: Request) -> str:
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{proto}://{host}"
 
 
 @router.get("/api/meta")
@@ -302,4 +402,7 @@ def meta():
         "public_portal": get_setting("public_portal", "0") == "1" or config.PUBLIC_PORTAL,
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": get_setting("default_expire_action") or "block",
+        # 控制台首屏就要上色，不能等设置页接口
+        "theme": theme.palette(theme.current()),
+        "rss": "/rss.xml",
     }
