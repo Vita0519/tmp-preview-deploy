@@ -429,6 +429,14 @@ onUnmounted(() => {
                   >
                     恢复默认
                   </button>
+                  <!-- 真正的选择框：藏起来由上面的按钮代点，少了它 pickIcon 就是空操作 -->
+                  <input
+                    ref="iconFile"
+                    type="file"
+                    class="srfile"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon,.png,.jpg,.jpeg,.webp,.svg,.ico"
+                    @change="onIconPicked"
+                  />
                 </div>
               </div>
               <span class="hint">
@@ -916,7 +924,20 @@ onUnmounted(() => {
 }
 .iconprev img { width: 30px; height: 30px; object-fit: contain; display: block; }
 .iconprev.def { background: var(--surface-3); }
-.iconacts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.iconacts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; }
+/* 选择框藏起来但保留可点击性（display:none 在部分浏览器上 programmatic click 会失效） */
+.srfile {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* ---- 配色系列：卡片本身就是一张缩略预览（底色/文字色/主色都是该系列的真值） ---- */
 .seriesgrid {
