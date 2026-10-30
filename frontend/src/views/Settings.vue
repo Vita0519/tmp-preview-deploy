@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { api } from '../api'
 import { store, toast } from '../store'
 import { fmtBytes, relTime } from '../format'
-import { PRESETS, applyAccent, applySiteIcon, normalize } from '../theme'
+import { applyPalette, applySiteIcon, neutralOf, normalize, palette, previewSeries, readable } from '../theme'
 import Icon from '../components/Icon.vue'
 
 const data = ref(null)
@@ -69,17 +69,52 @@ async function resetIcon() {
   }
 }
 
-// 主题色：选色即时预览，保存后才算数
+// 主题：整套配色系列（主色 + 中性色画布），选完即时预览，保存后才算数
 const accent = ref('#0f766e')
 const accentInput = ref('#0f766e')
-let savedAccent = '#0f766e'
+const seriesList = ref([])   // 后端下发的 6 套系列（含每套的完整中性色）
+const seriesKey = ref('classic')
+const custom = ref(false)    // 主色被手改过，不属于任何一套系列
+let savedBoard = null        // 进来时后端下发的整份色板，没保存就原样退回去
+
+const currentSeries = computed(() => seriesList.value.find((s) => s.key === seriesKey.value) || null)
+// 卡片上的配色条：画布 → 次级容器 → 主色，正好是 60-30-10 的读法
+const stripOf = (s) => [s.neutral.bg, s.neutral['surface-2'], s.accent]
+
+function pickSeries(s) {
+  seriesKey.value = s.key
+  custom.value = false
+  accent.value = normalize(s.accent)
+  accentInput.value = accent.value
+  previewSeries(s)
+}
 
 function pickAccent(v) {
   const hex = normalize(v)
   accent.value = hex
   accentInput.value = hex
-  applyAccent(hex)
+  // 改成和当前系列不一样的主色 → 记成「自定义」，中性色底保持不变
+  const hit = seriesList.value.find((s) => normalize(s.accent) === hex)
+  if (hit) {
+    seriesKey.value = hit.key
+    custom.value = false
+    previewSeries(hit)
+  } else {
+    custom.value = true
+    applyPalette({ ...palette(hex, currentSeries.value), neutral: neutralOf(currentSeries.value) })
+  }
 }
+
+function resetTheme() {
+  const s = seriesList.value.find((x) => x.key === 'classic') || seriesList.value[0]
+  if (s) pickSeries(s)
+}
+
+// 主色被「可读性兜底」压深时，设置页要说清楚实际生效的是哪个色
+const dimmed = computed(() => {
+  const b = readable(accent.value)
+  return b === normalize(accent.value) ? '' : b
+})
 
 const form = reactive({
   site_title: '',
@@ -170,10 +205,15 @@ async function load() {
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
     if (d.site_icon) siteIcon.value = d.site_icon
-    const hex = normalize(d.theme?.accent || '#0f766e')
+    const th = d.theme || {}
+    seriesList.value = Array.isArray(th.series_list) ? th.series_list : []
+    seriesKey.value = th.series || 'classic'
+    custom.value = !!th.custom
+    // 记用户填的原值；palette 内部会为可读性压深，实际生效值在 th.accent
+    const hex = normalize(th.raw || th.accent || '#0f766e')
     accent.value = hex
     accentInput.value = hex
-    savedAccent = hex
+    savedBoard = th.accent ? th : null
     if (Array.isArray(d.author_types) && d.author_types.length) authorTypes.value = d.author_types
     const a = d.author || {}
     form.author = {
@@ -210,6 +250,8 @@ async function save() {
       },
       default_expire_action: form.default_expire_action,
       public_portal: form.public_portal,
+      // 系列决定中性色画布，主色可以在此基础上手改（custom）
+      theme_series: seriesKey.value,
       theme_accent: accent.value,
       author: {
         name: form.author.name,
@@ -314,14 +356,17 @@ const state = computed(() =>
     ea: form.default_expire_action,
     pp: form.public_portal,
     ac: accent.value,
+    se: seriesKey.value,
     au: form.author,
   })
 )
 const dirty = computed(() => !!snap.value && state.value !== snap.value)
 
 onMounted(load)
-// 没保存就离开：把预览色退回去，别留下一个「只在这次会话有效」的主题
-onUnmounted(() => applyAccent(savedAccent))
+// 没保存就离开：把整套色板退回去，别留下一个「只在这次会话有效」的主题
+onUnmounted(() => {
+  if (savedBoard) applyPalette(savedBoard)
+})
 </script>
 
 <template>
@@ -415,25 +460,42 @@ onUnmounted(() => applyAccent(savedAccent))
           </div>
           <div class="panel-body form">
             <div class="frow">
-              <label>预设色板</label>
-              <div class="swatches">
+              <label>配色系列</label>
+              <div v-if="seriesList.length" class="seriesgrid">
                 <button
-                  v-for="p in PRESETS"
-                  :key="p.value"
+                  v-for="s in seriesList"
+                  :key="s.key"
                   type="button"
-                  class="swatch"
-                  :class="{ on: accent === p.value }"
-                  :style="{ background: p.value }"
-                  :title="`${p.name} ${p.value}`"
-                  :aria-label="p.name"
-                  @click="pickAccent(p.value)"
-                ></button>
+                  class="scard"
+                  :class="{ on: !custom && seriesKey === s.key }"
+                  :style="{
+                    background: s.neutral.bg,
+                    color: s.neutral.ink,
+                    borderColor: s.neutral.line,
+                    '--chip': s.accent,
+                  }"
+                  @click="pickSeries(s)"
+                >
+                  <span class="stop">
+                    <i :style="{ background: s.accent }">Aa</i>
+                    <b>{{ s.name }}</b>
+                    <svg v-if="!custom && seriesKey === s.key" class="sok" viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M3.6 8.4 6.3 11 12.4 4.8" />
+                    </svg>
+                  </span>
+                  <span class="sdesc" :style="{ color: s.neutral['ink-3'] }">{{ s.desc }}</span>
+                  <span class="suse" :style="{ color: s.neutral['ink-4'] }">{{ s.use }}</span>
+                </button>
               </div>
-              <span class="hint">hover、浅底、描边、渐变深色都由主色自动派生，不用手调</span>
+              <span v-else class="hint">配色系列没读到，刷新一下页面</span>
+              <span class="hint">
+                每套 = 画布底 + 两级文字色 + 主色，按 60-30-10 分配：底与留白占 60%、卡片占 30%、主色只占 10%。
+                点一下即时预览，点「保存更改」才写进配置
+              </span>
             </div>
 
             <div class="frow">
-              <label>自定义</label>
+              <label>主色微调</label>
               <div class="colorrow">
                 <input
                   type="color"
@@ -451,9 +513,14 @@ onUnmounted(() => applyAccent(savedAccent))
                   @blur="pickAccent(accentInput)"
                   @keyup.enter="pickAccent(accentInput)"
                 />
-                <button type="button" class="btn ghost sm" @click="pickAccent('#0f766e')">恢复默认</button>
+                <span v-if="custom" class="ctag">已自定义</span>
+                <button type="button" class="btn ghost sm" @click="resetTheme()">回到经典墨绿</button>
               </div>
-              <span class="hint">支持 #0f766e 或 #0f7 写法，非法值自动回落到墨绿</span>
+              <span class="hint">画布底留在所选系列上，只改强调色；改回系列自带的主色会自动归位</span>
+              <span v-if="dimmed" class="hint warnhint">
+                这个主色在白底上偏淡（对比度 < 3:1），实际会按 <code>{{ dimmed }}</code> 渲染，
+                免得按钮和浅底文字糊成一片
+              </span>
             </div>
 
             <div class="frow">
@@ -464,7 +531,7 @@ onUnmounted(() => applyAccent(savedAccent))
                 <button type="button" class="tp-btn">主按钮</button>
                 <span class="tp-ring"><i></i></span>
               </div>
-              <span class="hint">选完即时预览，点「保存更改」才写进配置</span>
+              <span class="hint">hover、浅底、描边、渐变深色仍由主色自动派生，不用手调</span>
             </div>
           </div>
         </section>
@@ -851,24 +918,86 @@ onUnmounted(() => applyAccent(savedAccent))
 .iconprev.def { background: var(--surface-3); }
 .iconacts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* ---- 主题色 ---- */
-.swatches { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
-.swatch {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  border: 1px solid rgba(20, 22, 26, 0.1);
-  cursor: pointer;
-  padding: 0;
-  position: relative;
-  transition: transform 0.14s var(--ease), box-shadow 0.14s var(--ease);
+/* ---- 配色系列：卡片本身就是一张缩略预览（底色/文字色/主色都是该系列的真值） ---- */
+.seriesgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 4px;
+  width: 100%;
 }
-.swatch:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -8px rgba(20, 22, 26, 0.6); }
-.swatch.on {
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand);
-  transform: translateY(-1px);
+.scard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 12px 10px;
+  border-radius: 11px;
+  border: 1px solid;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  min-height: 98px;
+  transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease);
+}
+.scard:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -16px var(--ink); }
+.scard.on { box-shadow: 0 0 0 2px var(--chip); }
+.scard .stop { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.scard .stop i {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.scard .stop b { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
+.scard .sok {
+  margin-left: auto;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--chip);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.scard .sdesc {
+  font-size: 11.5px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.scard .suse { margin-top: auto; font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em; }
+.ctag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
 }
 .colorrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.warnhint { color: var(--warn); }
+.warnhint code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--warn-soft);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
 .colorpick {
   width: 42px;
   height: 32px;
@@ -1091,7 +1220,7 @@ onUnmounted(() => applyAccent(savedAccent))
     position: sticky; top: 56px; z-index: 6;
     flex-direction: row; gap: 6px; padding: 8px 0;
     overflow-x: auto; scrollbar-width: none;
-    background: #f6f7f5;
+    background: var(--bg);
     border-bottom: 1px solid var(--line);
     -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
     mask-image: linear-gradient(90deg, #000 88%, transparent);
@@ -1100,6 +1229,7 @@ onUnmounted(() => applyAccent(savedAccent))
   .setnav a { flex: 0 0 auto; height: 28px; }
   .setmain .panel { scroll-margin-top: 108px; }
   .author-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .seriesgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
@@ -1118,5 +1248,6 @@ onUnmounted(() => applyAccent(savedAccent))
   .linkrow .url { grid-area: 2 / 1 / 3 / 3; }
   .linkrow .del { grid-area: 1 / 3; align-self: center; }
   .meter { flex: 1 1 140px; }
+  .seriesgrid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
