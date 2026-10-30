@@ -4,6 +4,7 @@ import { api } from '../api'
 import { toast } from '../store'
 import { fmtBytes, hoursLabel } from '../format'
 import { TAG_RULES, allowedText, checkTags } from '../tags'
+import { TITLE_RULE, clampTitle, fmtWidth, titleError, titleWidth } from '../namerule'
 import Icon from './Icon.vue'
 
 const emit = defineEmits(['close', 'created'])
@@ -33,6 +34,14 @@ const totalSize = computed(() => picked.value.reduce((s, p) => s + p.file.size, 
 
 // 标签边填边校验：不合规直接在弹窗里说清楚，别等提交才被打回
 const tagCheck = computed(() => checkTags(form.value.tags))
+
+// 项目名按显示宽度算：10 个中文字符 ≈ 20 个英文字符，超了在失焦时自动截短
+const titleW = computed(() => titleWidth(form.value.title))
+const titleErr = computed(() => titleError(form.value.title))
+
+function clampInputTitle() {
+  form.value.title = clampTitle(form.value.title)
+}
 
 const VIS_OPTS = [
   { key: 'portal', label: '门户可见', desc: '出现在访客门户列表' },
@@ -124,6 +133,7 @@ function humanRel(rel) {
 
 async function submit() {
   error.value = ''
+  clampInputTitle() // 后端也会截，这里先截一次让用户看到的是最终名字
   if (mode.value === 'link') return submitLink()
   if (mode.value === 'files' && !picked.value.length) return (error.value = '请选择要上传的文件或文件夹')
   if (mode.value === 'zip' && !zipFile.value) return (error.value = '请选择 zip 文件')
@@ -162,6 +172,7 @@ async function submit() {
 
 async function submitLink() {
   if (!form.value.link_url.trim()) return (error.value = '请填写外链地址')
+  clampInputTitle()
   if (tagCheck.value.error) return (error.value = tagCheck.value.error)
   uploading.value = true
   try {
@@ -259,9 +270,22 @@ async function submitLink() {
 
         <div class="frow two">
           <div class="frow">
-            <label>名称</label>
-            <input v-model="form.title" class="input" placeholder="用于列表展示，可中文" />
-            <span class="hint">同名不能重复，同名会提示改名</span>
+            <label>
+              名称
+              <span class="dim" style="font-weight: 500">（{{ fmtWidth(titleW) }}/{{ TITLE_RULE.max_width }}）</span>
+            </label>
+            <input
+              v-model="form.title"
+              class="input"
+              placeholder="用于列表展示，可中文"
+              @blur="clampInputTitle"
+            />
+            <span v-if="titleErr" class="hint" style="color: var(--danger)">
+              超了，提交时会自动截短
+            </span>
+            <span v-else class="hint">
+              最多 {{ TITLE_RULE.max_cjk }} 个中文字符（约 {{ TITLE_RULE.max_narrow }} 个英文字符）；同名不能重复
+            </span>
           </div>
           <div class="frow">
             <label>Slug</label>
