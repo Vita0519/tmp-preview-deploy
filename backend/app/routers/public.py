@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from .. import author, branding, config, defaults, pages, storage, tagspec, theme, views
+from .. import author, branding, config, defaults, namerule, pages, storage, tagspec, theme, views
 from ..db import db, get_setting
 from ..security import now_ms, resolve_user
 
@@ -467,5 +467,6 @@ def meta():
         "theme": theme.palette(theme.current()),
         "site_icon": _icon_info(),
         "tags": tagspec.rules(),
+        "title_rule": namerule.rules(),
         "rss": "/rss.xml",
     }

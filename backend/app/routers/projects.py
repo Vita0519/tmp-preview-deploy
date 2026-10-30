@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from .. import config, defaults, storage, tagspec, views
+from .. import config, defaults, namerule, storage, tagspec, views
 from ..db import db, get_setting, log_event, set_tags, tx
 from ..security import current_user, now_ms, publisher_user
 from ..serializers import PROJECT_SELECT, project_dict
@@ -351,7 +351,8 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
         raise HTTPException(status_code=400, detail="没有收到文件")
 
     slug = storage.slugify(slug_in or title or (files[0].filename if files else "project"))
-    title = title or slug
+    # 名字太长就截一下：上传这条路不拦人，返回体里给的是真实落库的名字
+    title = namerule.clamp(title or slug)
 
     with db() as conn:
         existing = conn.execute("SELECT * FROM projects WHERE slug=?", (slug,)).fetchone()
@@ -465,7 +466,7 @@ async def create_link(request: Request, user: dict = Depends(current_user)):
         url = "https://" + url.lstrip("/")
     if not re.match(r"^https?://[^\s]+$", url, re.I):
         raise HTTPException(status_code=400, detail="链接不合法")
-    title = str(body.get("title") or "").strip() or url
+    title = namerule.clamp(str(body.get("title") or "").strip() or url)
     slug = storage.slugify(body.get("slug") or title)
     hours = body.get("hours")
     visibility = body.get("visibility") if body.get("visibility") in VISIBILITY else "link"
@@ -506,6 +507,10 @@ async def patch_project(slug: str, request: Request, user: dict = Depends(curren
 
     if "title" in body:
         new_title = str(body["title"]).strip()[:200] or row["title"]
+        # 改名是用户明确要的动作，太长就直说，别偷偷截断
+        too_long = namerule.check(new_title)
+        if too_long:
+            raise HTTPException(status_code=422, detail=too_long)
         if new_title != row["title"]:
             with db() as conn:
                 dup = title_conflict(conn, row["owner_id"], new_title, row["id"])

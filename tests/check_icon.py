@@ -61,9 +61,13 @@ def unit_suite() -> None:
     mod.dir_path = lambda: tmp  # 所有落盘都进临时目录
     real_unlink = Path.unlink
 
-    def blocked(self, missing_ok=False):
-        """模拟环境的删除保护：抛的根本不是 OSError。"""
-        raise RuntimeError("SAFE_DELETE_BULK_CONFIRM_REQUIRED")
+    def make_blocker(exc):
+        """模拟删除保护。宿主环境抛的是 SystemExit(1)——`except Exception` 接不住的那种。"""
+
+        def blocked(self, missing_ok=False):
+            raise exc
+
+        return blocked
 
     try:
         print("[1] 正常删除")
@@ -73,25 +77,31 @@ def unit_suite() -> None:
         check("文件真没了", mod.find() is None)
         check("payload 回到内置", mod.payload()["custom"] is False)
 
-        print("[2] 删除被拦（环境的删除保护）")
-        mod.save("a.png", PNG)
-        Path.unlink = blocked
-        try:
-            ok = mod.remove()
-        except Exception as exc:  # noqa: BLE001 - 这里绝不该冒出来
-            ok = f"raised {exc!r}"
-        finally:
-            Path.unlink = real_unlink
-        check("remove 不抛异常且认为已移除", ok is True, ok)
-        check("find() 看不到它了", mod.find() is None)
-        check("回退留下了 .off 残骸", any(tmp.glob("site-icon*.off")), sorted(p.name for p in tmp.iterdir()))
-        check("payload 判定为内置", mod.payload()["custom"] is False)
+        # SystemExit 是 BaseException 的子类，最容易漏；RuntimeError 代表普通异常
+        for label, exc in (("普通异常", RuntimeError("SAFE_DELETE_BULK_CONFIRM_REQUIRED")),
+                           ("SystemExit（宿主真实行为）", SystemExit(1))):
+            print(f"[2] 删除被拦：{label}")
+            shutil.rmtree(tmp, ignore_errors=True)
+            tmp.mkdir(parents=True, exist_ok=True)
+            mod.save("a.png", PNG)
+            Path.unlink = make_blocker(exc)
+            try:
+                ok = mod.remove()
+            except BaseException as got:  # noqa: BLE001 - 这里绝不该冒出来
+                ok = f"raised {got!r}"
+            finally:
+                Path.unlink = real_unlink
+            check(f"{label}：remove 不抛且认为已移除", ok is True, ok)
+            check(f"{label}：find() 看不到它了", mod.find() is None)
+            check(f"{label}：回退留下 .off 残骸", any(tmp.glob("site-icon*.off")),
+                  sorted(p.name for p in tmp.iterdir()))
+            check(f"{label}：payload 判定为内置", mod.payload()["custom"] is False)
 
         print("[3] 删不掉时换图仍然生效")
         shutil.rmtree(tmp, ignore_errors=True)
         tmp.mkdir(parents=True, exist_ok=True)
         mod.save("a.png", PNG)
-        Path.unlink = blocked
+        Path.unlink = make_blocker(SystemExit(1))
         try:
             mod.save("b.svg", SVG)
         finally:

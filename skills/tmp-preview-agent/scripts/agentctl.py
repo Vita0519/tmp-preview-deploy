@@ -409,6 +409,9 @@ def cmd_deploy(args):
         return emit(args, False, "deploy", error=f"上传失败 HTTP {code}：{d.get('detail') or ''} {hint}".strip())
 
     urls = d.get("urls") or {}
+    saved_title = d.get("title") or title
+    if saved_title != title:
+        log(f"⚠️  项目名超过 10 个中文字符（约 20 个半角），已截成「{saved_title}」")
     status = 0 if args.no_verify else probe(urls.get("preview", ""))
     payload = {
         "slug": d.get("slug"),

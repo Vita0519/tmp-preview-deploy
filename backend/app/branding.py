@@ -21,6 +21,11 @@ MAX_BYTES = 512 * 1024  # 512KB 足够放一个 1024 的画布图标了
 STEM = "site-icon"
 OFF_SUFFIX = ".off"  # 删不掉时改成这个后缀，挪出 find() 的匹配范围
 
+# 删文件可能踩到的异常：普通 IO 错误是 OSError，宿主环境的删除保护则会直接
+# 抛 SystemExit（BaseException 的子类，`except Exception` 接不住，会把整个
+# 接口打成 500）。这里两个都收，但不动 KeyboardInterrupt/GeneratorExit。
+SOFT_DELETE_ERRORS = (Exception, SystemExit)
+
 
 def dir_path() -> Path:
     from .config import DATA_DIR
@@ -128,12 +133,12 @@ def remove(keep: Path | None = None) -> bool:
             f.unlink()
             removed = True
             continue
-        except Exception as exc:  # noqa: BLE001 - 删除保护抛的不是 OSError
+        except SOFT_DELETE_ERRORS as exc:  # 删除保护 / 文件占用：都别炸接口
             print(f"[branding] unlink {f.name} failed, falling back to rename: {exc!r}"[:400])
         try:
             f.rename(f.with_name(f.name + OFF_SUFFIX))
             removed = True
-        except Exception as exc:  # noqa: BLE001
+        except SOFT_DELETE_ERRORS as exc:
             print(f"[branding] rename {f.name} failed: {exc!r}"[:400])
     _sweep()  # 顺手清掉之前留下的 .off 残骸
     return removed
@@ -147,7 +152,7 @@ def _sweep() -> None:
     for junk in d.glob(f"*{OFF_SUFFIX}"):
         try:
             junk.unlink()
-        except Exception:  # noqa: BLE001
+        except SOFT_DELETE_ERRORS:
             pass
 
 

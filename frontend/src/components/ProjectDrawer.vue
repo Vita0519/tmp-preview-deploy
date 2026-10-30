@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { api } from '../api'
 import { confirmAction, toast } from '../store'
 import { fmtBytes, fmtDate, fmtRemain, hoursLabel, relTime, typeLabel } from '../format'
 import { TAG_RULES, allowedText, checkOneTag } from '../tags'
+import { TITLE_RULE, fmtWidth, titleError, titleWidth } from '../namerule'
 import Icon from './Icon.vue'
 import Sparkline from './Sparkline.vue'
 
@@ -54,11 +55,49 @@ async function patch(body, msg = '已保存') {
     detail.value = { ...detail.value, ...d, files: detail.value?.files }
     toast(msg)
     emit('changed')
+    return true
   } catch (e) {
     toast(e.message || '保存失败', 'err')
+    return false
   } finally {
     busy.value = false
   }
+}
+
+// ---- 改项目名：点标题就能改，宽度超了直接拦住 ----
+const renaming = ref(false)
+const titleDraft = ref('')
+const titleInput = ref(null)
+
+const draftWidth = computed(() => titleWidth(titleDraft.value))
+const draftError = computed(() => titleError(titleDraft.value))
+const draftLeft = computed(() => Math.max(0, TITLE_RULE.max_width - draftWidth.value))
+const canSaveTitle = computed(
+  () => !draftError.value && !!titleDraft.value.trim() && titleDraft.value.trim() !== detail.value?.title
+)
+
+function startRename() {
+  titleDraft.value = detail.value?.title || ''
+  renaming.value = true
+  nextTick(() => {
+    titleInput.value?.focus()
+    titleInput.value?.select()
+  })
+}
+
+function cancelRename() {
+  renaming.value = false
+  titleDraft.value = ''
+}
+
+async function saveTitle() {
+  if (!canSaveTitle.value && !draftError.value && titleDraft.value.trim() === detail.value?.title) {
+    return cancelRename()
+  }
+  if (draftError.value) return toast(draftError.value, 'err')
+  const t = titleDraft.value.trim()
+  if (!t) return toast('项目名不能为空', 'err')
+  if (await patch({ title: t }, '项目名已更新')) cancelRename()
 }
 
 function extend(hours) {
@@ -170,10 +209,41 @@ onMounted(load)
       <div class="drawer-head">
         <div class="top">
           <div style="flex: 1; min-width: 0">
-            <h2 class="truncate">{{ detail.title }}</h2>
+            <div v-if="!renaming" class="titlerow">
+              <h2 class="truncate" :title="`${detail.title}（点一下改名）`" @click="startRename">
+                {{ detail.title }}
+              </h2>
+              <button class="editbtn" title="重命名" @click="startRename">
+                <Icon name="edit" :size="12" />
+              </button>
+            </div>
+            <div v-else class="renamebox">
+              <input
+                ref="titleInput"
+                v-model="titleDraft"
+                class="input"
+                maxlength="40"
+                placeholder="项目名"
+                @keydown.enter.prevent="saveTitle"
+                @keydown.esc.stop.prevent="cancelRename"
+              />
+              <div class="renamefoot">
+                <span class="counter" :class="{ over: !!draftError }" :title="draftError || '按显示宽度算：中文 1、英文数字 0.5'">
+                  {{ fmtWidth(draftWidth) }} / {{ TITLE_RULE.max_width }}
+                  <template v-if="draftError">· 超出 {{ fmtWidth(draftWidth - TITLE_RULE.max_width) }}</template>
+                  <template v-else>· 还能写 {{ fmtWidth(draftLeft) }}</template>
+                </span>
+                <span style="flex: 1" />
+                <button class="btn sm" :disabled="busy" @click="cancelRename">取消</button>
+                <button class="btn sm primary" :disabled="busy || !canSaveTitle" @click="saveTitle">
+                  {{ busy ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </div>
             <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px">
               <span class="mono muted">/{{ detail.slug }}/</span>
               <button class="linkbtn" @click="copy(previewUrl)">复制链接</button>
+              <button v-if="!renaming" class="linkbtn" @click="startRename">重命名</button>
             </div>
           </div>
           <button class="btn ghost icon" title="关闭" @click="emit('close')">
