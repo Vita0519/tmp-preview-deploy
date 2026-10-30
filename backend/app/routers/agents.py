@@ -149,6 +149,10 @@ def delete_agent(agent_id: int, user: dict = Depends(admin_user)):
         if not remove_project_files(p["slug"]):
             leftover += 1  # 文件被占用时记录先删，残留目录交给孤儿清理
     with db() as conn:
+        # 文件都删了，记录也不能留：owner_id 是 ON DELETE SET NULL，
+        # 光删用户会把项目变成「无主孤儿」，门户上挂着一条谁都认不出的记录。
+        # project_tags / daily_views 都是 ON DELETE CASCADE，跟着走。
+        conn.execute("DELETE FROM projects WHERE owner_id=?", (agent_id,))
         conn.execute("DELETE FROM users WHERE id=?", (agent_id,))
     log_event("agent_delete", user["id"], None, row["username"])
     return {"ok": True, "removed_projects": len(projects), "leftover_dirs": leftover}

@@ -341,14 +341,30 @@ background:#fff;font-size:12.5px;color:#14161a;outline:none;transition:border-co
 font-size:12.5px;color:#2a2f36;outline:none;cursor:pointer}
 .sort:focus{border-color:rgba(var(--brand-rgb),.5)}
 .cnt{font-size:11.5px;color:#8a9099;font-variant-numeric:tabular-nums;white-space:nowrap}
-.tagsbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px;min-height:0}
+/* 成员筛选：和「类型」一样是个筛选维度，放在类型段选旁边 */
+.tools .sort.owner{max-width:152px;padding-right:4px}
+/* ---------- 标签条：一行横滑，两端渐隐，绝不把吸顶区撑高 ---------- */
+.tagsbar{display:flex;gap:6px;align-items:center;margin:0 0 12px;min-height:0;
+overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding-bottom:3px;
+scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
 .tagsbar:empty{display:none}
-.tagsbar button{height:22px;padding:0 8px;border-radius:6px;border:1px solid rgba(20,22,26,.08);
-background:#f4f6f4;color:#5b636d;font:600 11px/1 inherit;cursor:pointer;transition:.16s}
+.tagsbar::-webkit-scrollbar{display:none}
+.tagsbar.fade-r{mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);
+-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
+.tagsbar.fade-l{mask-image:linear-gradient(90deg,transparent,#000 32px);
+-webkit-mask-image:linear-gradient(90deg,transparent,#000 32px)}
+.tagsbar.fade-l.fade-r{mask-image:linear-gradient(90deg,transparent,#000 32px,#000 calc(100% - 32px),transparent);
+-webkit-mask-image:linear-gradient(90deg,transparent,#000 32px,#000 calc(100% - 32px),transparent)}
+.tagsbar button{flex:0 0 auto;height:22px;padding:0 8px;border-radius:6px;
+border:1px solid rgba(20,22,26,.08);background:#f4f6f4;color:#5b636d;font:600 11px/1 inherit;
+cursor:pointer;transition:.16s;white-space:nowrap}
 .tagsbar button:hover{background:#eef2f0;color:#14161a}
 .tagsbar button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.tagsbar button.tball{background:#fff;border-color:rgba(20,22,26,.12);color:#5b636d;padding:0 9px}
+.tagsbar button.tball:hover{background:#f4f6f4;color:#14161a}
+.tagsbar button.tball.on{background:var(--brand-soft);border-color:rgba(var(--brand-rgb),.34);color:var(--brand)}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch;
-padding-top:14px;margin-bottom:34px}
+padding-top:14px;margin-bottom:18px}
 .grid[hidden]{display:none}
 .card{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid rgba(20,22,26,.09);
 border-radius:12px;padding:14px 15px 12px;
@@ -367,10 +383,11 @@ font-variant-numeric:tabular-nums;min-width:0}
 .byline span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .desc{margin:8px 0 0;color:#5b636d;font-size:12.5px;line-height:1.55;display:-webkit-box;
 -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:19px}
-.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tags{display:flex;flex-wrap:nowrap;gap:5px;margin-top:9px;overflow:hidden}
 .tags:empty{display:none}
-.tag{font-size:10.5px;padding:2px 7px;border-radius:5px;background:#f3f5f3;color:#5b636d;
-border:1px solid rgba(20,22,26,.06)}
+.tag{flex:0 0 auto;font-size:10.5px;padding:2px 7px;border-radius:5px;background:#f3f5f3;color:#5b636d;
+border:1px solid rgba(20,22,26,.06);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.tag.more{background:#eaeeec;color:#8a9099;cursor:help;padding:2px 5px}
 .foot{margin-top:auto;padding-top:10px}
 .cdrow{display:flex;align-items:baseline;gap:5px;margin-bottom:6px}
 .cdlab{font-size:10.5px;color:#98a0a6}
@@ -426,7 +443,7 @@ pointer-events:none;transition:opacity .16s,transform .16s;z-index:4}
 .cbtn.done .tip{opacity:1;transform:scale(1)}
 .cbtn.fail .tip{background:#b42318;opacity:1;transform:scale(1)}
 /* ---------- 列表模式（独立结构，不复用卡片） ---------- */
-.rows{display:flex;flex-direction:column;gap:8px;padding-top:14px;margin-bottom:34px}
+.rows{display:flex;flex-direction:column;gap:8px;padding-top:14px;margin-bottom:18px}
 .rows[hidden]{display:none}
 .row{position:relative;display:grid;
 grid-template-columns:minmax(0,240px) minmax(0,1fr) auto 36px 170px 28px;
@@ -443,7 +460,7 @@ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rdesc{grid-area:desc;margin:0;min-width:0;font-size:12px;color:#5b636d;line-height:1.5;
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rtags{grid-area:tags;display:flex;gap:5px;flex-wrap:nowrap}
+.rtags{grid-area:tags;display:flex;gap:5px;flex-wrap:nowrap;overflow:hidden;min-width:0}
 .rring{grid-area:ring;position:relative;width:32px;height:32px;border-radius:50%;display:grid;
 place-items:center;background:conic-gradient(var(--brand) calc(var(--p,0) * 1%), #eef1ef 0)}
 .rring::after{content:'';position:absolute;inset:3px;border-radius:50%;background:#fff}
@@ -472,6 +489,25 @@ place-items:center;background:conic-gradient(var(--brand) calc(var(--p,0) * 1%),
 }
 .blank{margin-top:14px;text-align:center;color:#8a9099;padding:56px 0;
 border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
+/* ---------- 分页器 ---------- */
+.pager{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 30px}
+.pager[hidden]{display:none}
+.pgnums{display:flex;align-items:center;gap:4px}
+.pgbtn{min-width:30px;height:30px;padding:0 8px;border-radius:8px;border:1px solid rgba(20,22,26,.12);
+background:#fff;color:#5b636d;font:600 12px/1 inherit;cursor:pointer;display:inline-flex;
+align-items:center;justify-content:center;font-variant-numeric:tabular-nums;
+transition:color .16s,border-color .16s,background .16s}
+.pgbtn:hover:not(:disabled):not(.on){color:var(--brand);border-color:rgba(var(--brand-rgb),.4);background:#f6fbfa}
+.pgbtn:disabled{opacity:.4;cursor:not-allowed}
+.pgbtn.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.pgbtn.nav{padding:0 11px}
+.pgbtn.gap{min-width:14px;border-color:transparent;background:transparent;color:#a9b0b6;
+cursor:default;padding:0}
+.per{height:30px;padding:0 6px;border-radius:8px;border:1px solid rgba(20,22,26,.12);background:#fff;
+font-size:12px;color:#2a2f36;outline:none;cursor:pointer}
+.per:focus{border-color:rgba(var(--brand-rgb),.5)}
+.trunc{margin:0 0 30px;text-align:center;font-size:11.5px;color:#a3aab0}
+.trunc[hidden]{display:none}
 @media (max-width:900px){
   .grid.list .desc{display:none}
 }
@@ -489,14 +525,17 @@ border:1px dashed rgba(20,22,26,.14);border-radius:12px;font-size:13px}
   .tools .spacer{display:none}
   .cnt{display:none}
   .sort{order:2;flex:0 0 auto;height:28px}
-  .search{flex:1 1 110px;width:auto;order:3;height:28px}
+  .tools .sort.owner{order:1;max-width:124px;height:28px}
+  /* 输入框自带固有最小宽度，不给 min-width:0 就会把「成员+排序+搜索」挤成两行 */
+  .search{flex:1 1 90px;width:auto;min-width:0;order:3;height:28px}
   .seg button{height:24px;padding:0 9px;font-size:11.5px}
   .seg.icons button{width:26px}
-  /* 标签横向滚动，别把吸顶区撑高 */
-  .tagsbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;margin-bottom:8px;
-  padding-bottom:2px;scrollbar-width:none}
-  .tagsbar::-webkit-scrollbar{display:none}
-  .tagsbar button{flex:0 0 auto}
+  /* 标签条本来就是一行横滑，这里只收紧间距 */
+  .tagsbar{margin-bottom:8px}
+  .pager{gap:6px;margin-bottom:22px}
+  .pgbtn{min-width:26px;height:26px;font-size:11.5px}
+  .pgbtn.nav{padding:0 8px}
+  .per{height:26px;font-size:11.5px}
   .grid{grid-template-columns:1fr;padding-top:10px}
   .rows{padding-top:10px}
   .grid.list .card{flex-wrap:wrap;gap:8px 10px;padding:11px 12px}
@@ -525,11 +564,17 @@ PORTAL_JS = """
 (function(){
   var NOW=__NOW__, off=0;
   var grid=document.getElementById('grid'), rows=document.getElementById('rows');
+  var dock=document.querySelector('.dock');
   var cards=[].slice.call(grid.querySelectorAll('.card'));
   var rnodes=[].slice.call(rows.querySelectorAll('.row'));
-  var nodes=cards.concat(rnodes);
+  // 一个项目同时有「卡片」和「列表行」两个壳子，筛选/排序/分页必须成对操作，
+  // 所以先按顺序配成组，后面所有逻辑只认 items。
+  var items=[];
+  for(var i=0;i<cards.length;i++) items.push({c:cards[i], r:rnodes[i]||null});
   var cnt=document.getElementById('cnt'), blank=document.getElementById('blank');
-  var state={kind:'all',q:'',tag:'',sort:'created'};
+  var pager=document.getElementById('pager'), pgnums=document.getElementById('pgnums');
+  var perSel=document.getElementById('per');
+  var state={kind:'all',q:'',tag:'',owner:'',sort:'created',page:1,per:24};
   function pad(n){return n<10?'0'+n:''+n}
   function fmt(ms){
     if(ms<=0) return '已到期';
@@ -540,8 +585,8 @@ PORTAL_JS = """
   }
   function tick(){
     var now=Date.now()+off;
-    nodes.forEach(function(c){
-      var exp=+c.dataset.exp; if(!exp) return;
+    items.forEach(function(it){
+      var c=it.c, exp=+c.dataset.exp; if(!exp) return;
       var left=exp-now, cd=c.querySelector('.cd'), bar=c.querySelector('.track');
       var warn=left>0&&left<2*3600e3, dead=left<=0;
       if(cd){
@@ -562,31 +607,95 @@ PORTAL_JS = """
     if(state.sort==='name'){ return a.dataset.title.localeCompare(b.dataset.title,'zh'); }
     return (+b.dataset.created||0)-(+a.dataset.created||0);
   }
-  function apply(){
-    var q=state.q.toLowerCase(), shown=[], shownCards=0;
-    nodes.forEach(function(c){
-      var tags=(c.dataset.tags||'').split('|');
-      var ok = (state.kind==='all'||c.dataset.kind===state.kind)
-        && (!state.tag||tags.indexOf(state.tag)>=0)
-        && (!q||(c.dataset.title+' '+tags.join(' ')).toLowerCase().indexOf(q)>=0);
-      c.hidden=!ok;
-      if(ok){ shown.push(c); if(c.classList.contains('card')) shownCards++; }
+  function renderPager(total,pages){
+    if(!pager||!pgnums) return;
+    // 只有一页时收起页码，但「每页 N」必须留着——
+    // 否则选了「全部显示」把分页器整块藏掉，就再也切不回来了。
+    var show = total>0 && (pages>1 || state.per===0);
+    pager.hidden = !show;
+    if(!show || pages<=1){ pgnums.innerHTML=''; return; }
+    var h='';
+    h+='<button class="pgbtn nav" data-p="'+(state.page-1)+'"'+ (state.page<=1?' disabled':'') +'>‹ 上一页</button>';
+    var list=[1], prev=0, k;
+    for(k=state.page-2;k<=state.page+2;k++){ if(k>1&&k<pages) list.push(k); }
+    list.push(pages);
+    list.forEach(function(n){
+      if(prev && n-prev>1) h+='<span class="pgbtn gap">…</span>';
+      h+='<button class="pgbtn'+(n===state.page?' on':'')+'" data-p="'+n+'">'+n+'</button>';
+      prev=n;
     });
-    shown.sort(cmp).forEach(function(c,i){ c.style.order=i; });
-    if(cnt) cnt.textContent=shownCards+' / '+cards.length+' 个';
-    if(blank) blank.hidden=shownCards>0||!cards.length;
+    h+='<button class="pgbtn nav" data-p="'+(state.page+1)+'"'+ (state.page>=pages?' disabled':'') +'>下一页 ›</button>';
+    pgnums.innerHTML=h;
+    [].forEach.call(pgnums.querySelectorAll('button[data-p]'),function(b){
+      b.onclick=function(){
+        var p=+b.dataset.p;
+        if(p<1||p>pages||p===state.page) return;
+        state.page=p; apply(false); toList();
+      };
+    });
+  }
+  function toList(){
+    var box=(grid.hidden?rows:grid);
+    var top=box.getBoundingClientRect().top+(window.pageYOffset||0)-(dock?dock.offsetHeight:0)-8;
+    if(top<0) top=0;
+    if(Math.abs(top-(window.pageYOffset||0))>40) window.scrollTo({top:top,behavior:'smooth'});
+  }
+  function apply(reset){
+    if(reset) state.page=1;
+    var q=state.q.toLowerCase(), sel=[];
+    items.forEach(function(it){
+      var d=it.c.dataset, tags=(d.tags||'').split('|').filter(Boolean);
+      var hay=(d.title||'')+' '+tags.join(' ')+' '+(d.oname||'');
+      var ok = (state.kind==='all'||d.kind===state.kind)
+        && (!state.owner||d.owner===state.owner)
+        && (!state.tag||tags.indexOf(state.tag)>=0)
+        && (!q||hay.toLowerCase().indexOf(q)>=0);
+      if(ok) sel.push(it);
+    });
+    sel.sort(function(a,b){ return cmp(a.c,b.c); });
+    var total=sel.length, per=state.per;
+    var pages=per>0?Math.max(1,Math.ceil(total/per)):1;
+    if(state.page>pages) state.page=pages;
+    if(state.page<1) state.page=1;
+    var from=per>0?(state.page-1)*per:0;
+    var to=per>0?Math.min(total,from+per):total;
+    items.forEach(function(it){ it.c.hidden=true; if(it.r) it.r.hidden=true; });
+    sel.forEach(function(it,i){
+      it.c.style.order=i; if(it.r) it.r.style.order=i;
+      var vis=i>=from&&i<to;
+      it.c.hidden=!vis; if(it.r) it.r.hidden=!vis;
+    });
+    if(cnt){
+      cnt.textContent = !total ? '0 个'
+        : (per>0&&pages>1) ? '第 '+(from+1)+'–'+to+' / 共 '+total+' 个'
+        : '共 '+total+' 个';
+    }
+    if(blank) blank.hidden = total>0;
+    renderPager(total,pages);
   }
   document.querySelectorAll('.seg[data-kind] button').forEach(function(b){
     b.onclick=function(){
       state.kind=b.dataset.v;
       document.querySelectorAll('.seg[data-kind] button').forEach(function(x){x.classList.toggle('on',x===b)});
-      apply();
+      apply(true);
     };
   });
   var q=document.getElementById('q');
-  if(q) q.oninput=function(){ state.q=q.value.trim(); apply(); };
+  if(q) q.oninput=function(){ state.q=q.value.trim(); apply(true); };
   var s=document.getElementById('sort');
-  if(s) s.onchange=function(){ state.sort=s.value; apply(); };
+  if(s) s.onchange=function(){ state.sort=s.value; apply(true); };
+  var ow=document.getElementById('owner');
+  if(ow) ow.onchange=function(){ state.owner=ow.value; apply(true); };
+  if(perSel){
+    var savedPer=24;
+    try{ var pv=localStorage.getItem('pv_per'); if(pv!==null) savedPer=+pv; }catch(e){}
+    if([0,24,48,96].indexOf(savedPer)>=0){ state.per=savedPer; perSel.value=String(savedPer); }
+    perSel.onchange=function(){
+      state.per=+perSel.value;
+      try{ localStorage.setItem('pv_per',perSel.value); }catch(e){}
+      apply(true);
+    };
+  }
   // 卡片 / 列表视图，选过的记在 localStorage
   var vs=document.getElementById('viewseg');
   function setView(v){
@@ -639,6 +748,12 @@ PORTAL_JS = """
   var gb=document.getElementById('gonebar');
   if(gb&&/[?&]gone=1(&|$)/.test(location.search)){ gb.hidden=false; }
   var tb=document.getElementById('tagsbar');
+  function syncFade(){
+    if(!tb) return;
+    var more=tb.scrollWidth-tb.clientWidth>1;
+    tb.classList.toggle('fade-l', more && tb.scrollLeft>2);
+    tb.classList.toggle('fade-r', more && tb.scrollLeft+tb.clientWidth<tb.scrollWidth-2);
+  }
   if(tb){
     var seen={}, order=[];
     cards.forEach(function(c){
@@ -646,18 +761,36 @@ PORTAL_JS = """
         if(t&&!seen[t]){ seen[t]=1; order.push(t); }
       });
     });
-    order.forEach(function(t){
+    function chip(text, val, cls){
       var b=document.createElement('button');
-      b.textContent=t;
+      b.type='button';
+      b.textContent=text;
+      b.dataset.tag=val;
+      if(cls) b.className=cls;
+      b.classList.toggle('on', state.tag===val);
       b.onclick=function(){
-        state.tag = state.tag===t ? '' : t;
-        [].forEach.call(tb.children,function(x){x.classList.toggle('on',x===b&&!!state.tag)});
-        apply();
+        state.tag = (val===state.tag) ? '' : val;
+        [].forEach.call(tb.children,function(x){ x.classList.toggle('on', (x.dataset.tag||'')===state.tag); });
+        apply(true);
       };
       tb.appendChild(b);
-    });
+      return b;
+    }
+    // 头部固定一个「全部」：标签多了横滑到右边时，清空筛选不用往回滑
+    chip('全部','','tball');
+    order.forEach(function(t){ chip(t, t, ''); });
+    tb.addEventListener('scroll',syncFade,{passive:true});
+    // 鼠标滚轮竖着滚 → 横着滑，标签多的时候不用去抓滚动条
+    tb.addEventListener('wheel',function(e){
+      if(Math.abs(e.deltaY)<=Math.abs(e.deltaX)) return;
+      if(tb.scrollWidth<=tb.clientWidth) return;
+      tb.scrollLeft+=e.deltaY;
+      e.preventDefault();
+    },{passive:false});
+    window.addEventListener('resize',syncFade);
+    syncFade();
   }
-  tick(); setInterval(tick,1000); apply();
+  tick(); setInterval(tick,1000); apply(false); if(tb) syncFade();
 })();
 """
 
@@ -761,6 +894,53 @@ def _fmt_day(ts: int) -> str:
     return datetime.fromtimestamp(ts / 1000).strftime("%m-%d %H:%M")
 
 
+# 标签糖在 10.5px 下的粗略字宽：中文按全角算，其余按半角算。
+# 不是像素级精确，但只要保证「估算 ≤ 实际」就不会把卡片撑出格子。
+_CHIP_CJK = 10.8
+_CHIP_ASCII = 6.1
+_CHIP_PAD = 16.0  # 左右 padding 7*2 + 边框 1*2
+_CHIP_GAP = 5.0
+
+
+def _chip_px(text: str) -> float:
+    w = 0.0
+    for ch in text:
+        w += _CHIP_CJK if ord(ch) > 0x2E7F else _CHIP_ASCII
+    return w + _CHIP_PAD
+
+
+def _fit_tags(tags: list[str], budget: float) -> str:
+    """按像素预算把标签排成一行，装不下的折成 +N。
+
+    卡片宽度是弹性的、标签长度也是弹性的：纯 CSS 用 wrap 会把卡片撑高，
+    用 nowrap 又会把最后一个标签裁掉半截。这里先按字宽估一遍，
+    保证「至少一个完整标签 + 明确告诉你还剩几个」，多余的挂 title 里。
+    """
+    if not tags:
+        return ""
+    shown, used = 0, 0.0
+    for i, t in enumerate(tags):
+        rest = len(tags) - i - 1
+        need = _chip_px(t) + (_CHIP_GAP if shown else 0.0)
+        reserve = _chip_px(f"+{rest}") + _CHIP_GAP if rest > 0 else 0.0
+        if shown and used + need + reserve > budget:
+            break
+        used += need
+        shown += 1
+    hidden = len(tags) - shown
+    html = "".join(f'<span class="tag">{escape(t)}</span>' for t in tags[:shown])
+    if hidden:
+        tip = escape("还有：" + "、".join(tags[shown:]), quote=True)
+        html += f'<span class="tag more" title="{tip}">+{hidden}</span>'
+    return html
+
+
+def _owner_name(p: dict) -> str:
+    """项目归属人。门户上永远要有一个名字，不能出现「—」。"""
+    o = p.get("owner") or {}
+    return (o.get("display_name") or o.get("username") or "").strip() or "站点"
+
+
 def portal_page(
     items: list[dict],
     site_title: str,
@@ -769,9 +949,17 @@ def portal_page(
     logged_in: bool,
     author: dict | None = None,
     accent: str | None = None,
+    truncated: int = 0,
 ) -> str:
     accent = accent or theme.current()
     max_views = max([(p.get("views") or 0) for p in items] or [0]) or 1
+    # 成员列表：门户按成员筛选，选项从当前可见项目里现算，不额外查库
+    owners: dict[int, list] = {}
+    for p in items:
+        oid = p.get("owner_id") or 0
+        rec = owners.setdefault(oid, [_owner_name(p), 0])
+        rec[1] += 1
+    owner_opts = sorted(owners.items(), key=lambda kv: (-kv[1][1], kv[1][0]))
     cards: list[str] = []
     rows: list[str] = []
     for p in items:
@@ -795,8 +983,12 @@ def portal_page(
         card_cls = "card del" if dele else "card"
         row_cls = "row del" if dele else "row"
         tags_list = p.get("tags") or []
-        tags = "".join(f'<span class="tag">{escape(t)}</span>' for t in tags_list[:4])
-        owner = escape((p.get("owner") or {}).get("display_name") or "")
+        # 卡片最窄 300px（减掉左右各 15px 内边距 = 270），列表行标签列按 190 算
+        tags = _fit_tags(tags_list, 258)
+        rtags = _fit_tags(tags_list, 190)
+        owner_raw = _owner_name(p)
+        owner = escape(owner_raw)
+        owner_id = p.get("owner_id") or 0
         size = _human(p["size_bytes"]) if p["kind"] != "link" else "外链"
         num_cls = "sm" if views >= 1000 else ""
         ends = "" if not exp else f"到期 {_fmt_day(exp)}"
@@ -807,7 +999,8 @@ def portal_page(
         data_attr = (
             f'data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}" '
             f'data-kind="{p["kind"]}" data-tags="{escape(chr(124).join(tags_list), quote=True)}" '
-            f'data-act="{p.get("expire_action") or "block"}" '
+            f'data-act="{p.get("expire_action") or "block"}" data-owner="{owner_id}" '
+            f'data-oname="{escape(owner_raw, quote=True)}" '
             f'data-title="{escape(p["title"], quote=True)}"'
         )
         cards.append(
@@ -817,7 +1010,7 @@ def portal_page(
   <div class="top">
     <div class="tinfo">
       <div class="name">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></div>
-      <div class="byline"><span>{owner or '—'}</span><span class="dot"></span><span>{size}</span></div>
+      <div class="byline"><span>{owner}</span><span class="dot"></span><span>{size}</span></div>
     </div>
   </div>
   <p class="desc">{escape(p['description'] or '')}</p>
@@ -841,10 +1034,10 @@ def portal_page(
      aria-label="打开 {escape(p['title'])}"></a>
   <div class="rmain">
     <span class="rname">{escape(p['title'])}<span class="kind">{KIND_LABEL.get(p['kind'], p['kind'])}</span></span>
-    <div class="rmeta">{owner or '—'} · {size}</div>
+    <div class="rmeta">{owner} · {size}</div>
   </div>
   <p class="rdesc">{escape(p['description'] or '—')}</p>
-  <div class="rtags">{tags}</div>
+  <div class="rtags">{rtags}</div>
   <div class="rring" style="--p:{rpct}" title="累计 {views} 次访问（占本站最高值的 {rpct}%）">
     <span class="in"><b>{views}</b><i>访问</i></span>
   </div>
@@ -878,6 +1071,23 @@ def portal_page(
         f'<div class="flinks">{foot_right}</div>'
         '</footer>'
     )
+    # 服务端只取最近 N 个：超出部分必须明说，不能让人以为「就这么多」
+    trunc_note = ""
+    if truncated > 0:
+        trunc_note = (
+            f'<div class="trunc">只列出最近的 {len(items)} 个项目，'
+            f'另有 {truncated} 个更早的未显示</div>'
+        )
+    # 只有真的存在多个归属人时，成员筛选才有意义
+    owner_sel = ""
+    if len(owner_opts) > 1:
+        opts = '<option value="">全部成员</option>' + "".join(
+            f'<option value="{oid}">{escape(name)}（{n}）</option>'
+            for oid, (name, n) in owner_opts
+        )
+        owner_sel = (
+            f'<select class="sort owner" id="owner" aria-label="按成员筛选">{opts}</select>'
+        )
     who = _author_block(author)
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(site_title)}</title>
@@ -903,6 +1113,7 @@ def portal_page(
     <button data-v="link">外链</button>
     <button data-v="zip">压缩包</button>
   </div>
+  {owner_sel}
   <span class="spacer"></span>
   <span class="cnt" id="cnt">{len(items)} 个</span>
   <div class="seg icons" id="viewseg" role="group" aria-label="显示方式">
@@ -931,6 +1142,16 @@ def portal_page(
 <div class="grid" id="grid">{body}</div>
 <div class="rows" id="rows" hidden>{rowbody}</div>
 <div class="blank" id="blank"{' hidden' if items else ''}>{'没有匹配的项目，换个筛选条件试试' if items else '暂无公开项目'}</div>
+<div class="pager" id="pager" hidden>
+  <div class="pgnums" id="pgnums"></div>
+  <select class="per" id="per" aria-label="每页数量">
+    <option value="24">每页 24</option>
+    <option value="48">每页 48</option>
+    <option value="96">每页 96</option>
+    <option value="0">全部显示</option>
+  </select>
+</div>
+{trunc_note}
 {foot}
 </div>
 <script>
