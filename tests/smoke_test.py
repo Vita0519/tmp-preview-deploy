@@ -64,6 +64,18 @@ class Client:
         code, location, _ = self.fetch(path, accept)
         return code, location
 
+    def fetch_bytes(self, path: str, accept: str = "*/*") -> tuple[int, dict, bytes]:
+        """取二进制响应（图标、下载文件），返回 (状态码, 响应头, 原始字节)。响应头键名统一小写。"""
+        hdrs = {"User-Agent": "smoke-test", "Accept": accept}
+        if self.token:
+            hdrs["Authorization"] = "Bearer " + self.token
+        req = urllib.request.Request(self.base + path, headers=hdrs)
+        try:
+            with self.raw_opener.open(req, timeout=30) as r:
+                return r.status, {k.lower(): v for k, v in r.headers.items()}, r.read()
+        except urllib.error.HTTPError as e:
+            return e.code, {k.lower(): v for k, v in (e.headers or {}).items()}, e.read()
+
     def req(self, method, path, body=None, headers=None, raw=False, ct="application/json"):
         url = self.base + path
         data = None

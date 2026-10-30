@@ -59,8 +59,10 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/settings` | 🛡 | 站点配置 + `ttl_defaults` + `author` + `author_types` + 运行信息 + 最近操作 |
-| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, author}` |
+| GET | `/api/settings` | 🛡 | 站点配置 + `ttl_defaults` + `theme` + `site_icon` + `author` + `author_types` + 运行信息 + 最近操作 |
+| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_accent, author}` |
+| POST | `/api/settings/icon` | 🛡 | `multipart/form-data` 上传站点图标，字段名 `file`；同时间只留一份 |
+| DELETE | `/api/settings/icon` | 🛡 | 删除自定义图标，回到内置沙漏图标 |
 
 `ttl_defaults` 是**按可见性**区分的默认存活小时数，`0` 表示永久。上传/建外链时若没传 `hours`，
 后端就按项目可见性取这里的值（门户默认 6h、链接 12h、私有永久）。`default_expire_action`
@@ -75,13 +77,15 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/meta` | 🟢 | 站点标题 / 在线项目数（SPA 启动用） |
+| GET | `/api/meta` | 🟢 | 站点标题 / 在线项目数 / `theme` 色板 / `site_icon`（SPA 启动用） |
 | GET | `/api/public/p/{slug}` | 🟢 | 项目公开信息 + `server_now` |
 | GET | `/v/{slug}` | 🟢 | 预览外壳（倒计时、下载、复制链接）；外链项目 **记一次访问后 302 直达目标站**，失效/无权访问 **302 回 `/portal?gone=1`** |
 | GET | `/p/{slug}/{path}` | 🟢 | 项目文件；无扩展名补 `index.html`；SPA 回退到 `entry` |
 | GET | `/download/{slug}` | 🟢 | zip 下载（需项目开启 `allow_download`）；失效同样 302 回门户 |
 | GET | `/portal` | 🟢/👤 | 门户列表（`PUBLIC_PORTAL=1` 或已登录） |
 | GET | `/rss.xml`、`/feed.xml` | 🟢/👤 | 门户 RSS（最近 50 个门户可见且未过期项目）；门户不公开且未登录 → 404 |
+| GET | `/site-icon` | 🟢 | 自定义站点图标；没上传过 → `404`（页面回落到内置图标） |
+| GET | `/site.webmanifest` | 🟢 | 动态 manifest：`icons` 跟自定义图标走，`theme_color` 跟主色走 |
 | GET | `/api/health` | 🟢 | 健康检查（容器探针） |
 
 **失效与权限一律用「跳转」表达，不再用 404 页：**
@@ -106,3 +110,27 @@
 `GET /api/meta` 与 `GET /api/settings` 都带 `theme` 字段（`accent` + 派生色 `hover/soft/line/deep/light/rgb`）；
 `PATCH /api/settings {"theme_accent": "#3b5bdb"}` 改主色，接受 `#abc` / `abc` 简写，非法值静默回落 `#0f766e`。
 服务端渲染的页面直接把变量写进 `:root`，控制台启动时用 `/api/meta` 的同一份色板覆盖 `--brand*`。
+设置页另有 8 个预设色（`theme.presets`），点一下即时预览，不保存则离开页面自动回滚。
+
+**站点图标**
+
+`POST /api/settings/icon` 上传自定义 favicon，落在 `DATA_DIR/branding/site-icon.<ext>`，**只保留一份**：
+
+| 校验 | 不通过时 |
+|---|---|
+| 后缀 ∈ `png / svg / ico / jpg / jpeg / webp` | `422` |
+| 文件非空 | `422` |
+| ≤ 512KB | `422` |
+| `.svg` 头部得真像 SVG | `422` |
+
+`site_icon` 字段在所有接口里形状一致：
+`{custom, url, ext, size, max_kb, formats}`。没上传时 `custom=false`、`url=""`，前端据此回落到内置图标。
+`url` 里带 `?v=<mtime>`，换图后不会被浏览器老缓存卡住。
+门户页的 `<link rel="icon">`、`apple-touch-icon`、`/site.webmanifest` 的 `icons` 全部跟着它走；
+`theme_color` 则跟主题色走，手机加到主屏后标题栏也是当前主色。
+
+**门户页脚**
+
+RSS 入口固定在门户页脚右下（`<footer class="pfoot">`），与左侧「站点标识 · 公开项目数」同一行，
+不再占用顶栏按钮位；`<link rel="alternate" type="application/rss+xml">` 同时在 `<head>` 里，阅读器可直接发现。
+页脚用 `margin-top:auto` 贴住视口底部，项目少时页面也不会在中间断层。

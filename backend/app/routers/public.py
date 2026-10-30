@@ -4,9 +4,9 @@ from html import escape
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from .. import author, config, defaults, pages, storage, theme, views
+from .. import author, branding, config, defaults, pages, storage, theme, views
 from ..db import db, get_setting
 from ..security import now_ms, resolve_user
 
@@ -383,10 +383,53 @@ def _short_day(ts_ms: int) -> str:
     return datetime.fromtimestamp(ts_ms / 1000, ZoneInfo(config.TZ_NAME)).strftime("%m-%d %H:%M")
 
 
+def _icon_info():
+    return branding.payload()
+
+
 def _base_url(request: Request) -> str:
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
     return f"{proto}://{host}"
+
+
+@router.get("/site-icon")
+def site_icon():
+    """自定义站点图标。没上传过就 404，页面会回落到内置图标。"""
+    cur = branding.current()
+    if not cur:
+        return Response(status_code=404)
+    return FileResponse(
+        cur["path"],
+        media_type=cur["mime"],
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+@router.get("/site.webmanifest")
+def webmanifest():
+    """动态 manifest：图标跟着站点图标走，主题色跟着主色走。"""
+    cur = branding.current()
+    title = get_setting("site_title") or config.SITE_TITLE
+    if cur:
+        icons = [{"src": cur["url"], "sizes": "any", "type": cur["mime"], "purpose": "any"}]
+    else:
+        icons = [
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
+        ]
+    return JSONResponse(
+        {
+            "name": title,
+            "short_name": title,
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#f6f7f5",
+            "theme_color": theme.palette(theme.current())["accent"],
+            "icons": icons,
+        },
+        media_type="application/manifest+json",
+    )
 
 
 @router.get("/api/meta")
@@ -404,5 +447,6 @@ def meta():
         "default_expire_action": get_setting("default_expire_action") or "block",
         # 控制台首屏就要上色，不能等设置页接口
         "theme": theme.palette(theme.current()),
+        "site_icon": _icon_info(),
         "rss": "/rss.xml",
     }

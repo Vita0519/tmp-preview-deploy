@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { api } from '../api'
 import { store, toast } from '../store'
 import { fmtBytes, relTime } from '../format'
-import { PRESETS, applyAccent, normalize } from '../theme'
+import { PRESETS, applyAccent, applySiteIcon, normalize } from '../theme'
 import Icon from '../components/Icon.vue'
 
 const data = ref(null)
@@ -25,6 +25,49 @@ const ACTION_LABEL = {
   settings: '修改设置',
 }
 const actionLabel = (a) => ACTION_LABEL[a] || a
+
+// 站点图标：上传即生效（不需要点保存）
+const siteIcon = ref({ custom: false, url: '', ext: '', size: 0, max_kb: 512 })
+const iconFile = ref(null)
+const iconBusy = ref(false)
+const iconPreview = computed(() => (siteIcon.value.custom ? siteIcon.value.url : '/favicon.svg'))
+
+function pickIcon() {
+  iconFile.value?.click()
+}
+
+async function onIconPicked(e) {
+  const f = e.target.files && e.target.files[0]
+  if (!f) return
+  const fd = new FormData()
+  fd.append('file', f)
+  iconBusy.value = true
+  try {
+    const d = await api.post('/api/settings/icon', fd)
+    siteIcon.value = d.site_icon
+    applySiteIcon(d.site_icon)
+    toast('站点图标已更新')
+  } catch (err) {
+    toast(err.message || '图标上传失败', 'err')
+  } finally {
+    iconBusy.value = false
+    e.target.value = ''
+  }
+}
+
+async function resetIcon() {
+  iconBusy.value = true
+  try {
+    const d = await api.del('/api/settings/icon')
+    siteIcon.value = d.site_icon
+    applySiteIcon(d.site_icon)
+    toast('已恢复内置图标')
+  } catch (err) {
+    toast(err.message || '操作失败', 'err')
+  } finally {
+    iconBusy.value = false
+  }
+}
 
 // 主题色：选色即时预览，保存后才算数
 const accent = ref('#0f766e')
@@ -126,6 +169,7 @@ async function load() {
     form.ttl = { ...form.ttl, ...(d.ttl_defaults || {}) }
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
+    if (d.site_icon) siteIcon.value = d.site_icon
     const hex = normalize(d.theme?.accent || '#0f766e')
     accent.value = hex
     accentInput.value = hex
@@ -303,6 +347,33 @@ onUnmounted(() => applyAccent(savedAccent))
             <label>站点标题</label>
             <input v-model="form.site_title" class="input" placeholder="临时预览站" />
             <span class="hint">控制台侧栏与访客页的浏览器标题</span>
+          </div>
+          <div class="frow">
+            <label>站点图标</label>
+            <div class="iconrow">
+              <span class="iconprev" :class="{ def: !siteIcon.custom }">
+                <img :src="iconPreview" alt="站点图标预览" />
+              </span>
+              <div class="iconacts">
+                <button type="button" class="btn ghost sm" :disabled="iconBusy" @click="pickIcon">
+                  {{ iconBusy ? '处理中…' : siteIcon.custom ? '更换图标' : '上传图标' }}
+                </button>
+                <button v-if="siteIcon.custom" type="button" class="btn ghost sm" :disabled="iconBusy" @click="resetIcon">
+                  恢复默认
+                </button>
+                <input
+                  ref="iconFile"
+                  type="file"
+                  accept=".png,.svg,.ico,.jpg,.jpeg,.webp"
+                  hidden
+                  @change="onIconPicked"
+                />
+              </div>
+            </div>
+            <span class="hint">
+              支持 png / svg / ico / jpg / webp，不超过 {{ siteIcon.max_kb }}KB；建议方形、512×512 以上。
+              标签页、桌面图标、手机添加到主屏都用它
+            </span>
           </div>
           <label class="check" style="margin-top: 4px">
             <input v-model="form.public_portal" type="checkbox" />
@@ -495,6 +566,40 @@ onUnmounted(() => applyAccent(savedAccent))
 </template>
 
 <style scoped>
+/* ---- 站点图标 ---- */
+.iconrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.iconprev {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid var(--line-2, var(--line));
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.iconprev img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  display: block;
+}
+.iconprev.def {
+  background: var(--surface-3);
+}
+.iconacts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* ---- 主题色 ---- */
 .swatches {
   display: flex;

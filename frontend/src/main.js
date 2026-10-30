@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { router, ensureUser } from './router'
 import { store } from './store'
-import { applyPalette } from './theme'
+import { applyPalette, applySiteIcon } from './theme'
 import './styles.css'
 
 const app = createApp(App)
@@ -17,6 +17,8 @@ async function boot() {
     }
     // 主色跟着站点走，别让人先看到一屏墨绿再跳成蓝色
     if (meta?.theme) applyPalette(meta.theme)
+    // 自定义站点图标同样在首屏换掉，免得标签页闪一下旧图标
+    applySiteIcon(meta?.site_icon || null)
   } catch {}
   await ensureUser()
   app.mount('#app')
