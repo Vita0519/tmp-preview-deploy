@@ -63,6 +63,7 @@
 | PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_accent, author}` |
 | POST | `/api/settings/icon` | 🛡 | `multipart/form-data` 上传站点图标，字段名 `file`；同时间只留一份 |
 | DELETE | `/api/settings/icon` | 🛡 | 删除自定义图标，回到内置沙漏图标 |
+| POST | `/api/settings/tags/prune` | 🛡 | 清理没有任何项目在用的标签，返回剩余占用 |
 
 `ttl_defaults` 是**按可见性**区分的默认存活小时数，`0` 表示永久。上传/建外链时若没传 `hours`，
 后端就按项目可见性取这里的值（门户默认 6h、链接 12h、私有永久）。`default_expire_action`
@@ -105,9 +106,40 @@
 
 历史项目（`entry` 为空）仍按「根目录唯一 html」兜底，不会被判成失效。
 
+**标签规则**
+
+自由输入的标签不设上限就会长成一团乱麻，所以规则是硬约束：超了就 `422` + 一句中文说明，
+**不静默截断**（截断会让人以为加上了）。规则实现在 `backend/app/tagspec.py`，前端 `src/tags.js` 是同一套镜像。
+
+| 项 | 规则 | 违规返回 |
+|---|---|---|
+| 每个项目数量 | ≤ 6 个 | `每个项目最多 6 个标签，你填了 8 个` |
+| 单个长度 | 1–12 字（中文按 1 字） | `标签「xxx」太长了：最多 12 个字` |
+| 允许字符 | 中英文、数字与 `+ # . - _`（不许空格） | `标签「数据/分析」含有不允许的字符…` |
+| 分隔符 | `,` `，` `、` `;` `；` 空白 | — |
+| 归一化 | NFKC 全角转半角 + 英文小写 + 去重保序 | `Vue`/`VUE`/`vue` → `vue` |
+| 全站池 | ≤ 300 个不同标签 | `全站标签已达 300 个上限，请改用已有标签` |
+
+写入入口只有 `db.set_tags()` 一处：`POST /api/projects`、`POST /api/projects/link`、
+`PATCH /api/projects/{slug}`、`POST /api/projects/bulk`（`tag_add`）都走它。
+没人引用的标签会自动回收（改标签、删项目、到期清理时），所以池子不会越用越脏。
+批量 `tag_add` 是「合并」语义：已有标签在前，新标签塞到 6 个为止，塞不下的项目计入返回的 `trimmed`。
+
+**到期删除的视觉标记**
+
+`expire_action` 为 `delete` 的项目（到期连目录一起删掉）在所有出现的地方都会被标出来：
+
+- 门户卡片：`class="card del"` + 琥珀色左边条（`::before`）+ 「到期删除」徽章 `.deltag` + 进度条改琥珀；
+- 门户列表行：`class="row del"`，同样带徽章；
+- 预览页 `/v/{slug}` 顶栏：带 `.deltag` 徽章（窄屏只留图标）；
+- 卡片上还有 `data-act="delete|block"`，方便脚本按到期动作筛。
+
 **主题色**
 
 `GET /api/meta` 与 `GET /api/settings` 都带 `theme` 字段（`accent` + 派生色 `hover/soft/line/deep/light/rgb`）；
+`GET/PATCH /api/settings` 还带 `tags`（规则 + 占用：`max_per_project / max_len / pool_max / used /
+orphans / tagged_projects`），设置页据此显示「全站 17 / 300 个（6%）」。
+
 `PATCH /api/settings {"theme_accent": "#3b5bdb"}` 改主色，接受 `#abc` / `abc` 简写，非法值静默回落 `#0f766e`。
 服务端渲染的页面直接把变量写进 `:root`，控制台启动时用 `/api/meta` 的同一份色板覆盖 `--brand*`。
 设置页另有 8 个预设色（`theme.presets`），点一下即时预览，不保存则离开页面自动回滚。

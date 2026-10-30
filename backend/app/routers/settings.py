@@ -1,8 +1,8 @@
 """系统设置（站点标题、主题色、站点图标、按可见性的默认时长、到期策略、门户可见性）。"""
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from .. import author, branding, config, defaults, theme
-from ..db import all_settings, db, get_setting, set_setting
+from .. import author, branding, config, defaults, tagspec, theme
+from ..db import all_settings, db, get_setting, log_event, set_setting
 from ..pages import ICONS
 from ..security import admin_user
 
@@ -38,6 +38,7 @@ def read_settings(user: dict = Depends(admin_user)):
         "theme": {**theme.palette(s.get("theme_accent") or theme.DEFAULT),
                   "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
         "site_icon": _icon_payload(),
+        "tags": _tags_payload(),
         "author": author.load(),
         "author_types": [
             {"key": k, "label": v["label"], "paths": ICONS.get(v["icon"], "")}
@@ -91,12 +92,30 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         "theme": {**theme.palette(get_setting("theme_accent") or theme.DEFAULT),
                   "presets": [{"name": n, "value": v} for n, v in theme.PRESETS]},
         "site_icon": _icon_payload(),
+        "tags": _tags_payload(),
         "author": author.load(),
     }
 
 
 def _icon_payload() -> dict:
     return branding.payload()
+
+
+def _tags_payload() -> dict:
+    """标签规则 + 当前占用，设置页据此显示「已用 42 / 300」。"""
+    with db() as conn:
+        usage = tagspec.pool_usage(conn)
+    return {**tagspec.rules(), **usage}
+
+
+@router.post("/tags/prune")
+def prune_tags(user: dict = Depends(admin_user)):
+    """清掉没有任何项目在用的标签，池子腾出空间。"""
+    with db() as conn:
+        removed = tagspec.prune_orphans(conn)
+    if removed:
+        log_event("settings", user["id"], None, f"清理未使用标签 {removed} 个")
+    return {"ok": True, "removed": removed, "tags": _tags_payload()}
 
 
 @router.post("/icon")

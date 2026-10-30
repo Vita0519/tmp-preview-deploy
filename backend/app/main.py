@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import cleanup, config, storage, views
+from . import cleanup, config, storage, tagspec, views
 from .db import init_db
 from .routers import agents, auth, projects, public, settings
 from .security import bootstrap_admin
@@ -59,6 +59,12 @@ app.include_router(public.router)
 @app.get("/api/health")
 async def health():
     return {"ok": True, "service": "tmp-preview", "version": "2.0.0"}
+
+
+@app.exception_handler(tagspec.TagError)
+async def tag_error_handler(request: Request, exc: tagspec.TagError):
+    """标签不合规一律 422，detail 是给人看的一句中文，前端直接 toast。"""
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 _assets = config.DIST_DIR / "assets"

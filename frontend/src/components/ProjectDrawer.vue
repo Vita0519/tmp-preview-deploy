@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { api } from '../api'
 import { confirmAction, toast } from '../store'
 import { fmtBytes, fmtDate, fmtRemain, hoursLabel, relTime, typeLabel } from '../format'
+import { TAG_RULES, allowedText, checkOneTag } from '../tags'
 import Icon from './Icon.vue'
 import Sparkline from './Sparkline.vue'
 
@@ -85,13 +86,23 @@ async function toggleExpireAction() {
   await patch({ expire_action: next }, next === 'delete' ? '到期将删除文件' : '到期将保留文件')
 }
 
+const tagFull = computed(() => (detail.value?.tags?.length || 0) >= TAG_RULES.max_per_project)
+
 async function addTag() {
-  const name = tagDraft.value.trim().slice(0, 24)
-  if (!name) return
-  const tags = new Set(detail.value.tags || [])
-  tags.add(name)
+  const raw = tagDraft.value.trim()
+  if (!raw) return
+  const { tag, error } = checkOneTag(raw)
+  if (error) return toast(error, 'err')
+  const tags = detail.value.tags || []
+  if (tags.includes(tag)) {
+    tagDraft.value = ''
+    return toast('这个标签已经有了', 'err')
+  }
+  if (tags.length >= TAG_RULES.max_per_project) {
+    return toast(`每个项目最多 ${TAG_RULES.max_per_project} 个标签`, 'err')
+  }
   tagDraft.value = ''
-  await patch({ tags: [...tags] }, '标签已更新')
+  await patch({ tags: [...tags, tag] }, '标签已更新')
 }
 
 async function removeTag(name) {
@@ -174,6 +185,13 @@ onMounted(load)
           <span v-if="detail.expired" class="badge danger">已到期</span>
           <span v-else-if="detail.permanent" class="badge brand">永久</span>
           <span v-else class="badge">限时</span>
+          <span
+            v-if="detail.expire_action === 'delete'"
+            class="badge del"
+            title="到期后自动删除项目与文件，不可恢复"
+          >
+            <Icon name="trash" :size="10" />到期删除
+          </span>
           <span class="badge">{{ detail.visibility === 'portal' ? '门户可见' : detail.visibility === 'private' ? '仅自己' : '链接可见' }}</span>
         </div>
       </div>
@@ -207,7 +225,12 @@ onMounted(load)
         </div>
 
         <div class="section">
-          <h4>标签</h4>
+          <h4>
+            标签
+            <span class="dim" style="font-weight: 500; text-transform: none; letter-spacing: 0">
+              {{ (detail.tags || []).length }}/{{ TAG_RULES.max_per_project }}
+            </span>
+          </h4>
           <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center">
             <span v-for="t in detail.tags" :key="t" class="tag">
               {{ t }}
@@ -221,10 +244,15 @@ onMounted(load)
             <input
               v-model="tagDraft"
               class="input"
-              placeholder="+ 添加标签"
+              :maxlength="TAG_RULES.max_len"
+              :disabled="tagFull"
+              :placeholder="tagFull ? '已达上限' : '+ 添加标签'"
               style="width: 108px; height: 24px; font-size: 11.5px; padding: 0 8px"
               @keyup.enter="addTag"
             />
+          </div>
+          <div class="dim" style="font-size: 10.5px; margin-top: 6px; line-height: 1.5">
+            每个 ≤{{ TAG_RULES.max_len }} 字，只能用{{ allowedText }}；没有空格，全角自动转半角
           </div>
         </div>
 

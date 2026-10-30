@@ -126,6 +126,12 @@ def preview_page(p: dict, server_now: int, site_title: str, accent: str | None =
         f'<a class="btn primary" href="/download/{p["slug"]}" download>下载</a>'
         if allow_dl and not expired else ""
     )
+    # 到期会连文件一起删，访客和临时点开的人都该知道这件事
+    del_btn = (
+        f'<span class="deltag" title="到期后自动删除文件与记录，不可恢复">'
+        f'{TRASH_ICON}<span class="hide-sm">到期删除</span></span>'
+        if (p.get("expire_action") or "block") == "delete" and not expired else ""
+    )
 
     return f"""<!doctype html><html lang="zh-CN"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -153,6 +159,9 @@ font-size:12px;font-weight:600;background:var(--brand-soft);color:var(--brand);b
 .pill.warn .dot{{background:#b45309}}
 .pill.dead{{background:#fdeceb;color:#b42318;border-color:rgba(180,35,24,.18)}}
 .pill.perm{{background:#eef2f8;color:#3a4a63;border-color:rgba(58,74,99,.16)}}
+.deltag{{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 7px;border-radius:6px;
+background:#fff7ed;border:1px solid #fed7aa;color:#b45309;font-size:11px;font-weight:650;white-space:nowrap}}
+.deltag svg{{width:10px;height:10px;flex:0 0 auto;stroke-width:1.9}}
 .btn{{height:28px;display:inline-flex;align-items:center;padding:0 11px;border-radius:7px;font-size:12.5px;
 font-weight:600;border:1px solid rgba(20,22,26,.14);background:#fff;color:#2a2f36;cursor:pointer;
 transition:background .16s,border-color .16s,transform .16s}}
@@ -187,6 +196,7 @@ background:radial-gradient(120% 90% at 50% 0%,#fbfcfb 0%,#f1f3f1 100%);padding:2
   <div class="ttl"><b>{title}</b><span>{owner + ' · ' if owner else ''}{size}{' · ' + str(p['file_count']) + ' 个文件' if p['file_count'] else ''}</span></div>
   <div class="spacer"></div>
   <span class="pill {'dead' if expired else ('perm' if not expires else '')}" id="pill"><span class="dot"></span><span id="cd">{'已到期' if expired else ('永久' if not expires else '—')}</span></span>
+  {del_btn}
   {dl_btn}
   <button class="btn ghost hide-sm" id="copy" title="复制链接" style="gap:5px">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5V3.8c0-.7.6-1.3 1.3-1.3h4.4c.7 0 1.3.6 1.3 1.3v4.9c0 .7-.6 1.3-1.3 1.3H7.8c-.7 0-1.3-.6-1.3-1.3Z"/><path d="M3.5 7.5h5.2c.7 0 1.3.6 1.3 1.3v4.4c0 .7-.6 1.3-1.3 1.3H3.5c-.7 0-1.3-.6-1.3-1.3V8.8c0-.7.6-1.3 1.3-1.3Z"/></svg>
@@ -374,6 +384,17 @@ letter-spacing:-.01em;white-space:nowrap}
 .track > i{display:block;height:100%;border-radius:99px;background:var(--brand);transition:width .5s ease}
 .track.warn > i{background:#b45309}
 .track.dead > i{background:#b42318}
+/* ---------- 到期删除：不是「停访」而是连文件一起清掉，得一眼看出来 ---------- */
+.deltag{display:inline-flex;align-items:center;gap:3px;height:16px;padding:0 5px;border-radius:4px;
+background:#fff7ed;border:1px solid #fed7aa;color:#b45309;font-size:9.5px;font-weight:650;
+letter-spacing:.01em;white-space:nowrap;flex:0 0 auto}
+.deltag svg{width:9px;height:9px;flex:0 0 auto;stroke-width:1.9}
+.card.del,.row.del{border-color:rgba(180,83,9,.30)}
+.card.del:hover,.row.del:hover{border-color:rgba(180,83,9,.52);
+box-shadow:0 12px 28px -18px rgba(180,83,9,.55)}
+.card.del::before,.row.del::before{content:'';position:absolute;left:-1px;top:11px;bottom:11px;width:3px;
+border-radius:0 3px 3px 0;background:linear-gradient(180deg,#f59e0b,#b45309)}
+.card.del .track > i{background:#d97706}
 /* 访问圆环：整张卡片的右上角 */
 .ring{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;
 display:grid;place-items:center;
@@ -642,6 +663,19 @@ PORTAL_JS = """
 
 KIND_LABEL = {"static": "静态站", "link": "外链", "zip": "压缩包"}
 
+# 「到期删除」标记：门户卡片/列表行/预览页共用同一套文案与图标
+TRASH_ICON = (
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" '
+    'stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M2.9 4.4h10.2M6.4 4.4V3h3.2v1.4"/>'
+    '<path d="M4.4 4.4l.55 8c0 .6.5 1.05 1.1 1.05h4.3c.6 0 1.05-.45 1.1-1.05l.55-8"/>'
+    '<path d="M6.8 6.9v3.5M9.2 6.9v3.5"/></svg>'
+)
+DEL_TAG = (
+    '<span class="deltag" title="到期后自动删除文件与记录，不可恢复">'
+    f'{TRASH_ICON}到期删除</span>'
+)
+
 # 卡片上的复制按钮：复制图标 + 打勾图标（点击后切换）
 COPY_ICON = (
     '<svg class="ic-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"'
@@ -755,6 +789,11 @@ def portal_page(
             cd_text = "永久"
         views = p.get("views") or 0
         rpct = max(0, min(100, round(views / max_views * 100)))
+        # 到期「删除文件」和到期「停访」是两回事：前者会真的连目录清掉，卡片要显眼一点
+        dele = (p.get("expire_action") or "block") == "delete"
+        deltag = DEL_TAG if dele else ""
+        card_cls = "card del" if dele else "card"
+        row_cls = "row del" if dele else "row"
         tags_list = p.get("tags") or []
         tags = "".join(f'<span class="tag">{escape(t)}</span>' for t in tags_list[:4])
         owner = escape((p.get("owner") or {}).get("display_name") or "")
@@ -768,10 +807,11 @@ def portal_page(
         data_attr = (
             f'data-exp="{exp}" data-total="{total}" data-created="{created}" data-views="{views}" '
             f'data-kind="{p["kind"]}" data-tags="{escape(chr(124).join(tags_list), quote=True)}" '
+            f'data-act="{p.get("expire_action") or "block"}" '
             f'data-title="{escape(p["title"], quote=True)}"'
         )
         cards.append(
-            f"""<div class="card" style="order:0" {data_attr}>
+            f"""<div class="{card_cls}" style="order:0" {data_attr}>
   <a class="hit" href="{escape(target_url, quote=True)}" target="_blank"{ext_attr}
      aria-label="打开 {escape(p['title'])}"></a>
   <div class="top">
@@ -783,7 +823,7 @@ def portal_page(
   <p class="desc">{escape(p['description'] or '')}</p>
   <div class="tags">{tags}</div>
   <div class="foot">
-    <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span>
+    <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span>{deltag}
       <span class="cdend">{ends}</span></div>
     <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
@@ -796,7 +836,7 @@ def portal_page(
 </div>"""
         )
         rows.append(
-            f"""<div class="row" style="order:0" {data_attr}>
+            f"""<div class="{row_cls}" style="order:0" {data_attr}>
   <a class="hit" href="{escape(target_url, quote=True)}" target="_blank"{ext_attr}
      aria-label="打开 {escape(p['title'])}"></a>
   <div class="rmain">
@@ -809,7 +849,7 @@ def portal_page(
     <span class="in"><b>{views}</b><i>访问</i></span>
   </div>
   <div class="rfoot">
-    <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span>
+    <div class="cdrow"><span class="cdlab">剩余</span><span class="cd {cd_cls}">{cd_text}</span>{deltag}
       <span class="cdend">{ends}</span></div>
     <div class="track"><i style="width:{pct:.1f}%"></i></div>
   </div>
