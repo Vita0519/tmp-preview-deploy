@@ -389,7 +389,10 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
     total = 0
     entry = None
     if files:
-        file_count, total, entry = await storage.write_uploads(slug, files)
+        try:
+            file_count, total, entry = await storage.write_uploads(slug, files)
+        except storage.EntryConflict as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     zip_name = None
     if zip_up:

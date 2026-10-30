@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""失效链接一律回门户；外链项目直接跳外部站点，不再套 iframe。
+"""失效链接一律回门户；外链项目经本地短链 302 直跳源站，不套 iframe。
 
 覆盖：
   1. 不存在 / 已删除 / 已过期 / 无权访问 → /v/ 302 到 /portal
   2. iframe 里取不到文件 → 返回能跳出 iframe 的失效页（而不是原地 404）
   3. 子资源请求（图片/CSS）失效 → 静默 404，不跳转
-  4. 外链项目 /v/ 与 /p/ 都 302 到目标站点，门户卡片直接指向外部地址
+  4. 外链项目 /v/ 与 /p/ 都 302 到目标站点，门户卡片走本地短链（先计数再跳）
   5. 只有一个 html（不叫 index.html）的项目仍然能打开，不被当成失效
 
 用法: python tests/check_gone.py [--url http://127.0.0.1:8000]
@@ -104,9 +104,10 @@ def main() -> int:
 
     code, _loc, portal = admin.fetch("/portal", "text/html")
     link_slug = d.get("slug", "")
-    check("门户卡片里外链直接指向外部地址", f'href="{target}"' in portal, "")
-    check("外链卡片不再包 /v/ 外壳", f'href="/v/{link_slug}"' not in portal, "")
-    check("外链卡片的复制按钮复制外部地址", f'data-path="{target}"' in portal, "")
+    # 外链也走本地短链：点开时先计数再 302，转发出去才统计得到
+    check("门户卡片走本地短链", f'href="/v/{link_slug}"' in portal, "")
+    check("复制按钮也是短链", f'data-path="/v/{link_slug}"' in portal, "")
+    check("卡片不直连外部地址", f'href="{target}"' not in portal, "")
     check("静态卡片仍然是 /v/ 预览外壳", f'href="/v/{pub_slug}"' in portal, "")
 
     print("[6] 只有非 index.html 的单页站不算失效")
@@ -119,12 +120,15 @@ def main() -> int:
     text = body if isinstance(body, str) else body.decode("utf-8", "replace")
     check("根路径回退到唯一的 html", "only" in text, text[:60])
 
-    print("[7] 完全没有 html 的项目视为失效")
-    slug5 = f"noentry-{sfx}"
-    code, d = upload(admin, slug5, f"没入口 {sfx}", files=NO_ENTRY)
-    check("无 html 项目建成", code == 200, str(code))
+    print("[7] 单个非 html 文件同样当入口")
+    slug5 = f"raw-{sfx}"
+    code, d = upload(admin, slug5, f"单文本 {sfx}", files=NO_ENTRY)
+    check("单文件项目建成", code == 200, str(code))
+    check("entry 落在那个文件上", d.get("entry") == "readme.txt", str(d.get("entry")))
     code, loc = guest.probe(f"/v/{slug5}")
-    check("/v/ → 302 到门户", code == 302 and loc.startswith("/portal"), f"{code} {loc}")
+    check("/v/ 可打开（单文件即入口）", code == 200, f"{code} {loc}")
+    code, _loc2 = guest.probe(f"/p/{slug5}/")
+    check("/p/ 根路径直接给出该文件", code == 200, str(code))
 
     print("[8] 门户的失效提示")
     code, _loc, text = admin.fetch("/portal?gone=1", "text/html")

@@ -419,7 +419,7 @@ onMounted(load)
 .rolesel:focus-visible {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb),0.12);
 }
 .rolesel:disabled {
   cursor: not-allowed;
@@ -514,7 +514,7 @@ table .pslug { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   outline: none;
   border-color: var(--brand);
   background: var(--surface);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb),0.12);
 }
 .keymeta {
   display: flex;

@@ -50,9 +50,9 @@ function viewPct(p) {
   return Math.max(2, Math.round(((p.views || 0) / maxViews.value) * 100))
 }
 
-// 外链项目复制的是外部地址本身；否则复制 /v/<slug> 预览外壳
+// 一律复制 /v/<slug> 短链：外链项目点开时先记一次访问再 302 到源站，
+// 转发出去也能统计；直接复制源站地址就统计不到了。
 function shareUrl(p) {
-  if (p.kind === 'link' && p.link_url) return p.link_url
   return p.urls?.preview || `${location.origin}/v/${p.slug}`
 }
 
