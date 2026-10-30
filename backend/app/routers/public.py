@@ -18,6 +18,10 @@ NOINDEX = {"X-Robots-Tag": "noindex, nofollow"}
 # 所以这里无脑指 /portal 即可，不需要在跳转处再判一次权限，也不会泄露项目是否存在。
 PORTAL_HOME = "/portal?gone=1"
 
+# 门户一次最多取多少个（前端在其上做筛选/排序/分页）。
+# 公开门户可能被大量项目灌满，必须有个天花板；超出部分由页面明确提示，不静默截断。
+PORTAL_MAX = 500
+
 
 def _wants_html(request: Request) -> bool:
     """页面导航（顶层或 iframe）会带 text/html；图片/脚本这类子资源不会。"""
@@ -94,6 +98,14 @@ def _row_tags(row) -> list[str]:
 
 
 def _dict(row, origin: str) -> dict:
+    keys = row.keys()
+    owner = None
+    if row["owner_username"]:
+        owner = {
+            "id": row["owner_id"],
+            "username": row["owner_username"],
+            "display_name": row["owner_display_name"] or row["owner_username"],
+        }
     return {
         "slug": row["slug"],
         "title": row["title"],
@@ -112,9 +124,9 @@ def _dict(row, origin: str) -> dict:
         or (row["expires_at"] is not None and row["expires_at"] <= now_ms()),
         "views": row["views"],
         "tags": _row_tags(row),
-        "owner": {"display_name": row["owner_display_name"] or row["owner_username"] or ""}
-        if row["owner_username"]
-        else None,
+        # 归属：谁建的/谁挂的外链就归谁。门户要按成员筛选，所以 id 也得带上
+        "owner_id": row["owner_id"] if "owner_id" in keys else None,
+        "owner": owner,
         "link_url": row["link_url"],
         "preview_url": f"{origin}/v/{row['slug']}",
     }
@@ -268,20 +280,23 @@ def portal(request: Request):
         return RedirectResponse("/", status_code=302)
 
     now = now_ms()
+    # 门户是纯前端筛选/排序/分页：一次给够，别让人翻两页就翻空。
+    # 上限仍然要有，否则公开门户被人刷几千个项目会把首页撑爆。
     with db() as conn:
         rows = conn.execute(
             "SELECT p.*, u.display_name AS owner_display_name, u.username AS owner_username "
             "FROM projects p LEFT JOIN users u ON u.id=p.owner_id "
             "WHERE p.visibility='portal' AND p.status='active' "
-            "AND (p.expires_at IS NULL OR p.expires_at>?) ORDER BY p.created_at DESC LIMIT 200",
-            (now,),
+            "AND (p.expires_at IS NULL OR p.expires_at>?) ORDER BY p.created_at DESC LIMIT ?",
+            (now, PORTAL_MAX),
         ).fetchall()
+        total_public = conn.execute(
+            "SELECT COUNT(*) c FROM projects WHERE visibility='portal' AND status='active' "
+            "AND (expires_at IS NULL OR expires_at>?)",
+            (now,),
+        ).fetchone()["c"]
 
-    items = []
-    for r in rows:
-        d = _dict(r, "")
-        d["tags"] = _row_tags(r)
-        items.append(d)
+    items = [_dict(r, "") for r in rows]
     return HTMLResponse(
         pages.portal_page(
             items,
@@ -291,6 +306,7 @@ def portal(request: Request):
             bool(user),
             author.load(),
             theme.current(),
+            truncated=max(0, total_public - len(items)),
         ),
         headers=NOINDEX,
     )

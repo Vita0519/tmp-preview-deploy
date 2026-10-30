@@ -160,6 +160,33 @@ def init_db() -> None:
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
         _migrate_tags(conn)
+        _migrate_owner(conn)
+
+
+def _migrate_owner(conn) -> None:
+    """把「无主项目」收归到最早的管理员。
+
+    项目的归属人只应该是「谁建的/谁挂的」；但外键是 ON DELETE SET NULL，
+    历史上删成员时又只删了文件没删记录，owner_id 被置空，门户卡片就露出一条「—」。
+    这里给存量擦一次屁股，以后再出现由 delete_agent 负责连记录一起删。
+    """
+    key = "owner_backfill_v1"
+    row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    if row and row["value"] == "1":
+        return
+    admin = conn.execute(
+        "SELECT id FROM users WHERE role='admin' AND active=1 ORDER BY id LIMIT 1"
+    ).fetchone() or conn.execute(
+        "SELECT id FROM users WHERE role='admin' ORDER BY id LIMIT 1"
+    ).fetchone()
+    if admin:
+        n = conn.execute(
+            "UPDATE projects SET owner_id=? WHERE owner_id IS NULL", (admin["id"],)
+        ).rowcount
+        if n:
+            print(f"[migrate] {n} 个无主项目收归管理员 #{admin['id']}", flush=True)
+    conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, '1')", (key,))
+    conn.execute("UPDATE settings SET value='1' WHERE key=?", (key,))
 
 
 def _migrate_tags(conn) -> None:
