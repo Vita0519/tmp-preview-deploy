@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from .. import author, branding, config, defaults, pages, storage, theme, views
+from .. import author, branding, config, defaults, pages, storage, tagspec, theme, views
 from ..db import db, get_setting
 from ..security import now_ms, resolve_user
 
@@ -104,6 +104,8 @@ def _dict(row, origin: str) -> dict:
         "size_bytes": row["size_bytes"],
         "allow_download": bool(row["allow_download"]),
         "visibility": row["visibility"],
+        # 到期动作：门户要用它区分「到期删除」和「到期停访」，别让访客猜
+        "expire_action": row["expire_action"] or "block",
         "created_at": row["created_at"],
         "expires_at": row["expires_at"],
         "expired": row["status"] == "expired"
@@ -448,5 +450,6 @@ def meta():
         # 控制台首屏就要上色，不能等设置页接口
         "theme": theme.palette(theme.current()),
         "site_icon": _icon_info(),
+        "tags": tagspec.rules(),
         "rss": "/rss.xml",
     }

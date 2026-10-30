@@ -3,6 +3,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 
+from . import tagspec
 from .config import DB_PATH, FILES_DIR, ZIPS_DIR
 
 SCHEMA = """
@@ -158,6 +159,25 @@ def init_db() -> None:
         _add_user_key_cols(conn)
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
+        _migrate_tags(conn)
+
+
+def _migrate_tags(conn) -> None:
+    """存量标签按新规则规范化一次（归一化 / 合并重名 / 每项目截到上限 / 删孤儿）。
+
+    用设置里的开关位守着，只跑一次；以后再改规则要换 key，别偷偷重排别人数据。
+    """
+    key = "tags_spec_v1"
+    row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    if row and row["value"] == "1":
+        return
+    try:
+        tagspec.normalize_rows(conn)
+        tagspec.prune_orphans(conn)
+    except sqlite3.Error as exc:  # 老库结构异常时别把启动卡死
+        print(f"[migrate] 标签规范化跳过：{exc}", flush=True)
+    conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, '1')", (key,))
+    conn.execute("UPDATE settings SET value='1' WHERE key=?", (key,))
 
 
 def _add_user_key_cols(conn) -> None:
@@ -307,11 +327,19 @@ def log_event(action: str, user_id: int | None = None, project_id: int | None = 
 
 
 def set_tags(conn: sqlite3.Connection, project_id: int, names: list[str]) -> None:
-    clean = []
-    for n in names:
-        n = (n or "").strip()[:24]
-        if n and n not in clean:
-            clean.append(n)
+    """写项目的标签。规则在 tagspec 里（数量/长度/字符/归一化），这里只落库。
+
+    池子上限也在这里把：调用方可能已经校验过单项目规则，但「全站不能无限长」必须
+    看着库里的现状才好判断，放在唯一的写入口最省心。
+    """
+    clean = tagspec.clean(names)
+    existing = {r["name"] for r in conn.execute("SELECT name FROM tags").fetchall()}
+    fresh = [n for n in clean if n not in existing]
+    if len(existing) + len(fresh) > tagspec.POOL_MAX:
+        raise tagspec.TagError(
+            f"全站标签已达 {tagspec.POOL_MAX} 个上限，请改用已有标签"
+            "（或在设置页清理没人用的标签）"
+        )
     conn.execute("DELETE FROM project_tags WHERE project_id=?", (project_id,))
     for n in clean:
         conn.execute("INSERT OR IGNORE INTO tags(name) VALUES(?)", (n,))
@@ -321,3 +349,5 @@ def set_tags(conn: sqlite3.Connection, project_id: int, names: list[str]) -> Non
                 "INSERT OR IGNORE INTO project_tags(project_id, tag_id) VALUES(?,?)",
                 (project_id, row["id"]),
             )
+    # 改标签后原来那个标签可能没人用了，顺手回收，池子不会越攒越脏
+    tagspec.prune_orphans(conn)

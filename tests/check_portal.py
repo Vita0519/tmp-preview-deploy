@@ -52,8 +52,9 @@ def main():
     check("有列表容器", 'id="rows"' in html)
     check("列表默认隐藏", re.search(r'<div class="rows" id="rows" hidden', html) is not None)
     check("视图切换按钮存在", 'id="viewseg"' in html and 'data-view="list"' in html)
-    cards = re.findall(r'class="card"', html)
-    rows = re.findall(r'class="row"', html)
+    # 卡片可能是 class="card" 或 class="card del"（到期会删文件的），都算
+    cards = re.findall(r'class="card(?: del)?"', html)
+    rows = re.findall(r'class="row(?: del)?"', html)
     check("卡片与行数一致", len(cards) == len(rows) and len(cards) >= 0, f"card={len(cards)} row={len(rows)}")
 
     print("[3] 圆环与倒计时")

@@ -195,8 +195,23 @@ curl -X POST -H "Authorization: Bearer pv_xxx" -H "Content-Type: application/jso
 `action` 取值：`delete` / `expire` / `block` / `permanent` / `extend` / `allow_download` /
 `deny_download` / `visibility` / `tag_add`。
 
-返回 `{"done":N,"skipped":M,"expired":K}`：`skipped` 是无权操作的项目数，
-`expired` 是被改成门户可见但已经到期的项目数（需先续期才会出现在门户）。
+返回 `{"done":N,"skipped":M,"expired":K,"trimmed":T}`：`skipped` 是无权操作的项目数，
+`expired` 是被改成门户可见但已经到期的项目数（需先续期才会出现在门户），
+`trimmed` 是打标签时「凑满 6 个就停」的项目数。
+
+**标签有硬规则**（超了直接 422，不会悄悄截断）：
+
+| 项 | 规则 |
+|---|---|
+| 数量 | 每个项目最多 6 个 |
+| 长度 | 单个 1–12 字 |
+| 字符 | 中英文、数字与 `+ # . - _`，不许空格 |
+| 分隔 | `,` `，` `、` `;` `；` 或空格 |
+| 归一化 | 全角转半角、英文转小写，`Vue`/`VUE`/`vue` 合并成一个 |
+| 全站池 | 最多 300 个不同标签，池满只能复用已有标签 |
+
+422 的 `detail` 是给人看的中文，直接转述给用户即可，例如
+`每个项目最多 6 个标签，你填了 8 个`、`标签「数据/分析」含有不允许的字符`。
 
 ### 4. 查自己的项目 / 访问量
 

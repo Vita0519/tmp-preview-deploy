@@ -2,7 +2,7 @@
 import asyncio
 import time
 
-from . import storage, views
+from . import storage, tagspec, views
 from .db import db, log_event
 
 TICK_FLUSH = 3.0
@@ -25,6 +25,7 @@ def sweep() -> dict:
             views.reset(r["id"])
             with db() as conn:
                 conn.execute("DELETE FROM projects WHERE id=?", (r["id"],))
+                tagspec.prune_orphans(conn)  # 项目被删，它独有的标签一并回收
             log_event("expire_delete", None, r["id"], r["slug"])
             purged += 1
         else:

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { api } from '../api'
 import { toast } from '../store'
 import { fmtBytes, hoursLabel } from '../format'
+import { TAG_RULES, allowedText, checkTags } from '../tags'
 import Icon from './Icon.vue'
 
 const emit = defineEmits(['close', 'created'])
@@ -29,6 +30,9 @@ const progress = ref(0)
 const error = ref('')
 
 const totalSize = computed(() => picked.value.reduce((s, p) => s + p.file.size, 0))
+
+// 标签边填边校验：不合规直接在弹窗里说清楚，别等提交才被打回
+const tagCheck = computed(() => checkTags(form.value.tags))
 
 const VIS_OPTS = [
   { key: 'portal', label: '门户可见', desc: '出现在访客门户列表' },
@@ -123,6 +127,7 @@ async function submit() {
   if (mode.value === 'link') return submitLink()
   if (mode.value === 'files' && !picked.value.length) return (error.value = '请选择要上传的文件或文件夹')
   if (mode.value === 'zip' && !zipFile.value) return (error.value = '请选择 zip 文件')
+  if (tagCheck.value.error) return (error.value = tagCheck.value.error)
 
   const fd = new FormData()
   fd.append('slug', form.value.slug || '')
@@ -157,6 +162,7 @@ async function submit() {
 
 async function submitLink() {
   if (!form.value.link_url.trim()) return (error.value = '请填写外链地址')
+  if (tagCheck.value.error) return (error.value = tagCheck.value.error)
   uploading.value = true
   try {
     const d = await api.post('/api/projects/link', {
@@ -270,8 +276,18 @@ async function submitLink() {
         </div>
 
         <div class="frow">
-          <label>标签</label>
-          <input v-model="form.tags" class="input" placeholder="用逗号分隔，例如：前端, 验收, v2" />
+          <label>
+            标签
+            <span class="dim" style="font-weight: 500">（{{ tagCheck.tags.length }}/{{ TAG_RULES.max_per_project }}）</span>
+          </label>
+          <input v-model="form.tags" class="input" placeholder="逗号分隔，例如：前端, 验收, v2" />
+          <div v-if="tagCheck.tags.length" class="tagprev">
+            <span v-for="t in tagCheck.tags" :key="t" class="tag">{{ t }}</span>
+          </div>
+          <span v-if="tagCheck.error" class="hint" style="color: var(--danger)">{{ tagCheck.error }}</span>
+          <span v-else class="hint">
+            最多 {{ TAG_RULES.max_per_project }} 个、每个 ≤{{ TAG_RULES.max_len }} 字，只能用{{ allowedText }}；英文自动转小写
+          </span>
         </div>
 
         <div class="frow">

@@ -362,8 +362,15 @@ td.cell-num, th.cell-num { text-align: right; }
 .badge.brand { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-line); }
 .badge.warn { background: var(--warn-soft); color: var(--warn); border-color: rgba(180, 83, 9, 0.18); }
 .badge.danger { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-line); }
+/* 到期会连文件一起删的项目：琥珀色标记，跟「已到期」的红区分开 */
+.badge.del {
+  gap: 3px; font-weight: 650;
+  background: #fff7ed; color: #b45309; border-color: #fed7aa;
+}
+tbody tr.is-del td.cell-check { box-shadow: inset 3px 0 0 #f59e0b; }
 
 .taglist { display: flex; gap: 4px; flex-wrap: wrap; }
+.tagprev { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
 .tag {
   font-size: 10.5px; padding: 0 6px; height: 18px; display: inline-flex; align-items: center;
   border-radius: 4px; background: var(--surface-3); color: var(--ink-2); border: 1px solid var(--line);

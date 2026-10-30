@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from .. import config, defaults, storage, views
+from .. import config, defaults, storage, tagspec, views
 from ..db import db, get_setting, log_event, set_tags, tx
 from ..security import current_user, now_ms, publisher_user
 from ..serializers import PROJECT_SELECT, project_dict
@@ -82,18 +82,8 @@ def _scope_clause(user: dict) -> tuple[str, list]:
 
 
 def _parse_tags(raw) -> list[str]:
-    if not raw:
-        return []
-    if isinstance(raw, (list, tuple)):
-        parts = [str(x) for x in raw]
-    else:
-        parts = re.split(r"[,，]", str(raw))
-    out: list[str] = []
-    for p in parts:
-        p = p.strip()[:24]
-        if p and p not in out:
-            out.append(p)
-    return out[:12]
+    """标签一律过 tagspec：归一化 + 字符/长度/数量校验，不合规抛 TagError（→422）。"""
+    return tagspec.clean(raw)
 
 
 def _hours_to_expiry(hours) -> int | None:
@@ -593,6 +583,8 @@ def delete_project(slug: str, user: dict = Depends(current_user)):
     views.reset(row["id"])
     with db() as conn:
         conn.execute("DELETE FROM projects WHERE id=?", (row["id"],))
+        # 项目没了，它独有的标签也就没人用了，顺手回收，池子不会越删越脏
+        tagspec.prune_orphans(conn)
     log_event("delete", user["id"], row["id"], row["slug"])
     return {"ok": True, "slug": row["slug"]}
 
@@ -607,7 +599,7 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
     if action == "visibility" and str(body.get("visibility") or "") not in VISIBILITY:
         raise HTTPException(status_code=400, detail="可见性只能是 portal / link / private")
     now = now_ms()
-    done, skipped, expired = 0, 0, 0
+    done, skipped, expired, trimmed = 0, 0, 0, 0
     with db() as conn:
         rows = conn.execute(
             f"SELECT p.* FROM projects p WHERE p.slug IN ({','.join('?' * len(slugs))})", slugs
@@ -655,21 +647,28 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
             if row["status"] == "expired" or (row["expires_at"] and row["expires_at"] <= now):
                 expired += 1
         elif action == "tag_add":
+            # 批量打标签是「合并」：已有标签在前，新标签能塞几个塞几个，
+            # 塞不下的记一笔 trimmed，而不是让整批因为某一个项目爆掉。
             names = _parse_tags(body.get("tags"))
             with db() as conn:
-                for n in names:
-                    conn.execute("INSERT OR IGNORE INTO tags(name) VALUES(?)", (n,))
-                    trow = conn.execute("SELECT id FROM tags WHERE name=?", (n,)).fetchone()
-                    if trow:
-                        conn.execute(
-                            "INSERT OR IGNORE INTO project_tags(project_id, tag_id) VALUES(?,?)",
-                            (row["id"], trow["id"]),
-                        )
+                have = [
+                    r["name"]
+                    for r in conn.execute(
+                        "SELECT t.name FROM project_tags pt JOIN tags t ON t.id=pt.tag_id "
+                        "WHERE pt.project_id=? ORDER BY t.name",
+                        (row["id"],),
+                    ).fetchall()
+                ]
+                merged = have + [n for n in names if n not in have]
+                if len(merged) > tagspec.MAX_TAGS:
+                    trimmed += 1
+                    merged = merged[: tagspec.MAX_TAGS]
+                set_tags(conn, row["id"], merged)
         else:
             raise HTTPException(status_code=400, detail="未知操作")
         done += 1
     log_event("bulk", user["id"], None, f"{action} x{done}")
-    return {"ok": True, "done": done, "skipped": skipped, "expired": expired}
+    return {"ok": True, "done": done, "skipped": skipped, "expired": expired, "trimmed": trimmed}
 
 
 @router.post("/projects/{slug}/reset-views")

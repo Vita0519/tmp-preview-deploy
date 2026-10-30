@@ -114,7 +114,7 @@ function copyLink(p) {
         <tr
           v-for="p in items"
           :key="p.slug"
-          :class="{ 'is-expired': p.expired, selected: selected.includes(p.slug) }"
+          :class="{ 'is-expired': p.expired, 'is-del': p.expire_action === 'delete', selected: selected.includes(p.slug) }"
           @click="emit('open', p)"
         >
           <td class="cell-check" @click.stop>
@@ -135,6 +135,13 @@ function copyLink(p) {
               <div class="pmeta">
                 <div class="pname">
                   <span class="truncate" style="max-width: 260px">{{ p.title }}</span>
+                  <span
+                    v-if="p.expire_action === 'delete'"
+                    class="badge del"
+                    title="到期后自动删除项目与文件，不可恢复"
+                  >
+                    <Icon name="trash" :size="10" />到期删除
+                  </span>
                   <span v-if="!p.permanent && p.expired" class="badge danger">已到期</span>
                 </div>
                 <div class="pslug truncate">
