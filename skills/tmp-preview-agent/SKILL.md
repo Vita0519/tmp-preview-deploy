@@ -37,16 +37,17 @@ python scripts/agentctl.py selfcheck     # 用当前身份真跑一遍：建→�
 | `login` | 账号密码或已有 Key 换成本地凭据（0600 落盘） | `--url` `--username` `--password` / `--api-key` |
 | `whoami` | 我是谁、什么角色、能干什么 | — |
 | `health` | 站点是否活着 + Key 是否还有效 | — |
-| `deploy` | 上传目录，**传完自动探活** | `--slug` `--title` `--ttl` `--visibility` `--zip` `--no-verify` |
-| `link` | 只登记外链，不发文件 | `--url` `--title` `--ttl` |
-| `ls` | 列项目（默认只看自己的） | `--status` `--visibility` `--tag` `--q` `--sort` `--limit` |
+| `deploy` | 上传目录，**传完自动探活** | `--slug` `--title` `--ttl` `--visibility` `--collection` `--zip` `--no-verify` |
+| `link` | 只登记外链，不发文件 | `--url` `--title` `--ttl` `--collection` |
+| `ls` | 列项目（默认只看自己的） | `--status` `--visibility` `--collection` `--tag` `--q` `--sort` `--limit` |
 | `show` | 单个项目详情：文件清单、14 天访问、事件流水 | `<slug>` |
-| `set` | 改可见性 / 到期 / 标题 / 标签 / 下载开关 | `--visibility` `--ttl` `--forever` `--tags` |
+| `set` | 改可见性 / 到期 / 标题 / 标签 / 下载 / 归属收藏夹 | `--visibility` `--ttl` `--forever` `--tags` `--collection` `--no-collection` |
 | `extend` | 只续期 | `<slug> <小时>` 或 `--forever` |
 | `rm` | 删项目（文件 + zip + 访问记录） | `<slug>` `--yes` |
 | `bulk` | 批量改可见性 / 续期 / 删 | `--action` `--slugs` `--yes` |
 | `stats` | 访问趋势 | `--days` |
 | `members` | 成员管理（**需 admin**） | `list/create/set/rm/key`、`--role` `--label` `--rotate-key` |
+| `collections` | 收藏夹：列表 / 新建 / 删除 | `ls`(默认) `add --name [--parent]` `rm <id或名字> [--with-projects]` |
 | `selfcheck` | 自检，别信文档，信这个 | — |
 
 **输出契约（给上游程序读）**
@@ -254,7 +255,7 @@ agentctl set <slug> --no-collection         # 移出来
 agentctl ls --collection 办公                # 只看这个夹（含子夹）
 
 # 原始 API
-GET    /api/collections                     # {items:[...], unassigned, total}
+GET    /api/collections                     # {items:[...], unassigned, total, visibility:{portal,link,private}}
 POST   /api/collections                     # {"name":"办公","parent_id":null}
 PATCH  /api/collections/{id}                # {"name":"...","parent_id":...}
 DELETE /api/collections/{id}?with_projects=0
@@ -265,6 +266,11 @@ PATCH  /api/projects/{slug}                 # {"collection_id": 12} / {"collecti
 - 想「连项目一起删」得显式 `with_projects=1`，默认只删壳、项目退回未归类；
 - 建第三层会 422；同层重名会 409；
 - `GET /api/projects?collection=abc`（既不是数字也不是 `none`）会 400，不会静默返回全部。
+
+返回里的 `visibility` 是三档可见性的数量（三者之和 = `total`）。控制台侧栏把
+「全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类」做成了常驻分类，用的就是这几个数——
+**API 侧没变**，筛可见性仍然走 `GET /api/projects?visibility=portal|link|private`，
+只是控制台不再单独放一个可见性下拉（窄屏除外）。
 
 ### 7. 导入 / 导出浏览器书签
 

@@ -169,6 +169,66 @@ def main():
         rc, d, _ = run(url, token, "members", "list", expect=1)
         check("publisher 调 members 被拒", "403" in str(d.get("error", "")), d)
 
+    print("[10.5] 收藏夹（建 / 归类 / 筛选 / 退回未归类）")
+    cname = f"验收{suffix}"
+    rc, d, _ = run(url, token, "collections", "add", "--name", cname)
+    root_id = d.get("data", {}).get("id")
+    check("collections add 建成一级夹", isinstance(root_id, int), d)
+
+    rc, d, _ = run(url, token, "collections", "add", "--name", "子夹", "--parent", cname)
+    kid_id = d.get("data", {}).get("id")
+    check("collections add --parent 吃名字",
+          isinstance(kid_id, int) and d.get("data", {}).get("parent_id") == root_id, d)
+
+    rc, d, _ = run(url, token, "collections", "add", "--name", "深夹", "--parent", "子夹", expect=1)
+    check("挂在子夹下面被拒（只两级）", "两级" in str(d.get("error", "")), d)
+
+    rc, d, _ = run(url, token, "collections", "add", "--name", cname, expect=1)
+    check("同级同名收藏夹被拒", "409" in str(d.get("error", "")), d)
+
+    cslug = f"col-{suffix}"
+    rc, d, _ = run(url, token, "deploy", str(tmp), "--slug", cslug, "--title", "归类验收",
+                   "--collection", cname, "--ttl", "1")
+    check("deploy --collection 用名字归类", d.get("data", {}).get("slug") == cslug, d)
+
+    rc, d, _ = run(url, token, "collections")
+    items = d.get("data", {}).get("items") or []
+    node = next((i for i in items if i["id"] == root_id), None)
+    check("collections 列出新建的一级夹", node is not None, [i["name"] for i in items])
+    check("父夹合计含子夹项目", (node or {}).get("total", 0) >= 1, node)
+    vis = d.get("data", {}).get("visibility") or {}
+    check("collections 报三档可见性", set(vis) == {"portal", "link", "private"}, vis)
+    check("三档可见性之和 = 项目总数",
+          sum(vis.values()) == d.get("data", {}).get("total"),
+          (vis, d.get("data", {}).get("total")))
+
+    rc, d, _ = run(url, token, "ls", "--collection", cname)
+    check("ls --collection 按名字筛出项目", cslug in (d.get("data", {}).get("slugs") or []), d)
+
+    rc, d, _ = run(url, token, "ls", "--collection", "没这个夹", expect=1)
+    check("ls --collection 名字不存在报错清晰", "找不到收藏夹" in str(d.get("error", "")), d)
+
+    rc, d, _ = run(url, token, "set", cslug, "--collection", "子夹")
+    check("set --collection 挪到子夹", d.get("ok") is True, d)
+    rc, d, _ = run(url, token, "ls", "--collection", "子夹")
+    check("子夹里能筛到搬过去的项目", cslug in (d.get("data", {}).get("slugs") or []), d)
+
+    rc, d, _ = run(url, token, "set", cslug, "--no-collection")
+    check("set --no-collection 退回未归类", d.get("ok") is True, d)
+    rc, d, _ = run(url, token, "ls", "--collection", "none")
+    check("未归类里能找到退回来的项目", cslug in (d.get("data", {}).get("slugs") or []), d)
+
+    run(url, token, "set", cslug, "--collection", cname)
+    rc, d, _ = run(url, token, "collections", "rm", cname)
+    check("删夹默认不删项目", d.get("data", {}).get("deleted_projects") == 0, d)
+    check("删夹报告项目退回未归类", (d.get("data", {}).get("moved_to_unassigned") or 0) >= 1, d)
+    rc, d, _ = run(url, token, "show", cslug)
+    check("删夹后项目还在", d.get("data", {}).get("slug") == cslug, d)
+    rc, d, _ = run(url, token, "collections")
+    left = [i["name"] for i in (d.get("data", {}).get("items") or [])]
+    check("删夹时子夹一起没了", cname not in left and "子夹" not in left, left)
+    run(url, token, "rm", cslug, "--yes")
+
     print("[11] 清理")
     admin.req("DELETE", f"/api/agents/{uid}")
     admin.req("DELETE", f"/api/agents/{vd['id']}")
