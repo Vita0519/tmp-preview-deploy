@@ -7,6 +7,7 @@ import Icon from './Icon.vue'
 const props = defineProps({
   tree: { type: Object, default: () => ({ items: [], unassigned: 0, total: 0 }) },
   active: { type: String, default: '' }, // '' 全部 | 'none' 未归类 | '12' 收藏夹 id
+  visibility: { type: String, default: '' }, // '' | portal | link | private（选收藏夹时为空）
   loading: { type: Boolean, default: false },
 })
 const emit = defineEmits(['select', 'changed'])
@@ -14,6 +15,14 @@ const emit = defineEmits(['select', 'changed'])
 const items = computed(() => props.tree.items || [])
 const loose = computed(() => props.tree.unassigned || 0)
 const grandTotal = computed(() => props.tree.total || 0)
+const vis = computed(() => props.tree.visibility || { portal: 0, link: 0, private: 0 })
+
+// 三档可见性做成常驻分类，跟收藏夹抢同一个「当前选中」，所以工具栏里的可见性下拉可以收起来
+const VIS_ROWS = [
+  { key: 'portal', label: '门户可见', icon: 'eye' },
+  { key: 'link', label: '持链接', icon: 'external' },
+  { key: 'private', label: '仅自己', icon: 'key' },
+]
 
 const open = ref({})
 const menu = ref('')
@@ -121,17 +130,33 @@ function countOf(node) {
 <template>
   <aside class="rail">
     <div class="railhead">
-      <span>收藏夹</span>
+      <span>分类</span>
       <button class="railadd" title="新建收藏夹" @click="startNew(null)">
         <Icon name="plus" :size="12" />
       </button>
     </div>
 
     <div class="raillist">
-      <div class="railrow" :class="{ on: active === '' }" role="button" tabindex="0" @click="pick('')" @keydown.enter="pick('')">
+      <div class="railrow" :class="{ on: active === '' && !visibility }" role="button" tabindex="0" @click="pick('')" @keydown.enter="pick('')">
         <Icon name="layers" :size="12" />
         <span class="nm">全部项目</span>
         <span class="n num">{{ grandTotal }}</span>
+      </div>
+
+      <div
+        v-for="v in VIS_ROWS"
+        :key="v.key"
+        class="railrow"
+        :class="{ on: !active && visibility === v.key }"
+        role="button"
+        tabindex="0"
+        :title="`只看${v.label}的项目`"
+        @click="pick('vis:' + v.key)"
+        @keydown.enter="pick('vis:' + v.key)"
+      >
+        <Icon :name="v.icon" :size="12" />
+        <span class="nm">{{ v.label }}</span>
+        <span class="n num">{{ vis[v.key] || 0 }}</span>
       </div>
 
       <div class="railrow" :class="{ on: active === 'none' }" role="button" tabindex="0" @click="pick('none')" @keydown.enter="pick('none')">
@@ -141,6 +166,7 @@ function countOf(node) {
       </div>
 
       <div class="railsep" />
+      <div class="raillabel">收藏夹</div>
 
       <div v-for="node in items" :key="node.id" class="railnode">
         <div

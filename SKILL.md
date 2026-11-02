@@ -78,8 +78,17 @@ python cli/agentctl.py selfcheck                               # 建→探活→
 
 ## 收藏夹：给项目分门别类
 
-两级：**收藏夹 → 子收藏夹**。侧栏固定在项目列表左边（窗口窄于 1120px 时收起），
-点一下就筛，`⋯` 里能新建子夹 / 改名 / 删除；勾选多个项目后底部能一键「移到收藏夹…」。
+左侧那一栏是**分类导航 + 收藏夹**二合一，点一下就筛；`⋯` 里能新建子夹 / 改名 / 删除，
+勾选多个项目后底部能一键「移到收藏夹…」。
+
+- 常驻分类：**全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类**——按可见性和是否归类自动算，
+  不用手动维护；数量跟列表页的总数同源（三档之和 = 全部项目）
+- 再往下才是自己建的收藏夹（两级：**收藏夹 → 子收藏夹**）
+- 因为可见性已经在这里了，宽屏下工具栏里那个「全部可见性」下拉被去掉；
+  窗口窄于 1120px 侧栏会收起，这时工具栏里会补一个同样的下拉兜底
+
+控制台左侧导航栏右上角有一个折叠按钮（`‹` / `›`）：收起后只留图标，宽度 228px → 64px，
+内容区跟着往左扩 164px；选择记在 localStorage，刷新后保持。
 
 ```bash
 python cli/agentctl.py collections                       # 树 + 每个夹的直属/合计数量
@@ -143,7 +152,7 @@ python cli/agentctl.py members set alice --label "claude-code@笔记本" --rotat
 python cli/agentctl.py rm <slug>
 ```
 
-浏览器控制台还能做：按成员/标签/类型/可见性/状态筛选，按访问、创建、更新、到期、体积排序，
+浏览器控制台还能做：按成员/标签/类型/可见性（左侧分类）/状态筛选，按访问、创建、更新、到期、体积排序，
 勾选后一键批量改可见性/续期/转永久/开放下载/删除，抽屉里看文件清单与 14 天访问趋势，
 **点抽屉标题就能改项目名**（实时显示 当前宽度/10，超了保存按钮直接禁用）。
 
@@ -221,7 +230,7 @@ python tests/check_concurrency.py --url http://127.0.0.1:8000  # 20 项：6 agen
 python tests/check_copy.py       --url http://127.0.0.1:8000   # 26 项复制按钮（需 chrome）
 python tests/check_title.py      --url http://127.0.0.1:8000   # 22 项：同一成员重名拦截
 python tests/check_rename.py     --url http://127.0.0.1:8000   # 29 项：改名链路 + 项目名长度规则
-python tests/check_collections.py --url http://127.0.0.1:8000  # 48 项：收藏夹树 / 归类 / 筛选 / 删夹去向
+python tests/check_collections.py --url http://127.0.0.1:8000  # 61 项：收藏夹树 / 归类 / 筛选 / 删夹去向 / 侧栏折叠
 python tests/check_bookmarks.py --url http://127.0.0.1:8000   # 46 项：书签导入预览/判重/导出回灌（需 chrome）
 python tests/check_backup.py    --url http://127.0.0.1:8000   # 40 项：打包/预览/恢复/保留策略（会真恢复一次）
 python tests/check_icon.py       --url http://127.0.0.1:8000   # 35 项：站点图标上传/恢复（含 .off 残骸回归，需 chrome）
