@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # 允许的类型与对应 MIME
@@ -135,8 +136,16 @@ def remove(keep: Path | None = None) -> bool:
             continue
         except SOFT_DELETE_ERRORS as exc:  # 删除保护 / 文件占用：都别炸接口
             print(f"[branding] unlink {f.name} failed, falling back to rename: {exc!r}"[:400])
+        off = f.with_name(f.name + OFF_SUFFIX)
         try:
-            f.rename(f.with_name(f.name + OFF_SUFFIX))
+            # 先把同名的 `.off` 残骸清掉：Windows 上 rename 撞到已存在的目标会
+            # 直接 FileExistsError，那就等于这次删除静默失败了
+            if off.exists():
+                off.unlink()
+        except SOFT_DELETE_ERRORS:
+            pass
+        try:
+            os.replace(f, off)  # 原子改名，目标存在也覆盖
             removed = True
         except SOFT_DELETE_ERRORS as exc:
             print(f"[branding] rename {f.name} failed: {exc!r}"[:400])

@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import cleanup, config, storage, tagspec, views
 from .db import init_db
-from .routers import agents, auth, projects, public, settings
+from .routers import agents, auth, collections, projects, public, settings, transfer
 from .security import bootstrap_admin
 
 # 图标与清单文件的 MIME：Python 的 mimetypes 还不认识 webmanifest
@@ -50,9 +50,11 @@ app = FastAPI(title="tmp-preview", version="2.0.0", lifespan=lifespan, docs_url=
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(auth.router)
+app.include_router(collections.router)
 app.include_router(projects.router)
 app.include_router(agents.router)
 app.include_router(settings.router)
+app.include_router(transfer.router)
 app.include_router(public.router)
 
 

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { api } from '../api'
-import { store, toast } from '../store'
+import { confirmAction, store, toast } from '../store'
 import { fmtBytes, relTime } from '../format'
 import { applyPalette, applySiteIcon, neutralOf, normalize, palette, previewSeries, readable } from '../theme'
 import Icon from '../components/Icon.vue'
@@ -17,6 +17,10 @@ const ACTION_LABEL = {
   delete: '删除项目',
   link: '登记外链',
   bulk: '批量操作',
+  import: '导入书签',
+  backup: '下载备份',
+  restore: '恢复备份',
+  collection: '收藏夹',
   agent_create: '创建成员',
   agent_patch: '修改成员',
   agent_delete: '删除成员',
@@ -282,6 +286,62 @@ async function changePassword() {
 }
 
 
+// ---------------- 备份与恢复 ----------------
+const backupFile = ref(null)
+const backupBusy = ref(false)
+const backupInfo = ref(null)
+
+function pickBackupFile(e) {
+  backupFile.value = e.target.files?.[0] || null
+  backupInfo.value = null
+  e.target.value = ''
+}
+
+async function inspectBackup() {
+  if (!backupFile.value) return toast('先选一个备份包（.zip）', 'err')
+  backupBusy.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', backupFile.value, backupFile.value.name)
+    backupInfo.value = await api.postForm('/api/backup/inspect', fd)
+    toast('读到了，确认下面内容后再恢复')
+  } catch (e) {
+    backupInfo.value = null
+    toast(e.message || '读不了这个备份包', 'err')
+  } finally {
+    backupBusy.value = false
+  }
+}
+
+async function doRestore() {
+  if (!backupFile.value || !backupInfo.value) return
+  const ok = await confirmAction({
+    title: '用这个备份覆盖现网数据？',
+    message:
+      '当前数据库、项目文件、下载包和站点图标都会被替换成备份里的内容。' +
+      '旧数据会保留在 data/.backup-before-restore-<时间>/ 目录，可以手工挪回来。' +
+      '恢复后正在预览的页面需要刷新。',
+    confirmText: '确认恢复',
+    danger: true,
+  })
+  if (!ok) return
+  backupBusy.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', backupFile.value, backupFile.value.name)
+    const d = await api.postForm('/api/backup/restore', fd)
+    toast(`已恢复：${d.counts?.projects ?? '?'} 个项目，${d.counts?.users ?? '?'} 个账号`)
+    backupInfo.value = null
+    backupFile.value = null
+    setTimeout(() => location.reload(), 1200)
+  } catch (e) {
+    toast(e.message || '恢复失败', 'err')
+  } finally {
+    backupBusy.value = false
+  }
+}
+
+
 // ---------------- 分区导航 ----------------
 const SECTIONS = [
   { id: 'site', label: '站点', icon: 'sliders' },
@@ -290,6 +350,7 @@ const SECTIONS = [
   { id: 'tags', label: '标签规则', icon: 'folder' },
   { id: 'author', label: '作者名片', icon: 'users' },
   { id: 'account', label: '账号', icon: 'key' },
+  { id: 'backup', label: '备份恢复', icon: 'download' },
   { id: 'runtime', label: '运行信息', icon: 'layers' },
   { id: 'events', label: '最近操作', icon: 'refresh' },
 ]
@@ -750,6 +811,71 @@ onUnmounted(() => {
                 <button class="btn" @click="changePassword">更新密码</button>
               </div>
               <span class="hint">至少 6 位；改完其他设备上的登录态会失效</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 备份与恢复 -->
+        <section id="backup" class="panel">
+          <div class="panel-head">
+            <h2>备份与恢复</h2>
+            <span class="pdesc">数据库 + 项目文件 + 下载包 + 站点图标，一个 zip 全带走</span>
+          </div>
+          <div class="panel-body form">
+            <div class="frow">
+              <label>下载备份</label>
+              <div class="colorrow">
+                <a class="btn" href="/api/backup" download>
+                  <Icon name="download" :size="13" /> 打包下载
+                </a>
+                <span class="hint" style="margin: 0">
+                  数据库用在线快照，正在写入也不会拷到半截
+                </span>
+              </div>
+            </div>
+
+            <div class="frow">
+              <label>从备份恢复</label>
+              <div class="colorrow" style="flex-wrap: wrap">
+                <button class="btn" :disabled="backupBusy" @click="$refs.bk.click()">
+                  {{ backupFile ? backupFile.name : '选择备份 zip' }}
+                </button>
+                <input ref="bk" type="file" accept=".zip,application/zip" style="display: none" @change="pickBackupFile" />
+                <button class="btn" :disabled="backupBusy || !backupFile" @click="inspectBackup">
+                  {{ backupBusy ? '处理中…' : '先看看里面有什么' }}
+                </button>
+                <button
+                  class="btn danger"
+                  :disabled="backupBusy || !backupInfo"
+                  @click="doRestore"
+                >
+                  覆盖恢复
+                </button>
+              </div>
+              <span class="hint">
+                恢复会替换现网数据；旧数据保留在 data/.backup-before-restore-&lt;时间&gt;/，只留最近 3 份
+              </span>
+            </div>
+
+            <div v-if="backupInfo" class="panel" style="padding: 10px 12px; background: var(--surface-2); box-shadow: none">
+              <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px">
+                <span v-if="backupInfo.manifest?.counts">
+                  项目 <b class="num">{{ backupInfo.manifest.counts.projects }}</b>
+                </span>
+                <span v-if="backupInfo.manifest?.counts">
+                  账号 <b class="num">{{ backupInfo.manifest.counts.users }}</b>
+                </span>
+                <span v-if="backupInfo.manifest?.counts">
+                  收藏夹 <b class="num">{{ backupInfo.manifest.counts.collections }}</b>
+                </span>
+                <span class="dim">文件 {{ backupInfo.files }} 个</span>
+                <span v-if="backupInfo.manifest?.created_at" class="dim">
+                  备份于 {{ new Date(backupInfo.manifest.created_at).toLocaleString() }}
+                </span>
+              </div>
+              <div class="hint" style="margin-top: 6px; color: var(--danger)">
+                确认无误再点「覆盖恢复」，这是不可撤销操作（旧数据另存一份）。
+              </div>
             </div>
           </div>
         </section>

@@ -146,6 +146,9 @@ def emit(args, ok, cmd, data=None, error="", human=None):
     elif human:
         for line in human:
             print(line)
+    elif error:
+        # 人读模式也得把错误说出来，不然只有退出码 1、屏幕上什么都没有
+        print(f"❌ {error}", file=sys.stderr)
     return 0 if ok else 1
 
 
@@ -358,6 +361,31 @@ def cmd_health(args):
 # --------------------------------------------------------------------------- #
 # 命令：部署 / 外链
 # --------------------------------------------------------------------------- #
+def resolve_collection(url, token, value):
+    """把 `--collection` 的值换成收藏夹 id。
+
+    能吃三种：数字 id、`none`（移出收藏夹）、收藏夹名字（子夹写成 `办公/报表`）。
+    名字找不到就返回 None（= 未归类），让命令继续跑，不因为归类失败中断部署。
+    """
+    v = str(value or "").strip()
+    if v.lower() in ("", "none", "0", "unassigned", "-"):
+        return None
+    if v.isdigit():
+        return int(v)
+    code, tree = call(url, "/api/collections", token)
+    if code != 200:
+        return None
+    want = v.replace(" ", "")
+    for node in tree.get("items") or []:
+        if node["name"].replace(" ", "") == want:
+            return int(node["id"])
+        for kid in node.get("children") or []:
+            pair = f"{node['name']}/{kid['name']}".replace(" ", "")
+            if pair == want or kid["name"].replace(" ", "") == want:
+                return int(kid["id"])
+    return None
+
+
 def cmd_deploy(args):
     c = conn(args)
     if not c:
@@ -386,6 +414,9 @@ def cmd_deploy(args):
         "visibility": args.visibility,
         "allow_download": "1" if args.download else "0",
     }
+    if getattr(args, "collection", None):
+        cid = resolve_collection(url, token, args.collection)
+        fields["collection"] = "" if cid is None else str(cid)
     if args.forever:
         fields["forever"] = "1"
     elif args.ttl is not None:
@@ -454,6 +485,8 @@ def cmd_link(args):
     }
     if args.slug:
         body["slug"] = args.slug
+    if getattr(args, "collection", None):
+        body["collection_id"] = resolve_collection(url, token, args.collection)
     if args.forever:
         body["forever"] = True
     elif args.ttl is not None:
@@ -486,6 +519,15 @@ def cmd_ls(args):
         qs.append(f"kind={args.kind}")
     if args.q:
         qs.append("q=" + urllib.request.quote(args.q))
+    if getattr(args, "collection", None):
+        raw = str(args.collection).strip()
+        if raw.lower() in ("none", "0", "unassigned"):
+            qs.append("collection=none")
+        else:
+            cid = resolve_collection(url, token, raw)
+            if cid is None:
+                return emit(args, False, "ls", error=f"找不到收藏夹：{raw}")
+            qs.append(f"collection={cid}")
     for t in args.tag or []:
         qs.append("tag=" + urllib.request.quote(t))
     code, d = call(url, "/api/projects?" + "&".join(qs), token)
@@ -562,6 +604,10 @@ def cmd_set(args):
         body["allow_download"] = True
     if args.no_download:
         body["allow_download"] = False
+    if getattr(args, "collection", None):
+        body["collection_id"] = resolve_collection(url, token, args.collection)
+    if getattr(args, "no_collection", False):
+        body["collection_id"] = None
     if not body:
         return emit(args, False, "set", error="没有要改的字段")
     code, d = call(url, f"/api/projects/{args.slug}", token, "PATCH", body=body)
@@ -653,6 +699,59 @@ def cmd_stats(args):
         f"近 {args.days} 天访问合计 {payload['total']} 次",
         *[f"  {i['day']}  {i['count']}" for i in items[-7:]],
     ])
+
+
+# --------------------------------------------------------------------------- #
+# 命令：收藏夹
+# --------------------------------------------------------------------------- #
+def cmd_collections(args):
+    c = conn(args)
+    if not c:
+        return 2
+    url, token = c
+    act = getattr(args, "action", "ls")
+
+    if act == "ls":
+        code, d = call(url, "/api/collections", token)
+        if code != 200:
+            return emit(args, False, "collections.ls", error=f"读取失败 HTTP {code}：{d.get('detail') or ''}")
+        lines = [f"{'ID':>5}  {'项目':>4}  {'合计':>4}  名称", "-" * 56]
+        for node in d.get("items") or []:
+            lines.append(f"{node['id']:>5}  {node['count']:>4}  {node['total']:>4}  {node['name']}")
+            for kid in node.get("children") or []:
+                lines.append(f"{kid['id']:>5}  {kid['count']:>4}  {kid['total']:>4}    └ {kid['name']}")
+        lines.append(f"{'':>5}  {d.get('unassigned', 0):>4}  {'':>4}  （未归类）")
+        return emit(args, True, "collections.ls", d, human=lines)
+
+    if act == "add":
+        if not args.name:
+            return emit(args, False, "collections.add", error="要给个名字：collections add 办公")
+        body = {"name": args.name}
+        if args.parent:
+            body["parent_id"] = resolve_collection(url, token, args.parent)
+            if body["parent_id"] is None:
+                return emit(args, False, "collections.add", error=f"找不到上级收藏夹：{args.parent}")
+        code, d = call(url, "/api/collections", token, "POST", body=body)
+        if code != 200:
+            return emit(args, False, "collections.add", error=f"新建失败 HTTP {code}：{d.get('detail') or ''}")
+        col = d.get("collection") or {}
+        return emit(args, True, "collections.add", col, human=[f"✅ 收藏夹 {col.get('id')}：{col.get('name')}"])
+
+    if act in ("rm", "delete"):
+        cid = resolve_collection(url, token, args.target)
+        if cid is None:
+            return emit(args, False, "collections.rm", error=f"找不到收藏夹：{args.target}")
+        qs = "?with_projects=1" if args.with_projects else ""
+        code, d = call(url, f"/api/collections/{cid}{qs}", token, "DELETE")
+        if code != 200:
+            return emit(args, False, "collections.rm", error=f"删除失败 HTTP {code}：{d.get('detail') or ''}")
+        return emit(args, True, "collections.rm", d, human=[
+            f"✅ 已删除收藏夹「{d.get('name')}」："
+            + (f"连 {d.get('deleted_projects')} 个项目一起删" if args.with_projects
+               else f"{d.get('moved_to_unassigned')} 个项目退回未归类")
+        ])
+
+    return emit(args, False, "collections", error=f"不认识的动作：{act}")
 
 
 # --------------------------------------------------------------------------- #
@@ -867,6 +966,7 @@ def build_parser():
     p.add_argument("--visibility", default="link", choices=list(VISIBILITY))
     p.add_argument("--expire-action", default="block", choices=["block", "delete"])
     p.add_argument("--no-verify", action="store_true", help="跳过部署后的地址探活")
+    p.add_argument("--collection", help="归到哪个收藏夹：id 或名字（子夹写 办公/报表）")
     p.set_defaults(func=cmd_deploy)
 
     p = sub.add_parser("link", parents=[common], help="登记一个外链项目")
@@ -878,6 +978,7 @@ def build_parser():
     p.add_argument("--ttl", type=float)
     p.add_argument("--forever", action="store_true")
     p.add_argument("--visibility", default="link", choices=list(VISIBILITY))
+    p.add_argument("--collection", help="归到哪个收藏夹：id 或名字")
     p.set_defaults(func=cmd_link)
 
     p = sub.add_parser("ls", parents=[common], help="列出项目")
@@ -892,6 +993,7 @@ def build_parser():
                             "downloads", "size_bytes", "title"])
     p.add_argument("--order", default="desc", choices=["asc", "desc"])
     p.add_argument("--limit", type=int, default=50)
+    p.add_argument("--collection", help="只看某个收藏夹：id / 名字 / none（未归类）")
     p.set_defaults(func=cmd_ls)
 
     p = sub.add_parser("show", parents=[common], help="项目详情")
@@ -908,6 +1010,8 @@ def build_parser():
     p.add_argument("--tags")
     p.add_argument("--download", action="store_true")
     p.add_argument("--no-download", action="store_true")
+    p.add_argument("--collection", help="挪到某个收藏夹：id 或名字")
+    p.add_argument("--no-collection", action="store_true", help="移出收藏夹（回到未归类）")
     p.set_defaults(func=cmd_set)
 
     p = sub.add_parser("extend", parents=[common], help="延长存活时间")
@@ -948,6 +1052,14 @@ def build_parser():
     p.add_argument("--disable", action="store_true")
     p.add_argument("--rotate-key", action="store_true")
     p.set_defaults(func=cmd_members)
+
+    p = sub.add_parser("collections", parents=[common], help="收藏夹：列表 / 新建 / 删除")
+    p.add_argument("action", nargs="?", default="ls", choices=["ls", "add", "rm", "delete"])
+    p.add_argument("target", nargs="?", help="要删的收藏夹（id 或名字）")
+    p.add_argument("--name", help="add 时用：收藏夹名字")
+    p.add_argument("--parent", help="add 时用：挂在哪一级下面（id 或名字）")
+    p.add_argument("--with-projects", action="store_true", help="删除时连项目一起删")
+    p.set_defaults(func=cmd_collections)
 
     sub.add_parser("selfcheck", parents=[common],
                    help="用当前身份跑一遍增删改查").set_defaults(func=cmd_selfcheck)

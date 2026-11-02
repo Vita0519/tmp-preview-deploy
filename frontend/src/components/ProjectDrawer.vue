@@ -20,6 +20,18 @@ const busy = ref(false)
 const tagDraft = ref('')
 const showFiles = ref(false)
 const customHours = ref('')
+const collections = ref({ items: [] })
+
+const collectionOptions = computed(() => {
+  const out = []
+  for (const node of collections.value.items || []) {
+    out.push({ id: String(node.id), label: node.name })
+    for (const kid of node.children || []) {
+      out.push({ id: String(kid.id), label: `${node.name} / ${kid.name}` })
+    }
+  }
+  return out
+})
 
 const remaining = computed(() => {
   const d = detail.value
@@ -120,6 +132,14 @@ async function setVisibility(v) {
   await patch({ visibility: v }, '可见性已更新')
 }
 
+async function setCollection(value) {
+  await patch({ collection_id: value || null }, value ? '已归入收藏夹' : '已移出收藏夹')
+}
+
+function fileDownloadUrl(path) {
+  return `/download/${encodeURIComponent(props.slug)}/${path.split('/').map(encodeURIComponent).join('/')}`
+}
+
 async function toggleExpireAction() {
   const next = detail.value.expire_action === 'delete' ? 'block' : 'delete'
   await patch({ expire_action: next }, next === 'delete' ? '到期将删除文件' : '到期将保留文件')
@@ -194,6 +214,13 @@ function copy(text, msg = '链接已复制') {
 }
 
 onMounted(load)
+onMounted(async () => {
+  try {
+    collections.value = await api.get('/api/collections')
+  } catch {
+    /* 拿不到就当没有收藏夹，不影响抽屉其它功能 */
+  }
+})
 </script>
 
 <template>
@@ -344,6 +371,19 @@ onMounted(load)
           <dl class="kv">
             <dt>归属</dt>
             <dd>{{ detail.owner?.display_name || '—' }}</dd>
+            <dt>收藏夹</dt>
+            <dd>
+              <select
+                class="field"
+                style="height: 26px; font-size: 12px; max-width: 180px"
+                :value="detail.collection?.id ? String(detail.collection.id) : ''"
+                :disabled="busy"
+                @change="setCollection($event.target.value)"
+              >
+                <option value="">未归类</option>
+                <option v-for="o in collectionOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
+              </select>
+            </dd>
             <dt>文件</dt>
             <dd>{{ detail.file_count }} 个 · {{ fmtBytes(detail.size_bytes) }}</dd>
             <dt>下载</dt>
@@ -380,9 +420,19 @@ onMounted(load)
           </h4>
           <div v-if="showFiles" class="filelist" style="max-height: 220px">
             <div v-for="f in detail.files" :key="f.path">
-              <span class="mono truncate" style="max-width: 280px">{{ f.path }}</span>
+              <span class="mono truncate" style="max-width: 240px">{{ f.path }}</span>
               <span class="dim num">{{ fmtBytes(f.size) }}</span>
+              <a
+                v-if="detail.allow_download"
+                class="dlbtn"
+                :href="fileDownloadUrl(f.path)"
+                :title="`下载 ${f.path}`"
+              >↓</a>
+              <span v-else class="dlbtn off" title="未开放下载">↓</span>
             </div>
+          </div>
+          <div v-if="showFiles && !detail.allow_download" class="dim" style="font-size: 10.5px; margin-top: 6px">
+            下载已关闭。打开上方「下载」开关后，整包和单个文件都能直接下。
           </div>
         </div>
 

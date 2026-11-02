@@ -239,7 +239,66 @@ DELETE /api/projects/{slug}     # 文件、zip、访问记录一起清
 
 删除是不可恢复的，批量删之前先用 `GET /api/projects?status=expired` 确认清单。
 
-### 6. 管理员：管成员
+### 6. 收藏夹：把项目分门别类
+
+两级（收藏夹 → 子收藏夹）。**归类是幂等的**，重复放同一个夹不会出错。
+
+```bash
+# CLI
+agentctl collections                        # 树：id / 直属数 / 合计 / 名字
+agentctl collections add --name 办公         # 建一级夹
+agentctl collections add --name 报表 --parent 办公
+agentctl deploy ./dist --collection 办公     # 部署顺手归类（也可写 id）
+agentctl set <slug> --collection 办公/报表   # 挪进去
+agentctl set <slug> --no-collection         # 移出来
+agentctl ls --collection 办公                # 只看这个夹（含子夹）
+
+# 原始 API
+GET    /api/collections                     # {items:[...], unassigned, total}
+POST   /api/collections                     # {"name":"办公","parent_id":null}
+PATCH  /api/collections/{id}                # {"name":"...","parent_id":...}
+DELETE /api/collections/{id}?with_projects=0
+GET    /api/projects?collection=12          # 12 及其子夹；collection=none = 未归类
+PATCH  /api/projects/{slug}                 # {"collection_id": 12} / {"collection_id": null}
+```
+
+- 想「连项目一起删」得显式 `with_projects=1`，默认只删壳、项目退回未归类；
+- 建第三层会 422；同层重名会 409；
+- `GET /api/projects?collection=abc`（既不是数字也不是 `none`）会 400，不会静默返回全部。
+
+### 7. 导入 / 导出浏览器书签
+
+Chrome / Edge / Firefox / Safari 导出的 HTML 都能直接吃，**文件夹变收藏夹、书签变外链项目**。
+
+```bash
+# 先预览（不落库），确认条数与层级再真导
+curl -H "Authorization: Bearer $KEY" -F "file=@bookmarks.html" -F "dry_run=1" \
+     $BASE/api/import/bookmarks
+
+# 真导：默认仅自己可见，可选 link / portal，可统一打标签，可指定落到哪个收藏夹
+curl -H "Authorization: Bearer $KEY" -F "file=@bookmarks.html" \
+     -F "visibility=private" -F "tag=书签" -F "parent_id=12" \
+     $BASE/api/import/bookmarks
+
+# 导回成书签（浏览器能直接导入）：?collection=12 只导这个夹
+curl -H "Authorization: Bearer $KEY" -OJ "$BASE/api/export/bookmarks?collection=12"
+```
+
+要点：同一网址**重复导入自动跳过**（响应里的 `skipped_duplicate`），所以脚本可以放心重跑；
+`javascript:` 之类的地址会被丢弃（`skipped_invalid`）。单文件 8MB、单次最多 500 条。
+
+### 8. 管理员：备份 / 恢复
+
+```bash
+GET  /api/backup                              # 下载全站 zip（库 + 项目文件 + zip + 图标）
+POST /api/backup/inspect   (multipart file)   # 先看包里有什么，再决定恢复
+POST /api/backup/restore   (multipart file)   # 覆盖现网数据，旧数据进 data/.backup-before-restore-<时间>/
+```
+
+**这是破坏性操作，Agent 不该自己发起**：只在人明确说「用这个包恢复」时调用，
+并且先 `inspect` 把 `counts` 报回去让人确认。成员 Key 调用一律 403。
+
+### 9. 管理员：管成员
 
 ```bash
 GET    /api/agents                     # 列表（含 key_label / key_last_used_at / key_uses）
@@ -265,7 +324,8 @@ GET    /api/agents/{id}/key            # 取回完整 Key
 | 409 | slug 冲突 / **项目名重复** / 账号已存在 | 同名就用那个 slug 覆盖更新；不同项目就换个名字 |
 | 422 | 改名时项目名超长（>10 个中文字符）/ 入口文件缺失 / 图标格式不对 | 名字砍到 10 个中文字以内再来一次；上传场景不会 422，只会被截短 |
 | 410 | 项目已到期（`/api/public/p/{slug}` 返回；`/v/` 页面本身是 302 回门户） | 续期后访问恢复 |
-| 413 | 单项目超过 `MAX_UPLOAD_MB` | 拆包或调大上限 |
+| 413 | 单项目超过 `MAX_UPLOAD_MB` / 书签文件超过 8MB | 拆包或调大上限 |
+| 400 | `collection` 参数既不是 id 也不是 `none` | 用 `GET /api/collections` 拿到的 id，或直接传 `none` |
 
 ## 五、Agent 执行时的红线
 
@@ -282,5 +342,5 @@ GET    /api/agents/{id}/key            # 取回完整 Key
 ## 六、相关文档
 
 - `docs/visibility.md`：三档可见性的完整判定表（谁能看、私有链接怎么打开）
-- `docs/api.md`：接口一览
+- `docs/api.md`：接口一览（含收藏夹、书签导入导出、备份恢复）
 - `SKILL.md`：把这套服务部署起来（运维侧）
