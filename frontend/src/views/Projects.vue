@@ -61,11 +61,12 @@ const saved = (() => {
   }
 })()
 if (saved.status) filters.status = saved.status
-if (saved.visibility) filters.visibility = saved.visibility
 if (saved.sort) filters.sort = saved.sort
 if (saved.order) filters.order = saved.order
 if (saved.size) size.value = saved.size
+// 收藏夹与可见性分类共用一条选中线，只能有一个生效：老版本存过两个的，按收藏夹优先
 if (saved.collection) filters.collection = String(saved.collection)
+else if (saved.visibility) filters.visibility = saved.visibility
 
 async function load(keepSelection = false) {
   loading.value = true
@@ -119,7 +120,15 @@ async function loadCollections() {
 
 function onCollectionPicked(key) {
   // 赋值本身会触发下面的 watch（重置到第 1 页并重新拉取），不用手动 load
-  filters.collection = key
+  const k = String(key)
+  if (k.startsWith('vis:')) {
+    // 侧栏把三档可见性做成了常驻分类，跟收藏夹互斥
+    filters.visibility = k.slice(4)
+    filters.collection = ''
+  } else {
+    filters.collection = k
+    filters.visibility = ''
+  }
 }
 
 function onCollectionsChanged() {
@@ -343,6 +352,7 @@ onBeforeUnmount(() => {
       <CollectionTree
         :tree="colTree"
         :active="filters.collection"
+        :visibility="filters.visibility"
         :loading="colLoading"
         @select="onCollectionPicked"
         @changed="onCollectionsChanged"
@@ -366,7 +376,14 @@ onBeforeUnmount(() => {
         <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
       </div>
 
-      <select v-model="filters.visibility" class="field" style="min-width: 112px" title="按可见性筛选">
+      <!-- 窄屏时收藏夹侧栏会收起来，可见性筛选得有个落脚的地方 -->
+      <select
+        v-model="filters.visibility"
+        class="field visfallback"
+        style="min-width: 112px"
+        title="按可见性筛选"
+        @change="filters.collection = ''"
+      >
         <option value="">全部可见性</option>
         <option value="portal">门户可见</option>
         <option value="link">持链接可见</option>

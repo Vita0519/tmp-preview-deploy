@@ -28,6 +28,11 @@
   [5] 删夹
      16. 删空壳：子夹一起删，项目退回未归类
      17. with_projects=1：项目连记录一起删
+  [7] 侧栏折叠 & 可见性分类（浏览器）
+     20. 点折叠按钮：228 → 64，只留图标
+     21. 折叠状态落 localStorage，刷新后还是收起的
+     22. 点「门户可见」：列表条数 = 该分类上的数字，且只有它高亮
+     23. 点「全部项目」：可见性筛选被清掉
 
 用法: python tests/check_collections.py [--url http://127.0.0.1:8000] [--headed]
 """
@@ -185,6 +190,17 @@ def main() -> int:
         check("成员只看到自己的收藏夹", root["id"] not in ids and mine.get("id") in ids, sorted(ids))
         check("成员的未归类数不含别人的项目", tree2.get("unassigned", 0) == 0, tree2.get("unassigned"))
 
+        print("[5.5] 可见性分类")
+        code, tree = admin.req("GET", "/api/collections")
+        vis = tree.get("visibility") or {}
+        check("树里带三档可见性计数", set(vis) == {"portal", "link", "private"}, vis)
+        check("三档之和等于总数", sum(vis.values()) == tree.get("total"),
+              f"{vis} vs {tree.get('total')}")
+        for k, label in (("portal", "门户可见"), ("link", "持链接"), ("private", "仅自己")):
+            code, d = admin.req("GET", f"/api/projects?visibility={k}&limit=1")
+            check(f"{label}计数与筛选结果一致", vis.get(k) == d.get("total"),
+                  f"{vis.get(k)} vs {d.get('total')}")
+
         print("[5] 删夹")
         code, d = admin.req("DELETE", f"/api/collections/{kid['id']}")
         check("删子夹只删壳", code == 200 and d.get("removed") == 1, f"{code} {d}")
@@ -277,6 +293,45 @@ def browser_suite(base: str, user: str, password: str, headed: bool, sfx: str) -
         pg.locator(".modal button", has_text="删除").last.click()
         pg.wait_for_timeout(900)
         check("确认后侧栏里消失", pg.locator(f".railrow:has-text('{name}')").count() == 0)
+
+        print("[7.1] 可见性分类")
+        vis_row = pg.locator(".railrow", has_text="门户可见").first
+        want = int(vis_row.inner_text().split("\n")[-1].strip() or 0)
+        vis_row.click()
+        pg.wait_for_timeout(800)
+        got = pg.locator("text=共 ").first.inner_text()
+        check("点「门户可见」筛出的条数 = 分类上的数字", f"共 {want} 条" in got, f"{got} vs {want}")
+        check("高亮落在「门户可见」上",
+              "门户可见" in pg.eval_on_selector(".railrow.on", "el => el.innerText"),
+              pg.eval_on_selector(".railrow.on", "el => el.innerText"))
+
+        pg.locator(".railrow", has_text="全部项目").first.click()
+        pg.wait_for_timeout(800)
+        check("点「全部项目」把可见性清掉",
+              pg.eval_on_selector(".railrow.on", "el => el.innerText").find("全部项目") >= 0,
+              pg.eval_on_selector(".railrow.on", "el => el.innerText"))
+
+        print("[7.2] 侧栏折叠")
+        w0 = pg.evaluate("() => document.querySelector('.sidebar').getBoundingClientRect().width")
+        pg.click(".navtoggle")
+        pg.wait_for_timeout(450)
+        w1 = pg.evaluate("() => document.querySelector('.sidebar').getBoundingClientRect().width")
+        check("点一下侧栏收窄", w1 < w0 and w1 <= 70, f"{w0} → {w1}")
+        check("收起后文字标签不占位",
+              pg.evaluate("() => { const l=document.querySelector('.nav-item .lbl'); return l? l.getBoundingClientRect().width : -1 }") == 0)
+        check("内容区跟着往左挪",
+              pg.evaluate("() => getComputedStyle(document.querySelector('.main')).marginLeft") == "64px",
+              pg.evaluate("() => getComputedStyle(document.querySelector('.main')).marginLeft"))
+
+        pg.reload(wait_until="domcontentloaded")
+        pg.wait_for_selector(".railrow", timeout=15000)
+        pg.wait_for_timeout(400)
+        w2 = pg.evaluate("() => document.querySelector('.sidebar').getBoundingClientRect().width")
+        check("刷新后还是收起的（记在本地）", w2 <= 70, w2)
+        pg.click(".navtoggle")
+        pg.wait_for_timeout(400)
+        check("再点一下能展开",
+              pg.evaluate("() => document.querySelector('.sidebar').getBoundingClientRect().width") > 200)
 
         check("全程无 JS 报错", not errs, errs[:3])
         b.close()

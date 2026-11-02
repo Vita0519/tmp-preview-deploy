@@ -97,9 +97,36 @@ p { margin: 0; }
 
 .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
 /* 站点标记（沙漏）由 BrandMark.vue 渲染，自带圆角与投影 */
-.brand-text { min-width: 0; }
+.brand-text { min-width: 0; flex: 1 1 auto; }
 .brand-text b { display: block; font-size: 13.5px; letter-spacing: -0.01em; }
 .brand-text span { display: block; font-size: 11px; color: var(--ink-4); }
+
+/* 侧栏折叠按钮：展开时在最右，收起时居中待在图钉下面 */
+.navtoggle {
+  flex: 0 0 auto;
+  width: 22px; height: 22px; border-radius: 6px;
+  border: 1px solid var(--line-2); background: var(--surface-2);
+  color: var(--ink-3); cursor: pointer; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.navtoggle:hover { color: var(--brand); border-color: var(--brand-line); background: var(--brand-soft); }
+.navtoggle svg { transform: rotate(90deg); transition: transform 0.2s var(--ease); }
+
+/* 收起的侧栏：只留图标，省下 164px 给内容区 */
+.shell.mini { --sidebar-w: 64px; }
+.shell.mini .sidebar { padding: 14px 8px 10px; }
+.shell.mini .brand { flex-direction: column; gap: 8px; padding: 2px 0 12px; }
+.shell.mini .brand-text { display: none; }
+.shell.mini .navtoggle { margin: 0; }
+.shell.mini .navtoggle svg { transform: rotate(-90deg); }
+.shell.mini .nav-label { display: none; }
+.shell.mini .nav-item { justify-content: center; padding: 0; gap: 0; }
+.shell.mini .nav-item .lbl,
+.shell.mini .nav-item .ico.out { display: none; }
+.shell.mini .userchip { justify-content: center; padding: 7px 0; }
+.shell.mini .userchip .who,
+.shell.mini .userchip .ico.out { display: none; }
 
 .nav { display: flex; flex-direction: column; gap: 2px; }
 .nav-label {
@@ -115,6 +142,7 @@ p { margin: 0; }
 .nav-item:hover { background: rgba(20, 22, 26, 0.045); color: var(--ink); }
 .nav-item.router-link-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
 .nav-item .ico { width: 16px; display: grid; place-items: center; color: var(--ink-3); }
+.nav-item .ico.out { margin-left: auto; }
 .nav-item.router-link-active .ico { color: var(--brand); }
 .nav-item .count {
   margin-left: auto; font-size: 11px; color: var(--ink-3);
@@ -136,6 +164,7 @@ p { margin: 0; }
 .userchip .who { min-width: 0; }
 .userchip .who b { display: block; font-size: 12.5px; font-weight: 600; }
 .userchip .who span { display: block; font-size: 10.5px; color: var(--ink-4); }
+.userchip .ico.out { margin-left: auto; display: grid; place-items: center; width: 16px; }
 
 .main { flex: 1 1 auto; margin-left: var(--sidebar-w); min-width: 0; display: flex; flex-direction: column; }
 
@@ -211,6 +240,10 @@ p { margin: 0; }
 .railrow .dots:hover { background: var(--surface-2); color: var(--ink); }
 
 .railsep { height: 1px; background: var(--line); margin: 6px 4px; }
+.raillabel {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-4); font-weight: 600; padding: 2px 8px 5px;
+}
 
 .railmenu {
   position: relative; z-index: 3;
@@ -240,9 +273,13 @@ p { margin: 0; }
 .railkids { display: flex; flex-direction: column; gap: 1px; }
 .railmenu.kidmenu { margin-left: 20px; }
 
+.visfallback { display: none; }
+
 @media (max-width: 1120px) {
   .withrail { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
+  /* 侧栏收起后，可见性筛选改由工具栏下拉兜底 */
+  .visfallback { display: inline-flex; }
 }
 
 

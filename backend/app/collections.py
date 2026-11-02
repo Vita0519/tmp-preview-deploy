@@ -101,6 +101,23 @@ def counts(conn, user: dict) -> dict:
     return out
 
 
+def visibility_counts(conn, user: dict) -> dict:
+    """三档可见性各有多少项目——侧栏把它们做成常驻的「智能收藏夹」。"""
+    where = "status='active'"
+    args: list = []
+    if user["role"] != "admin":
+        where += " AND owner_id=?"
+        args.append(user["id"])
+    rows = conn.execute(
+        f"SELECT visibility, COUNT(*) AS n FROM projects WHERE {where} GROUP BY visibility", args
+    ).fetchall()
+    out = {"portal": 0, "link": 0, "private": 0}
+    for r in rows:
+        if r["visibility"] in out:
+            out[r["visibility"]] = r["n"]
+    return out
+
+
 def tree(conn, user: dict) -> dict:
     """返回 {items: 树, unassigned: N, total: N}。"""
     rows = visible_rows(conn, user)
@@ -131,6 +148,8 @@ def tree(conn, user: dict) -> dict:
         "unassigned": loose,
         # 「全部项目」= 各收藏夹合计 + 未归类，跟列表页的总数对得上
         "total": sum(n["total"] for n in roots) + loose,
+        # 三档可见性的数量：侧栏把它们当常驻分类，所以工具栏里的可见性下拉可以省掉
+        "visibility": visibility_counts(conn, user),
         "max_depth": MAX_DEPTH,
     }
 

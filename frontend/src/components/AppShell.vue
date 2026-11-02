@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { store, toast } from '../store'
 import { api } from '../api'
@@ -22,6 +22,17 @@ const nav = computed(() => [
   { name: 'settings', label: '设置', icon: 'sliders', show: isAdmin.value },
 ])
 
+// 侧栏折叠：只留图标（228px → 64px），选择记在本地，下次进来还是收起的
+const mini = ref(localStorage.getItem('pv_nav_mini') === '1')
+function toggleNav() {
+  mini.value = !mini.value
+  try {
+    localStorage.setItem('pv_nav_mini', mini.value ? '1' : '0')
+  } catch {
+    /* 隐身模式下写不了，本次会话照样生效 */
+  }
+}
+
 async function logout() {
   try {
     await api.logout()
@@ -37,7 +48,7 @@ function closeNav() {
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :class="{ mini: mini }">
     <button class="mobile-toggle" aria-label="菜单" @click="store.mobileNav = !store.mobileNav">
       <Icon name="menu" :size="16" />
     </button>
@@ -49,6 +60,15 @@ function closeNav() {
           <b>{{ store.siteTitle }}</b>
           <span>临时预览 · 控制台</span>
         </div>
+        <button
+          class="navtoggle"
+          :title="mini ? '展开侧栏' : '收起侧栏'"
+          :aria-label="mini ? '展开侧栏' : '收起侧栏'"
+          :aria-expanded="!mini"
+          @click="toggleNav"
+        >
+          <Icon name="chevron" :size="12" />
+        </button>
       </div>
 
       <nav v-if="nav.some((n) => n.show)" class="nav">
@@ -58,26 +78,27 @@ function closeNav() {
           :key="item.name"
           :to="{ name: item.name }"
           class="nav-item"
+          :title="item.label"
           @click="closeNav"
         >
           <span class="ico"><Icon :name="item.icon" /></span>
-          {{ item.label }}
+          <span class="lbl">{{ item.label }}</span>
         </router-link>
       </nav>
 
       <div class="sidebar-foot">
-        <a class="nav-item" href="/portal" target="_blank" rel="noopener">
+        <a class="nav-item" href="/portal" target="_blank" rel="noopener" title="访客门户（新窗口打开）">
           <span class="ico"><Icon name="eye" /></span>
-          访客门户
-          <span class="ico" style="margin-left: auto"><Icon name="external" :size="13" /></span>
+          <span class="lbl">访客门户</span>
+          <span class="ico out"><Icon name="external" :size="13" /></span>
         </a>
-        <button class="userchip" @click="logout" title="退出登录">
+        <button class="userchip" :title="`${user?.display_name || user?.username} · ${roleLabel}（点击退出）`" @click="logout">
           <span class="avatar">{{ (user?.display_name || user?.username || '?').slice(0, 1) }}</span>
           <span class="who">
             <b>{{ user?.display_name || user?.username }}</b>
             <span>{{ roleLabel }}</span>
           </span>
-          <span style="margin-left: auto; color: var(--ink-4)"><Icon name="logout" :size="14" /></span>
+          <span class="ico out" :style="{ color: 'var(--ink-4)' }"><Icon name="logout" :size="14" /></span>
         </button>
       </div>
     </aside>
