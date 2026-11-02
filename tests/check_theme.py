@@ -81,9 +81,11 @@ def main() -> int:
     code, _ = admin.login(args.user, args.password)
     check("管理员登录", code == 200)
 
-    # 造一个项目，后面用它的预览页验证
+    # 造一个项目，后面用它的预览页验证。
+    # allow_download 现在默认是开的（上传即可下载），这里显式关掉，
+    # 好让 /download/<slug> 走 403 错误页那条分支。
     slug = f"thm-{sfx}"
-    body, ct = multipart({"slug": slug, "title": f"主题测试 {slug}", "hours": "2"},
+    body, ct = multipart({"slug": slug, "title": f"主题测试 {slug}", "hours": "2", "allow_download": "0"},
                          [("files", "index.html", HTML)])
     admin.req("POST", "/api/projects", body, ct=ct, raw=True)
 

@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from .. import config, defaults, namerule, storage, tagspec, views
+from .. import collections as colls, config, defaults, namerule, storage, tagspec, views
 from ..db import db, get_setting, log_event, set_tags, tx
 from ..security import current_user, now_ms, publisher_user
 from ..serializers import PROJECT_SELECT, project_dict
@@ -119,6 +119,7 @@ def list_projects(
     kind: str = "",
     status: str = "online",
     visibility: str = "",
+    collection: str = "",
     expiring_hours: float = 0,
     sort: str = "updated_at",
     order: str = "desc",
@@ -147,6 +148,22 @@ def list_projects(
     if visibility and visibility in VISIBILITY:
         where.append("p.visibility = ?")
         args.append(visibility)
+
+    # 收藏夹：空 = 全部；none = 未归类；数字 = 这个夹（含子夹）
+    if collection:
+        if collection in ("none", "0", "unassigned"):
+            where.append("p.collection_id IS NULL")
+        else:
+            try:
+                cid = int(collection)
+            except ValueError:
+                # 以前这里会静默当成「全部」，看着像筛选生效了其实没筛，很容易被骗
+                raise HTTPException(status_code=400, detail="collection 参数不合法，要 id 或 none") from None
+            with db() as conn:
+                ids = colls.subtree_ids(conn, cid)
+            marks = ",".join("?" * len(ids))
+            where.append(f"p.collection_id IN ({marks})")
+            args += ids
 
     tag_names = [t for t in (tag or []) if not t.startswith("kind:")]
     if tag_names:
@@ -337,12 +354,14 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
     expire_action = str(form.get("expire_action") or "")
     if expire_action not in EXPIRE_ACTIONS:
         expire_action = default_expire_action()
-    allow_download = str(form.get("allow_download") or "").lower() in ("1", "true", "yes", "on")
+    # 下载开关默认开：文件夹传上来就是个能直接下走的东西，不该还要再点一次
+    allow_download = str(form.get("allow_download") or "1").lower() in ("1", "true", "yes", "on")
     visibility = str(form.get("visibility") or "link")
     if visibility not in VISIBILITY:
         visibility = "link"
     tags = _parse_tags(form.get("tags"))
     owner_username = str(form.get("owner") or "").strip()
+    collection_in = str(form.get("collection") or "").strip()
 
     files = [f for f in form.getlist("files") if getattr(f, "filename", "")]
     zip_up = form.get("zip")
@@ -368,6 +387,18 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
     # 已有项目：保留归属者
     if existing:
         owner_id = existing["owner_id"] or owner_id
+
+    # 收藏夹：没传就沿用原来的；"none" 表示移出收藏夹
+    collection_id = None
+    if collection_in and collection_in not in ("none", "0", "unassigned"):
+        try:
+            collection_id = int(collection_in)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="collection 参数不合法") from None
+        with db() as conn:
+            crow = colls.get(conn, collection_id, user)
+        if crow["owner_id"] != owner_id:
+            raise HTTPException(status_code=409, detail="该收藏夹属于其他成员")
 
     # 同一成员名下不允许重名；覆盖更新自己这个 slug 时不算冲突
     with db() as conn:
@@ -446,6 +477,11 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
                 ),
             )
             pid = cur.lastrowid
+        # 收藏夹单独写：没传就不动，传 "none" 就挪出去
+        if collection_id:
+            conn.execute("UPDATE projects SET collection_id=? WHERE id=?", (collection_id, pid))
+        elif collection_in in ("none", "0", "unassigned"):
+            conn.execute("UPDATE projects SET collection_id=NULL WHERE id=?", (pid,))
         set_tags(conn, pid, tags)
 
     log_event("upload" if not existing else "replace", user["id"], pid, f"{slug} {file_count} files")
@@ -477,17 +513,29 @@ async def create_link(request: Request, user: dict = Depends(current_user)):
     else:
         expires_at = defaults.expiry_for(visibility)
     t = now_ms()
+    collection_in = body.get("collection_id", body.get("collection"))
+    collection_id = None
+    if collection_in not in (None, "", 0, "0", "none", "unassigned"):
+        try:
+            collection_id = int(collection_in)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="collection_id 不合法") from None
     with tx() as conn:
         if conn.execute("SELECT 1 FROM projects WHERE slug=?", (slug,)).fetchone():
             raise HTTPException(status_code=409, detail="slug 已存在")
+        if collection_id:
+            crow = colls.get(conn, collection_id, user)  # 存在 + 有权限
+            if crow["owner_id"] != user["id"]:
+                raise HTTPException(status_code=409, detail="该收藏夹属于其他成员")
         dup = title_conflict(conn, user["id"], title)
         if dup:
             _raise_title_conflict(dup, title)
         cur = conn.execute(
             "INSERT INTO projects(slug, title, description, owner_id, kind, link_url, visibility, "
-            "expire_action, expires_at, status, created_at, updated_at) VALUES(?,?,?,?,'link',?,?,?,?,'active',?,?)",
+            "collection_id, expire_action, expires_at, status, created_at, updated_at) "
+            "VALUES(?,?,?,?,'link',?,?,?,?,?,'active',?,?)",
             (slug, title, str(body.get("description") or ""), user["id"], url, visibility,
-             body.get("expire_action") or default_expire_action(), expires_at, t, t),
+             collection_id, body.get("expire_action") or default_expire_action(), expires_at, t, t),
         )
         pid = cur.lastrowid
         set_tags(conn, pid, _parse_tags(body.get("tags")))
@@ -532,6 +580,21 @@ async def patch_project(slug: str, request: Request, user: dict = Depends(curren
         args.append(body["expire_action"])
     if "tags" in body:
         tags = _parse_tags(body["tags"])
+    if "collection_id" in body or "collection" in body:
+        cid = body.get("collection_id", body.get("collection"))
+        if cid in (None, "", 0, "0", "none", "unassigned"):
+            sets.append("collection_id=NULL")
+        else:
+            try:
+                cid = int(cid)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="collection_id 不合法") from None
+            with db() as conn:
+                crow = colls.get(conn, cid, user)  # 存在 + 有权限
+            if crow["owner_id"] != row["owner_id"]:
+                raise HTTPException(status_code=409, detail="该收藏夹属于其他成员")
+            sets.append("collection_id=?")
+            args.append(cid)
 
     if body.get("permanent"):
         sets.append("expires_at=NULL")
@@ -651,6 +714,26 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
             # 已到期的项目就算设成门户可见也不会出现在列表里，单独报个数提醒用户续期
             if row["status"] == "expired" or (row["expires_at"] and row["expires_at"] <= now):
                 expired += 1
+        elif action == "collection":
+            # 批量归入收藏夹；collection_id 为空表示移出收藏夹
+            cid = body.get("collection_id")
+            if cid in (None, "", 0, "0", "none", "unassigned"):
+                with db() as conn:
+                    conn.execute("UPDATE projects SET collection_id=NULL, updated_at=? WHERE id=?",
+                                 (now, row["id"]))
+            else:
+                try:
+                    cid = int(cid)
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="collection_id 不合法") from None
+                with db() as conn:
+                    crow = colls.get(conn, cid, user)
+                if crow["owner_id"] != row["owner_id"]:
+                    skipped += 1
+                    continue
+                with db() as conn:
+                    conn.execute("UPDATE projects SET collection_id=?, updated_at=? WHERE id=?",
+                                 (cid, now, row["id"]))
         elif action == "tag_add":
             # 批量打标签是「合并」：已有标签在前，新标签能塞几个塞几个，
             # 塞不下的记一笔 trimmed，而不是让整批因为某一个项目爆掉。

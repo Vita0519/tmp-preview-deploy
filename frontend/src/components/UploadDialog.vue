@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '../api'
 import { toast } from '../store'
 import { fmtBytes, hoursLabel } from '../format'
@@ -9,6 +9,10 @@ import Icon from './Icon.vue'
 
 const emit = defineEmits(['close', 'created'])
 
+const props = defineProps({
+  collections: { type: Object, default: () => ({ items: [] }) },
+})
+
 const mode = ref('files') // files | zip | link
 const ttlDefaults = ref({ portal: 6, link: 12, private: 0 })
 const form = ref({
@@ -16,10 +20,11 @@ const form = ref({
   title: '',
   description: '',
   tags: '',
+  collection: '',
   hours: '', // 空 = 跟随可见性默认
   forever: false,
   expire_action: 'block',
-  allow_download: false,
+  allow_download: true, // 文件夹传上来就该能直接下走，默认开着
   visibility: 'link',
   link_url: '',
 })
@@ -38,6 +43,17 @@ const tagCheck = computed(() => checkTags(form.value.tags))
 // 项目名按显示宽度算：10 个中文字符 ≈ 20 个英文字符，超了在失焦时自动截短
 const titleW = computed(() => titleWidth(form.value.title))
 const titleErr = computed(() => titleError(form.value.title))
+
+const folderOptions = computed(() => {
+  const out = []
+  for (const node of props.collections.items || []) {
+    out.push({ id: String(node.id), label: node.name })
+    for (const kid of node.children || []) {
+      out.push({ id: String(kid.id), label: `${node.name} / ${kid.name}` })
+    }
+  }
+  return out
+})
 
 function clampInputTitle() {
   form.value.title = clampTitle(form.value.title)
@@ -59,6 +75,7 @@ const effectiveTTL = computed(() => {
 })
 
 onMounted(async () => {
+  window.addEventListener('keydown', onKey, true)
   try {
     const m = await api.get('/api/meta')
     if (m.ttl_defaults) ttlDefaults.value = { ...ttlDefaults.value, ...m.ttl_defaults }
@@ -67,6 +84,14 @@ onMounted(async () => {
     /* 拿不到就用内置默认值 */
   }
 })
+onUnmounted(() => window.removeEventListener('keydown', onKey, true))
+
+function onKey(e) {
+  if (e.key === 'Escape' && !uploading.value) {
+    e.stopPropagation()
+    emit('close')
+  }
+}
 
 function addFiles(list) {
   const next = []
@@ -144,6 +169,7 @@ async function submit() {
   fd.append('title', form.value.title || '')
   fd.append('description', form.value.description || '')
   fd.append('tags', form.value.tags || '')
+  fd.append('collection', form.value.collection || '')
   fd.append('expire_action', form.value.expire_action)
   fd.append('visibility', form.value.visibility)
   fd.append('allow_download', form.value.allow_download ? '1' : '0')
@@ -182,6 +208,7 @@ async function submitLink() {
       slug: form.value.slug,
       description: form.value.description,
       tags: form.value.tags,
+      collection_id: form.value.collection || null,
       visibility: form.value.visibility,
       hours: form.value.forever ? null : form.value.hours === '' ? null : Number(form.value.hours),
       forever: form.value.forever,
@@ -295,6 +322,15 @@ async function submitLink() {
         </div>
 
         <div class="frow">
+          <label>收藏夹</label>
+          <select v-model="form.collection" class="field">
+            <option value="">未归类</option>
+            <option v-for="o in folderOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
+          </select>
+          <span class="hint">项目多了按收藏夹分组更好找；也可以先空着，回头批量挪</span>
+        </div>
+
+        <div class="frow">
           <label>说明</label>
           <textarea v-model="form.description" class="textarea" placeholder="一句话描述用途（可选）" />
         </div>
@@ -351,7 +387,7 @@ async function submitLink() {
           <input v-model="form.forever" type="checkbox" /> 永久保存（不自动到期）
         </label>
         <label class="check">
-          <input v-model="form.allow_download" type="checkbox" /> 开放 zip 下载
+          <input v-model="form.allow_download" type="checkbox" /> 允许下载（整包 zip + 单个文件）
         </label>
 
         <div class="frow">

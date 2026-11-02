@@ -7,6 +7,24 @@ from . import tagspec
 from .config import DB_PATH, FILES_DIR, ZIPS_DIR
 
 SCHEMA = """
+-- 收藏夹（两层：parent_id 为空是一级，否则挂在某个一级下面）
+-- 靠 parent_id 存而不是写死两列，是为了以后放开深度不用改表
+CREATE TABLE IF NOT EXISTS collections (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  parent_id  INTEGER REFERENCES collections(id) ON DELETE CASCADE,
+  owner_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  icon       TEXT NOT NULL DEFAULT '',
+  sort       INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_collections_owner  ON collections(owner_id);
+CREATE INDEX IF NOT EXISTS idx_collections_parent ON collections(parent_id);
+-- 同一层里不许重名（忽略大小写与首尾空格）
+CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_uniq
+  ON collections(owner_id, ifnull(parent_id, 0), lower(trim(name)));
+
 CREATE TABLE IF NOT EXISTS users (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   username      TEXT NOT NULL UNIQUE,
@@ -47,6 +65,7 @@ CREATE TABLE IF NOT EXISTS projects (
   zip_name      TEXT,
   link_url      TEXT,
   visibility    TEXT NOT NULL DEFAULT 'link' CHECK (visibility IN ('portal','link','private')),
+  collection_id INTEGER REFERENCES collections(id) ON DELETE SET NULL,
   allow_download INTEGER NOT NULL DEFAULT 0,
   expire_action TEXT NOT NULL DEFAULT 'block' CHECK (expire_action IN ('block','delete')),
   expires_at    INTEGER,
@@ -159,6 +178,7 @@ def init_db() -> None:
         conn.executescript(SCHEMA)
         _migrate_roles(conn)
         _add_user_key_cols(conn)
+        _add_project_cols(conn)
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
         _migrate_tags(conn)
@@ -207,6 +227,23 @@ def _migrate_tags(conn) -> None:
         print(f"[migrate] 标签规范化跳过：{exc}", flush=True)
     conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, '1')", (key,))
     conn.execute("UPDATE settings SET value='1' WHERE key=?", (key,))
+
+
+def _add_project_cols(conn) -> None:
+    """给老库的 projects 补上收藏夹归属（collections 表本身由 SCHEMA 建好）。"""
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
+    if "collection_id" not in have:
+        try:
+            conn.execute(
+                "ALTER TABLE projects ADD COLUMN collection_id INTEGER "
+                "REFERENCES collections(id) ON DELETE SET NULL"
+            )
+        except sqlite3.OperationalError as exc:
+            print(f"[migrate] 跳过 projects.collection_id：{exc}", flush=True)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_coll ON projects(collection_id)")
+    except sqlite3.OperationalError as exc:
+        print(f"[migrate] 跳过 idx_projects_coll：{exc}", flush=True)
 
 
 def _add_user_key_cols(conn) -> None:

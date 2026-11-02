@@ -23,13 +23,13 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/projects` | ✍ | 列表。参数：`q`、`agent`、`tag`(可重复)、`kind`、`status`(online/expired/permanent/all)、`visibility`、`expiring_hours`、`sort`、`order`、`limit`、`offset`。返回 `items`、`total`、`stats`、`facets`、`server_now` |
+| GET | `/api/projects` | ✍ | 列表。参数：`q`、`agent`、`tag`(可重复)、`kind`、`status`(online/expired/permanent/all)、`visibility`、`collection`(收藏夹 id / `none`)、`expiring_hours`、`sort`、`order`、`limit`、`offset`。返回 `items`、`total`、`stats`、`facets`、`server_now` |
 | GET | `/api/projects/{slug}` | ✍ | 详情：含 `files[]`、`daily_views[]`、`events[]` |
-| POST | `/api/projects` | ✍ | 上传（multipart）：`slug,title,description,tags,hours,forever,expire_action,allow_download,visibility,files[],zip,owner(管理员)`。`hours` 省略时按可见性取默认时长 |
-| POST | `/api/projects/link` | ✍ | 登记外链：`{link_url,title,slug,description,tags,hours,forever,visibility}` |
-| PATCH | `/api/projects/{slug}` | ✍ | 改属性：`title,description,tags[],visibility,allow_download,expire_action,hours,permanent,expires_at,slug(改名),revive` |
+| POST | `/api/projects` | ✍ | 上传（multipart）：`slug,title,description,tags,hours,forever,expire_action,allow_download,visibility,collection,files[],zip,owner(管理员)`。`hours` 省略时按可见性取默认时长；`allow_download` **默认为开**，传 `0` 才关；`collection` 是收藏夹 id 或 `none` |
+| POST | `/api/projects/link` | ✍ | 登记外链：`{link_url,title,slug,description,tags,hours,forever,visibility,collection_id}` |
+| PATCH | `/api/projects/{slug}` | ✍ | 改属性：`title,description,tags[],visibility,allow_download,expire_action,hours,permanent,expires_at,slug(改名),revive,collection_id`（`null` / `"none"` = 移出收藏夹） |
 | DELETE | `/api/projects/{slug}` | ✍ | 删除项目与文件 |
-| POST | `/api/projects/bulk` | ✍ | `{slugs[], action}`，action ∈ `delete, expire, permanent, extend, allow_download, deny_download, visibility, tag_add` |
+| POST | `/api/projects/bulk` | ✍ | `{slugs[], action}`，action ∈ `delete, expire, permanent, extend, allow_download, deny_download, visibility, tag_add, collection`（后者带 `collection_id`，`null` = 移出） |
 | POST | `/api/projects/{slug}/reset-views` | ✍ | 访问计数清零 |
 | GET | `/api/stats/trend` | ✍ | 近 N 天访问趋势（默认 14） |
 
@@ -64,6 +64,84 @@
 ```
 
 截断不会劈坏字符，也会去掉尾部的空格与标点；不传 `title` 时从文件名 / URL 推导，同样按这条规则截。
+
+## 收藏夹（项目层级归类）
+
+两级：**收藏夹 → 子收藏夹**，项目挂在任意一层（挂在父夹上的不会自动算进子夹）。
+表里只有 `parent_id`，没有写死 `level`，以后要放开深度不用迁表。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/collections` | ✍ | 树：`{items:[{id,name,parent_id,icon,sort,count,total,children}], unassigned, total, max_depth}` |
+| POST | `/api/collections` | ✍ | 新建：`{name, parent_id?, icon?}`。同名（同层）→ 409；挂到子夹下（第三层）→ 422 |
+| PATCH | `/api/collections/{id}` | ✍ | 改名 / 换图标 / 调顺序 / 移动：`{name?,icon?,sort?,parent_id?}` |
+| DELETE | `/api/collections/{id}` | ✍ | 删夹。默认**只删壳**，里面的项目退回「未归类」；`?with_projects=1` 才连项目与文件一起删 |
+
+返回字段里 `count` 是直属项目数，`total` 是含子夹的合计；`total`（顶层）已经包含「未归类」，
+所以侧栏的「全部项目」跟项目列表的 `total` 永远对得上。非管理员只统计**自己名下**的项目。
+
+删夹的返回：
+
+```json
+{"ok": true, "removed": 2, "moved_to_unassigned": 1, "deleted_projects": 0, "name": "办公"}
+```
+
+`removed` 是删掉的收藏夹个数（含子夹），两个数字只会有一个非零。
+
+**筛选**：`GET /api/projects?collection=12` 取 12 及其子夹的项目；`collection=none` 只取未归类的；
+非数字且不是 `none` → `400`（以前会静默当成「全部」，看着像筛了其实没筛）。
+
+## 导入 / 导出（浏览器书签）
+
+Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，一个解析器全吃。
+**文件夹 → 收藏夹，书签 → 外链项目**（默认 `visibility=private`，仅自己可见）。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| POST | `/api/import/bookmarks` | ✍ | multipart：`file`（或 `text` 直接贴 HTML）、`parent_id`、`visibility`、`tag`、`dry_run` |
+| GET | `/api/export/bookmarks` | ✍ | Netscape HTML 附件；`?collection=<id>` 只导这个夹（含子夹） |
+
+导入的层级映射：
+
+| 场景 | 结果 |
+|---|---|
+| 不指定 `parent_id` | 书签一级文件夹 → 一级收藏夹；二级 → 子收藏夹；**更深的层折进第二级** |
+| 指定 `parent_id` | 目标夹已经是一级，只能再往下放一层：书签一级文件夹 → 它的子夹，更深折进去 |
+
+其它规则：
+
+- 同一个网址**重复导入自动跳过**（按 `link_url` 判重，跨次也有效），所以反复导同一个文件不会长出一堆重复项目；
+- `javascript:` / `place:` / `data:` / `chrome:` / `about:` / `file:` 这类地址直接丢弃；
+- 书名超长会按项目名规则截短并加 `(2)` / `(3)` 去重；
+- 单文件 8MB 上限，一次最多 500 条，超出的部分在 `truncated` 里报数。
+
+```json
+{"ok": true, "dry_run": false, "created": 5, "folders_created": 3, "parsed": 6,
+ "skipped_duplicate": 0, "skipped_invalid": 1, "truncated": 0, "visibility": "private"}
+```
+
+`dry_run=1` 时只解析不落库，额外返回 `folders`（`[[一级, 二级], …]`）、`items`（最多 200 条预览）与 `will_create`。
+导出的响应带 `X-Bookmark-Count`，方便脚本核对条数。
+
+## 备份 / 恢复（仅管理员）
+
+备份 = **一个 zip**：数据库在线快照（`sqlite3.backup()`，WAL 里没落盘的也会带上）+ `projects/` + `zips/` + `branding/` + `manifest.json`。
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET | `/api/backup` | 👑 | 直接下载 `preview-backup-<时间>.zip`；打完临时文件自动清掉 |
+| POST | `/api/backup/inspect` | 👑 | 上传 zip，只读检查：`{db, files, zips, branding, manifest}`。不是本站备份 → 422 |
+| POST | `/api/backup/restore` | 👑 | 用 zip 覆盖现网数据，返回 `{ok, counts, backup_dir, files, zips}` |
+
+恢复是**整体换血**，但旧数据不会消失：现网的 `db.sqlite3`（连同 `-wal`/`-shm`）、`projects/`、`zips/`、`branding/` 会被整体挪进
+`data/.backup-before-restore-<时间>/`，只保留最近 3 份。实在删不掉的会被改名丢进 `data/.trash/`，不会悄悄占满磁盘。
+
+```json
+{"ok": true, "counts": {"projects": 25, "users": 6, "collections": 3, "tags": 15},
+ "backup_dir": ".../data/.backup-before-restore-20261102-083925", "files": 324, "zips": 3}
+```
+
+`counts.projects` 只数 `status='active'`，跟控制台列表的总数一致。
 
 ## 成员
 
@@ -103,6 +181,7 @@
 | GET | `/v/{slug}` | 🟢 | 预览外壳（倒计时、下载、复制链接）；外链项目 **记一次访问后 302 直达目标站**，失效/无权访问 **302 回 `/portal?gone=1`** |
 | GET | `/p/{slug}/{path}` | 🟢 | 项目文件；无扩展名补 `index.html`；SPA 回退到 `entry` |
 | GET | `/download/{slug}` | 🟢 | zip 下载（需项目开启 `allow_download`）；失效同样 302 回门户 |
+| GET | `/download/{slug}/{rel}` | 🟢 | **单个文件**下载（文件名取原名，中文名走 RFC 5987）；`allow_download=0` → 403；非静态项目（zip 包）自动回落到整包下载；`../` 越界一律 404 |
 | GET | `/portal` | 🟢/👤 | 门户列表（`PUBLIC_PORTAL=1` 或已登录） |
 | GET | `/rss.xml`、`/feed.xml` | 🟢/👤 | 门户 RSS（最近 50 个门户可见且未过期项目）；门户不公开且未登录 → 404 |
 | GET | `/site-icon` | 🟢 | 自定义站点图标；没上传过 → `404`（页面回落到内置图标） |

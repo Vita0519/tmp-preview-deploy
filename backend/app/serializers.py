@@ -30,6 +30,9 @@ def project_dict(row, origin: str = "", tags: list[str] | None = None) -> dict:
             "username": row["owner_username"],
             "display_name": row["owner_display_name"] or row["owner_username"],
         }
+    collection = None
+    if "collection_name" in keys and row["collection_id"]:
+        collection = {"id": row["collection_id"], "name": row["collection_name"] or "未命名"}
     return {
         "id": row["id"],
         "slug": slug,
@@ -57,6 +60,7 @@ def project_dict(row, origin: str = "", tags: list[str] | None = None) -> dict:
         "updated_at": row["updated_at"],
         "last_viewed_at": row["last_viewed_at"],
         "tags": tags or [],
+        "collection": collection,
         "urls": {
             "preview": f"{origin}/v/{slug}",
             "raw": f"{origin}/p/{slug}/",
@@ -66,6 +70,9 @@ def project_dict(row, origin: str = "", tags: list[str] | None = None) -> dict:
 
 
 PROJECT_SELECT = """
-SELECT p.*, u.username AS owner_username, u.display_name AS owner_display_name
-FROM projects p LEFT JOIN users u ON u.id = p.owner_id
+SELECT p.*, u.username AS owner_username, u.display_name AS owner_display_name,
+       c.name AS collection_name
+FROM projects p
+LEFT JOIN users u ON u.id = p.owner_id
+LEFT JOIN collections c ON c.id = p.collection_id
 """

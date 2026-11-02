@@ -8,6 +8,8 @@ import StatStrip from '../components/StatStrip.vue'
 import ProjectTable from '../components/ProjectTable.vue'
 import ProjectDrawer from '../components/ProjectDrawer.vue'
 import UploadDialog from '../components/UploadDialog.vue'
+import CollectionTree from '../components/CollectionTree.vue'
+import ImportDialog from '../components/ImportDialog.vue'
 
 const data = reactive({
   items: [],
@@ -22,6 +24,7 @@ const filters = reactive({
   agent: '',
   kind: '',
   visibility: '',
+  collection: '',
   status: 'online',
   tags: [],
   sort: 'updated_at',
@@ -34,6 +37,9 @@ const err = ref('')
 const selected = ref([])
 const openSlug = ref('')
 const uploadOpen = ref(false)
+const importOpen = ref(false)
+const colTree = ref({ items: [], unassigned: 0, total: 0 })
+const colLoading = ref(false)
 const now = ref(Date.now())
 let offset = 0
 let qTimer = null
@@ -59,6 +65,7 @@ if (saved.visibility) filters.visibility = saved.visibility
 if (saved.sort) filters.sort = saved.sort
 if (saved.order) filters.order = saved.order
 if (saved.size) size.value = saved.size
+if (saved.collection) filters.collection = String(saved.collection)
 
 async function load(keepSelection = false) {
   loading.value = true
@@ -69,6 +76,7 @@ async function load(keepSelection = false) {
       agent: filters.agent,
       kind: filters.kind,
       visibility: filters.visibility,
+      collection: filters.collection,
       status: filters.status,
       tag: filters.tags,
       sort: filters.sort,
@@ -98,6 +106,33 @@ async function loadTrend() {
   } catch {}
 }
 
+async function loadCollections() {
+  colLoading.value = true
+  try {
+    colTree.value = await api.get('/api/collections')
+  } catch {
+    /* 收藏夹接口挂了不该拦着项目列表 */
+  } finally {
+    colLoading.value = false
+  }
+}
+
+function onCollectionPicked(key) {
+  // 赋值本身会触发下面的 watch（重置到第 1 页并重新拉取），不用手动 load
+  filters.collection = key
+}
+
+function onCollectionsChanged() {
+  loadCollections()
+  load(true)
+}
+
+const exportHref = computed(
+  () => '/api/export/bookmarks' + (filters.collection && filters.collection !== 'none'
+    ? `?collection=${filters.collection}`
+    : '')
+)
+
 function scheduleLoad() {
   clearTimeout(qTimer)
   qTimer = setTimeout(() => {
@@ -112,6 +147,7 @@ watch(
     filters.agent,
     filters.kind,
     filters.visibility,
+    filters.collection,
     filters.status,
     filters.tags.join(','),
     filters.sort,
@@ -128,6 +164,7 @@ watch(
         sort: filters.sort,
         order: filters.order,
         size: size.value,
+        collection: filters.collection,
       })
     )
     load()
@@ -154,6 +191,7 @@ function resetFilters() {
   filters.agent = ''
   filters.kind = ''
   filters.visibility = ''
+  filters.collection = ''
   filters.status = 'online'
   filters.tags = []
   filters.sort = 'updated_at'
@@ -203,6 +241,16 @@ async function bulk(action, extra = {}, label = '') {
 
 const VIS_LABEL = { portal: '门户可见', link: '持链接可见', private: '仅自己可见' }
 
+async function bulkMove(cid) {
+  if (!selected.value.length) return
+  await bulk(
+    'collection',
+    { collection_id: cid || null },
+    cid ? '已归入收藏夹' : '已移出收藏夹',
+  )
+  loadCollections()
+}
+
 async function bulkVisibility(v) {
   if (!selected.value.length) return
   if (v === 'private') {
@@ -232,6 +280,16 @@ function onAction({ type, item }) {
 function onDrawerChanged() {
   load(true)
   loadTrend()
+  loadCollections()
+}
+
+function onImported(d) {
+  load()
+  loadTrend()
+  loadCollections()
+  if (d?.created) {
+    filters.status = 'online'
+  }
 }
 
 function tick() {
@@ -241,6 +299,7 @@ function tick() {
 onMounted(() => {
   load()
   loadTrend()
+  loadCollections()
   refreshTimer = setInterval(() => {
     if (document.hidden) return
     if (openSlug.value || uploadOpen.value) return
@@ -268,13 +327,29 @@ onBeforeUnmount(() => {
     <button class="btn ghost icon" title="刷新" :disabled="loading" @click="load(true)">
       <Icon name="refresh" :size="14" />
     </button>
+    <button class="btn ghost" title="导入浏览器书签（Chrome / Edge / Firefox）" @click="importOpen = true">
+      <Icon name="download" :size="13" /> 导入书签
+    </button>
+    <a class="btn ghost" :href="exportHref" title="导出为书签 HTML，可被浏览器直接导入">
+      <Icon name="external" :size="13" /> 导出
+    </a>
     <button class="btn primary" @click="uploadOpen = true">
       <Icon name="plus" :size="13" /> 新建项目
     </button>
   </header>
 
   <div class="content">
-    <StatStrip :stats="data.stats" :trend="trend" />
+    <div class="withrail">
+      <CollectionTree
+        :tree="colTree"
+        :active="filters.collection"
+        :loading="colLoading"
+        @select="onCollectionPicked"
+        @changed="onCollectionsChanged"
+      />
+
+      <div class="maincol">
+        <StatStrip :stats="data.stats" :trend="trend" />
 
     <div class="toolbar">
       <select v-if="isAdmin" v-model="filters.agent" class="field" style="min-width: 116px">
@@ -376,6 +451,8 @@ onBeforeUnmount(() => {
         <button class="btn sm" :disabled="page >= totalPages" @click="page++">下一页</button>
       </div>
     </div>
+      </div>
+    </div>
   </div>
 
   <div v-if="selected.length" class="bulkbar">
@@ -391,6 +468,22 @@ onBeforeUnmount(() => {
     <button class="btn sm" title="只有你和管理员登录后能打开（外部一律 404）" @click="bulkVisibility('private')">
       仅自己
     </button>
+    <span class="bulksep" aria-hidden="true"></span>
+    <select
+      class="field sm"
+      style="min-width: 118px; height: 26px"
+      title="批量归入收藏夹"
+      @change="bulkMove($event.target.value); $event.target.value = ''"
+    >
+      <option value="">移到收藏夹…</option>
+      <option value="none">移出收藏夹</option>
+      <optgroup v-for="node in colTree.items" :key="node.id" :label="node.name">
+        <option :value="node.id">{{ node.name }}</option>
+        <option v-for="kid in node.children || []" :key="kid.id" :value="kid.id">
+          {{ node.name }} / {{ kid.name }}
+        </option>
+      </optgroup>
+    </select>
     <span class="bulksep" aria-hidden="true"></span>
     <button class="btn sm" @click="bulk('extend', { hours: 24 })">+24 小时</button>
     <button class="btn sm" @click="bulk('permanent')">设为永久</button>
@@ -408,7 +501,20 @@ onBeforeUnmount(() => {
     @changed="onDrawerChanged"
   />
 
-  <UploadDialog v-if="uploadOpen" @close="uploadOpen = false" @created="onCreated" />
+  <UploadDialog
+    v-if="uploadOpen"
+    :collections="colTree"
+    @close="uploadOpen = false"
+    @created="onCreated"
+  />
+
+  <ImportDialog
+    v-if="importOpen"
+    :collections="colTree"
+    :default-collection="filters.collection"
+    @close="importOpen = false"
+    @imported="onImported"
+  />
 </template>
 
 <style scoped>

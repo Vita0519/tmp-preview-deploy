@@ -1,0 +1,286 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""收藏夹（项目层级归类）：两级树、归类、删夹时项目去哪。
+
+以前项目是一整片平铺，没有归类。现在做成「收藏夹 → 子收藏夹」两层，
+项目挂在叶子上；删收藏夹默认只删壳，项目退回「未归类」，不连坐。
+
+覆盖：
+  [1] 建夹
+      1. 新建一级收藏夹
+      2. 同级重名 → 409
+      3. 空名 / 超 20 字 → 422
+      4. 建子收藏夹（第二级）
+      5. 子夹下再挂子夹（第三级）→ 422
+  [2] 树与计数
+      6. 树里根节点带 children
+      7. 父夹 total 含子夹，count 只算直属
+      8. 全部项目的数 = 各夹合计 + 未归类
+  [3] 归类
+      9. 上传时直接指定收藏夹
+     10. PATCH 把项目挪进 / 挪出收藏夹
+     11. 批量归类（bulk action=collection）
+     12. 按收藏夹筛选（含子夹）
+     13. collection=none 只出未归类
+  [4] 权限
+     14. 成员动不了别人的收藏夹
+     15. 成员的收藏夹里看不到别人的项目计数
+  [5] 删夹
+     16. 删空壳：子夹一起删，项目退回未归类
+     17. with_projects=1：项目连记录一起删
+
+用法: python tests/check_collections.py [--url http://127.0.0.1:8000] [--headed]
+"""
+import argparse
+import json
+import sys
+import time
+import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from smoke_test import FAIL, PASS, Client, check, multipart  # noqa: E402
+
+HTML = b"<!doctype html><meta charset=utf-8><h1>collections</h1>"
+
+
+def upload(c: Client, slug: str, title: str, collection=None):
+    fields = {"slug": slug, "title": title, "hours": "2", "allow_download": "1"}
+    if collection not in (None, ""):
+        fields["collection"] = str(collection)
+    body, ct = multipart(fields, [("files", "index.html", HTML)])
+    return c.req("POST", "/api/projects", body, ct=ct)
+
+
+def totals(c: Client) -> dict:
+    code, d = c.req("GET", "/api/projects?limit=1")
+    return d.get("total") if code == 200 else -1
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--url", default="http://127.0.0.1:8000")
+    ap.add_argument("--user", default="admin")
+    ap.add_argument("--password", default="admin123")
+    ap.add_argument("--headed", action="store_true")
+    args = ap.parse_args()
+
+    sfx = str(int(time.time()))[-5:]
+    admin = Client(args.url)
+    code, _ = admin.login(args.user, args.password)
+    check("管理员登录", code == 200)
+
+    made_colls: list[int] = []
+    made_slugs: list[str] = []
+    made_agents: list[str] = []
+
+    try:
+        print("[1] 建夹")
+        code, d = admin.req("POST", "/api/collections", {"name": f"办公{sfx}"})
+        root = d.get("collection") or {}
+        made_colls.append(root.get("id"))
+        check("新建一级收藏夹", code == 200 and root.get("name") == f"办公{sfx}", f"{code} {d}")
+        check("一级夹 parent_id 为空", root.get("parent_id") is None, root.get("parent_id"))
+
+        code, d = admin.req("POST", "/api/collections", {"name": f"办公{sfx}"})
+        check("同级重名 → 409", code == 409, f"{code} {d}")
+
+        code, d = admin.req("POST", "/api/collections", {"name": "   "})
+        check("空名 → 422", code == 422, f"{code} {d}")
+        code, d = admin.req("POST", "/api/collections", {"name": "很" * 21})
+        check("超过 20 个字 → 422", code == 422, f"{code} {d}")
+        code, d = admin.req("POST", "/api/collections", {"name": "很" * 20})
+        check("正好 20 个字可以", code == 200, f"{code} {d}")
+        if code == 200:
+            made_colls.append(d["collection"]["id"])
+
+        code, d = admin.req("POST", "/api/collections", {"name": f"报表{sfx}", "parent_id": root["id"]})
+        kid = d.get("collection") or {}
+        made_colls.append(kid.get("id"))
+        check("建子收藏夹", code == 200 and kid.get("parent_id") == root["id"], f"{code} {d}")
+
+        code, d = admin.req("POST", "/api/collections", {"name": f"更深{sfx}", "parent_id": kid["id"]})
+        check("第三级 → 422", code == 422, f"{code} {d}")
+
+        print("[2] 树与计数")
+        slug_a = f"col{sfx}-a"
+        slug_b = f"col{sfx}-b"
+        slug_c = f"col{sfx}-c"
+        code, d = upload(admin, slug_a, f"根夹项目{sfx}", root["id"])
+        made_slugs.append(slug_a)
+        check("上传时直接指定收藏夹", code == 200, f"{code} {d}")
+        check("项目带上了收藏夹名",
+              (d.get("collection") or {}).get("name") == f"办公{sfx}", d.get("collection"))
+        code, d = upload(admin, slug_b, f"子夹项目{sfx}", kid["id"])
+        made_slugs.append(slug_b)
+        check("项目可以挂在子夹上", code == 200, f"{code} {d}")
+        code, d = upload(admin, slug_c, f"未归类项目{sfx}")
+        made_slugs.append(slug_c)
+        check("不指定收藏夹 = 未归类", code == 200 and d.get("collection") is None, d.get("collection"))
+
+        code, tree = admin.req("GET", "/api/collections")
+        check("取收藏夹树", code == 200 and isinstance(tree.get("items"), list), code)
+        node = next((n for n in tree["items"] if n["id"] == root["id"]), None)
+        check("根节点在树里", node is not None, [n["id"] for n in tree["items"]])
+        check("根节点带 children", any(k["id"] == kid["id"] for k in node.get("children") or []),
+              node.get("children"))
+        check("父夹 total 含子夹（2）", node.get("total") == 2, node.get("total"))
+        check("父夹 count 只算直属（1）", node.get("count") == 1, node.get("count"))
+        check("未归类数 ≥ 1", tree.get("unassigned", 0) >= 1, tree.get("unassigned"))
+        roots_sum = sum(n["total"] for n in tree["items"])
+        check("total = 各夹合计 + 未归类",
+              tree.get("total") == roots_sum + tree.get("unassigned", 0),
+              f"{tree.get('total')} vs {roots_sum}+{tree.get('unassigned')}")
+        check("total 与项目列表总数一致", tree.get("total") == totals(admin),
+              f"{tree.get('total')} vs {totals(admin)}")
+
+        print("[3] 归类")
+        code, d = admin.req("PATCH", f"/api/projects/{slug_c}", {"collection_id": kid["id"]})
+        check("PATCH 把项目挪进子夹",
+              code == 200 and (d.get("collection") or {}).get("id") == kid["id"], f"{code} {d.get('collection')}")
+        code, d = admin.req("PATCH", f"/api/projects/{slug_c}", {"collection_id": None})
+        check("PATCH 挪回未归类", code == 200 and d.get("collection") is None, f"{code} {d.get('collection')}")
+        code, d = admin.req("PATCH", f"/api/projects/{slug_c}", {"collection_id": 999999})
+        check("挂到不存在的收藏夹 → 404", code == 404, f"{code} {d}")
+
+        code, d = admin.req("POST", "/api/projects/bulk",
+                            {"action": "collection", "slugs": [slug_c], "collection_id": kid["id"]})
+        check("批量归类", code == 200 and d.get("done") == 1, f"{code} {d}")
+        code, d = admin.req("GET", f"/api/projects/{slug_c}")
+        check("批量归类生效", (d.get("collection") or {}).get("id") == kid["id"], d.get("collection"))
+
+        code, d = admin.req("GET", f"/api/projects?collection={root['id']}")
+        got = {p["slug"] for p in d.get("items", [])}
+        check("按根夹筛选含子夹", got == {slug_a, slug_b, slug_c}, got)
+
+        code, d = admin.req("GET", f"/api/projects?collection={kid['id']}")
+        got = {p["slug"] for p in d.get("items", [])}
+        check("按子夹筛选只出子夹里的", got == {slug_b, slug_c}, got)
+
+        code, d = admin.req("GET", "/api/projects?collection=none")
+        got = {p["slug"] for p in d.get("items", [])}
+        check("collection=none 不含已归类的", slug_a not in got and slug_b not in got, len(got))
+        check("collection=none 里都是 collection 为空的",
+              all(p.get("collection") is None for p in d.get("items", [])), "")
+
+        print("[4] 权限")
+        agent_name = f"cb{suffix_short()}"
+        code, d = admin.req("POST", "/api/agents", {"username": agent_name, "display_name": "收藏夹测试"})
+        made_agents.append(agent_name)
+        check("建一个成员账号", code == 200, f"{code} {d}")
+        agent = Client(args.url)
+        agent.token = (d or {}).get("api_key") or ""
+
+        code, d = agent.req("PATCH", f"/api/collections/{root['id']}", {"name": f"抢{sfx}"})
+        check("成员改不了别人的收藏夹", code in (403, 404), f"{code} {d}")
+        code, d = agent.req("DELETE", f"/api/collections/{root['id']}")
+        check("成员删不了别人的收藏夹", code in (403, 404), f"{code} {d}")
+
+        code, d = agent.req("POST", "/api/collections", {"name": f"我的{sfx}"})
+        mine = d.get("collection") or {}
+        made_colls.append(mine.get("id"))
+        check("成员能建自己的收藏夹", code == 200, f"{code} {d}")
+        code, tree2 = agent.req("GET", "/api/collections")
+        ids = {n["id"] for n in tree2.get("items", [])}
+        check("成员只看到自己的收藏夹", root["id"] not in ids and mine.get("id") in ids, sorted(ids))
+        check("成员的未归类数不含别人的项目", tree2.get("unassigned", 0) == 0, tree2.get("unassigned"))
+
+        print("[5] 删夹")
+        code, d = admin.req("DELETE", f"/api/collections/{kid['id']}")
+        check("删子夹只删壳", code == 200 and d.get("removed") == 1, f"{code} {d}")
+        check("里面的项目退回未归类", d.get("moved_to_unassigned") == 2, d.get("moved_to_unassigned"))
+        code, d = admin.req("GET", f"/api/projects/{slug_b}")
+        check("项目本身还在", code == 200 and d.get("collection") is None, f"{code} {d.get('collection')}")
+
+        code, d = admin.req("DELETE", f"/api/collections/{root['id']}?with_projects=1")
+        check("with_projects=1 连项目一起删", code == 200 and d.get("deleted_projects") == 1, f"{code} {d}")
+        code, _ = admin.req("GET", f"/api/projects/{slug_a}")
+        check("项目记录真的没了", code == 404, code)
+        code, _ = admin.req("GET", f"/api/projects/{slug_b}")
+        check("没在夹里的项目不受影响", code == 200, code)
+
+        print("[6] 浏览器")
+        browser_suite(args.url.rstrip("/"), args.user, args.password, args.headed, sfx)
+    finally:
+        for cid in made_colls:
+            if cid:
+                admin.req("DELETE", f"/api/collections/{cid}?with_projects=1")
+        for s in made_slugs:
+            admin.req("DELETE", f"/api/projects/{s}")
+        for name in made_agents:
+            admin.req("DELETE", f"/api/agents/{name}")
+
+    print(f"\n{len(PASS)}/{len(PASS) + len(FAIL)} 通过")
+    if FAIL:
+        print("失败：")
+        for f in FAIL:
+            print("  -", f)
+        return 1
+    return 0
+
+
+def suffix_short() -> str:
+    return uuid.uuid4().hex[:5]
+
+
+def browser_suite(base: str, user: str, password: str, headed: bool, sfx: str) -> None:
+    """侧栏：新建 → 出现 → 点进去筛选 → 更多菜单里删除。"""
+    from playwright.sync_api import sync_playwright
+
+    name = f"考{sfx}"
+    with sync_playwright() as p:
+        b = p.chromium.launch(channel="chrome", headless=not headed)
+        pg = b.new_context(viewport={"width": 1440, "height": 900}).new_page()
+        errs = []
+
+        pg.goto(base + "/login", wait_until="domcontentloaded")
+        pg.fill('input[autocomplete="username"]', user)
+        pg.fill('input[type="password"]', password)
+        pg.click('button[type="submit"]')
+        pg.wait_for_url(lambda u: "/login" not in u, timeout=15000)
+
+        pg.on("pageerror", lambda e: errs.append(str(e)))
+        pg.on("console", lambda m: errs.append(m.text)
+              if m.type == "error" and "401" not in m.text else None)
+
+        pg.goto(base + "/", wait_until="domcontentloaded")
+        pg.wait_for_selector(".railrow", timeout=15000)
+        pg.wait_for_timeout(300)
+
+        print("[6.1] 侧栏新建")
+        pg.click(".railhead .railadd")
+        pg.wait_for_selector(".railedit .input", timeout=5000)
+        pg.fill(".railedit .input", name)
+        pg.keyboard.press("Enter")
+        pg.wait_for_selector(f".railrow:has-text('{name}')", timeout=8000)
+        check("新建后侧栏立刻出现", pg.locator(f".railrow:has-text('{name}')").count() >= 1)
+
+        row = pg.locator(f".railedit .input")
+        check("保存后输入框收起", row.count() == 0, row.count())
+
+        print("[6.2] 点一下筛选")
+        pg.locator(f".railrow:has-text('{name}')").first.click()
+        pg.wait_for_timeout(700)
+        check("选中后高亮", pg.eval_on_selector(".railrow.on", "el => el.innerText").find(name) >= 0,
+              pg.eval_on_selector(".railrow.on", "el => el.innerText"))
+        check("空夹筛出 0 条",
+              "共 0 条" in pg.inner_text("text=共 ").split("\n")[0]
+              or "共 0 条" in pg.locator("text=共 ").first.inner_text(),
+              pg.locator("text=共 ").first.inner_text())
+
+        print("[6.3] 更多菜单删除")
+        pg.locator(f".railrow:has-text('{name}')").first.hover()
+        pg.locator(f".railrow:has-text('{name}')").first.locator(".dots").click()
+        pg.wait_for_selector(".railmenu", timeout=5000)
+        pg.locator(".railmenu button.danger").first.click()
+        pg.wait_for_selector(".modal", timeout=5000)
+        pg.locator(".modal button", has_text="删除").last.click()
+        pg.wait_for_timeout(900)
+        check("确认后侧栏里消失", pg.locator(f".railrow:has-text('{name}')").count() == 0)
+
+        check("全程无 JS 报错", not errs, errs[:3])
+        b.close()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

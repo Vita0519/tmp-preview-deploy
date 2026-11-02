@@ -49,10 +49,11 @@ export const api = {
   login: (username, password) => request('/api/auth/login', { method: 'POST', body: { username, password } }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
 
-  upload(formData, onProgress) {
+  /** 任意 multipart 提交（上传项目、导入书签、恢复备份都用它） */
+  postForm(path, formData, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', '/api/projects')
+      xhr.open('POST', path)
       xhr.withCredentials = true
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
@@ -75,6 +76,10 @@ export const api = {
       xhr.onerror = () => reject(new ApiError('网络错误，上传中断', 0))
       xhr.send(formData)
     })
+  },
+
+  upload(formData, onProgress) {
+    return api.postForm('/api/projects', formData, onProgress)
   },
 }
 

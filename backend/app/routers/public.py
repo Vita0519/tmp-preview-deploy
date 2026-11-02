@@ -1,6 +1,7 @@
 """访客侧：项目文件直出、zip 下载、预览外壳、门户列表、RSS。"""
 import os
 from html import escape
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -240,6 +241,36 @@ async def download(slug: str, request: Request):
         path,
         media_type="application/zip",
         filename=filename,
+        headers={"Cache-Control": "no-store", **NOINDEX},
+    )
+
+
+@router.get("/download/{slug}/{rel:path}")
+async def download_single_file(slug: str, rel: str, request: Request):
+    """项目里的单个文件直接下载。
+
+    文件夹传上来就是一份能带走的文件集合：整包走 `/download/<slug>`，
+    单个文件走这里，不用再单独传一次 zip 或另建外链。
+    """
+    row = _load(slug)
+    user = resolve_user(request)
+    visible, expired = _public_state(row, user)
+    if not visible or expired:
+        return RedirectResponse(PORTAL_HOME, status_code=302)
+    if row["kind"] != "static":
+        return RedirectResponse(f"/download/{slug}", status_code=302)
+    if not row["allow_download"]:
+        return HTMLResponse(pages.error_page(403, "未开放下载", "该项目仅支持在线预览"), status_code=403)
+
+    target = storage.resolve_in_project(slug, rel)
+    if not target or not target.is_file():
+        return HTMLResponse(pages.error_page(404, "文件不存在", "这个路径下没有文件"), status_code=404)
+
+    views.bump_download(row["id"])
+    return FileResponse(
+        target,
+        media_type=storage.media_type(str(target)),
+        filename=Path(target).name,
         headers={"Cache-Control": "no-store", **NOINDEX},
     )
 

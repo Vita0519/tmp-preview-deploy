@@ -16,6 +16,7 @@
       4. 目录里残留多份时 find() 取最新那份
       5. save() 换格式后只留一份，且不会把刚写下去的新文件删掉
       6. unlink 全程失败时 save() 仍然「换图成功」（靠 mtime 兜底）
+      7. 上次删除留下的 .off 残骸不挡住这次删除（Windows rename 撞名会静默失败）
   [2] 浏览器（Playwright + Chrome）
       7. 页面上有隐藏的 file input（它就是按钮的命门）
       8. 点「上传图标」能弹出文件选择框
@@ -128,6 +129,22 @@ def unit_suite() -> None:
         check("目录里只剩一份", left == ["site-icon.svg"], left)
         check("find 指向 svg", (mod.find() or Path()).name == "site-icon.svg")
         check("内容完整", (tmp / "site-icon.svg").read_bytes() == SVG)
+
+        print("[6] 上一次留下的 .off 残骸不该挡住这次删除")
+        # 这正是一个真实现场：删除被拦 → 改名成 .off 留下来 → 下次再删时
+        # Windows 的 rename 撞到同名目标会 FileExistsError，删除就静默失效了
+        shutil.rmtree(tmp, ignore_errors=True)
+        tmp.mkdir(parents=True, exist_ok=True)
+        mod.save("a.png", PNG)
+        (tmp / "site-icon.png.off").write_bytes(PNG)
+        Path.unlink = make_blocker(SystemExit(1))
+        try:
+            ok = mod.remove()
+        finally:
+            Path.unlink = real_unlink
+        check("残骸挡路也认为已移除", ok is True, ok)
+        check("find() 看不到图标了", mod.find() is None, sorted(p.name for p in tmp.iterdir()))
+        check("payload 判定为内置", mod.payload()["custom"] is False)
     finally:
         Path.unlink = real_unlink
         shutil.rmtree(tmp, ignore_errors=True)
