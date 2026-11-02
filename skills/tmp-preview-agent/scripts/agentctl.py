@@ -721,6 +721,15 @@ def cmd_collections(args):
             for kid in node.get("children") or []:
                 lines.append(f"{kid['id']:>5}  {kid['count']:>4}  {kid['total']:>4}    └ {kid['name']}")
         lines.append(f"{'':>5}  {d.get('unassigned', 0):>4}  {'':>4}  （未归类）")
+        vis = d.get("visibility") or {}
+        if vis:
+            # 跟控制台侧栏那三个常驻分类同源：三档之和 = 上面的合计
+            lines.append("")
+            lines.append(
+                f"可见性：门户 {vis.get('portal', 0)} · 持链接 {vis.get('link', 0)}"
+                f" · 仅自己 {vis.get('private', 0)}"
+                f"（合计 {d.get('total', 0)}）"
+            )
         return emit(args, True, "collections.ls", d, human=lines)
 
     if act == "add":
