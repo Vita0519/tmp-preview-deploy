@@ -1,9 +1,9 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { api } from '../api'
-import { confirmAction, toast } from '../store'
+import { confirmAction, store, toast } from '../store'
 import { fmtBytes, fmtDate, fmtRemain, hoursLabel, relTime, typeLabel } from '../format'
-import { TAG_RULES, allowedText, checkOneTag } from '../tags'
+import { allowedText, checkOneTag } from '../tags'
 import { TITLE_RULE, fmtWidth, titleError, titleWidth } from '../namerule'
 import Icon from './Icon.vue'
 import Sparkline from './Sparkline.vue'
@@ -145,20 +145,20 @@ async function toggleExpireAction() {
   await patch({ expire_action: next }, next === 'delete' ? '到期将删除文件' : '到期将保留文件')
 }
 
-const tagFull = computed(() => (detail.value?.tags?.length || 0) >= TAG_RULES.max_per_project)
+const tagFull = computed(() => (detail.value?.tags?.length || 0) >= store.tagRules.max_per_project)
 
 async function addTag() {
   const raw = tagDraft.value.trim()
   if (!raw) return
-  const { tag, error } = checkOneTag(raw)
+  const { tag, error } = checkOneTag(raw, store.tagRules)
   if (error) return toast(error, 'err')
   const tags = detail.value.tags || []
   if (tags.includes(tag)) {
     tagDraft.value = ''
     return toast('这个标签已经有了', 'err')
   }
-  if (tags.length >= TAG_RULES.max_per_project) {
-    return toast(`每个项目最多 ${TAG_RULES.max_per_project} 个标签`, 'err')
+  if (tags.length >= store.tagRules.max_per_project) {
+    return toast(`每个项目最多 ${store.tagRules.max_per_project} 个标签`, 'err')
   }
   tagDraft.value = ''
   await patch({ tags: [...tags, tag] }, '标签已更新')
@@ -325,7 +325,7 @@ onMounted(async () => {
           <h4>
             标签
             <span class="dim" style="font-weight: 500; text-transform: none; letter-spacing: 0">
-              {{ (detail.tags || []).length }}/{{ TAG_RULES.max_per_project }}
+              {{ (detail.tags || []).length }}/{{ store.tagRules.max_per_project }}
             </span>
           </h4>
           <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center">
@@ -341,7 +341,7 @@ onMounted(async () => {
             <input
               v-model="tagDraft"
               class="input"
-              :maxlength="TAG_RULES.max_len"
+              :maxlength="store.tagRules.max_len"
               :disabled="tagFull"
               :placeholder="tagFull ? '已达上限' : '+ 添加标签'"
               style="width: 108px; height: 24px; font-size: 11.5px; padding: 0 8px"
@@ -349,7 +349,7 @@ onMounted(async () => {
             />
           </div>
           <div class="dim" style="font-size: 10.5px; margin-top: 6px; line-height: 1.5">
-            每个 ≤{{ TAG_RULES.max_len }} 字，只能用{{ allowedText }}；没有空格，全角自动转半角
+            每个 ≤{{ store.tagRules.max_len }} 字，只能用{{ allowedText }}；没有空格，全角自动转半角
           </div>
         </div>
 
