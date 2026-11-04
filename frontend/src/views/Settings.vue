@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { api } from '../api'
-import { confirmAction, store, toast } from '../store'
+import { applyTagRules, confirmAction, store, toast } from '../store'
 import { fmtBytes, relTime } from '../format'
 import { applyPalette, applySiteIcon, neutralOf, normalize, palette, previewSeries, readable } from '../theme'
 import Icon from '../components/Icon.vue'
@@ -270,6 +270,8 @@ async function save() {
       },
     })
     store.siteTitle = d.site_title || store.siteTitle
+    // 标签上限刚被改过，前端那份运行时规则得跟着变，不然别处还按旧数字提示
+    applyTagRules(d.tags)
     toast('设置已保存')
     load()
   } catch (e) {

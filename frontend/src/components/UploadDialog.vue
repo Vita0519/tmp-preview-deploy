@@ -1,9 +1,9 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '../api'
-import { toast } from '../store'
+import { store, toast } from '../store'
 import { fmtBytes, hoursLabel } from '../format'
-import { TAG_RULES, allowedText, checkTags } from '../tags'
+import { allowedText, checkTags } from '../tags'
 import { TITLE_RULE, clampTitle, fmtWidth, titleError, titleWidth } from '../namerule'
 import Icon from './Icon.vue'
 
@@ -34,11 +34,20 @@ const dragOver = ref(false)
 const uploading = ref(false)
 const progress = ref(0)
 const error = ref('')
+// 存活时长/到期动作这些一次性的选项收在「高级」里，首屏留给名字和分类
+const advOpen = ref(false)
+const advEl = ref(null)
+
+function toggleAdv() {
+  advOpen.value = !advOpen.value
+  // 弹窗内容比视口高，展开后高级区往往落在折叠线以下，滚过去免得只露个边
+  if (advOpen.value) nextTick(() => advEl.value?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+}
 
 const totalSize = computed(() => picked.value.reduce((s, p) => s + p.file.size, 0))
 
 // 标签边填边校验：不合规直接在弹窗里说清楚，别等提交才被打回
-const tagCheck = computed(() => checkTags(form.value.tags))
+const tagCheck = computed(() => checkTags(form.value.tags, store.tagRules))
 
 // 项目名按显示宽度算：10 个中文字符 ≈ 20 个英文字符，超了在失焦时自动截短
 const titleW = computed(() => titleWidth(form.value.title))
@@ -73,6 +82,11 @@ const effectiveTTL = computed(() => {
   if (form.value.forever) return '永久'
   return form.value.hours === '' ? ttlLabel() : hoursLabel(Number(form.value.hours))
 })
+
+// 高级区收起时也要能一眼看到将按什么规则创建
+const advSummary = computed(
+  () => `${effectiveTTL.value} · ${form.value.expire_action === 'delete' ? '到期删除文件' : '到期停止访问'}`
+)
 
 onMounted(async () => {
   window.addEventListener('keydown', onKey, true)
@@ -234,7 +248,7 @@ async function submitLink() {
     </div>
 
     <div class="modal-body">
-      <div class="seg" style="margin-bottom: 14px">
+      <div class="seg" style="margin-bottom: 12px">
         <button :class="{ on: mode === 'files' }" @click="mode = 'files'">文件 / 文件夹</button>
         <button :class="{ on: mode === 'zip' }" @click="mode = 'zip'">ZIP 压缩包</button>
         <button :class="{ on: mode === 'link' }" @click="mode = 'link'">外部链接</button>
@@ -311,13 +325,13 @@ async function submitLink() {
               超了，提交时会自动截短
             </span>
             <span v-else class="hint">
-              最多 {{ TITLE_RULE.max_cjk }} 个中文字符（约 {{ TITLE_RULE.max_narrow }} 个英文字符）；同名不能重复
+              ≤{{ TITLE_RULE.max_cjk }} 中文 / {{ TITLE_RULE.max_narrow }} 英文，同名不可重复
             </span>
           </div>
           <div class="frow">
             <label>Slug</label>
             <input v-model="form.slug" class="input" placeholder="留空自动生成" />
-            <span class="hint">同一个 slug 再传一次 = 覆盖更新</span>
+            <span class="hint">同名再传一次 = 覆盖更新</span>
           </div>
         </div>
 
@@ -338,7 +352,7 @@ async function submitLink() {
         <div class="frow">
           <label>
             标签
-            <span class="dim" style="font-weight: 500">（{{ tagCheck.tags.length }}/{{ TAG_RULES.max_per_project }}）</span>
+            <span class="dim" style="font-weight: 500">（{{ tagCheck.tags.length }}/{{ store.tagRules.max_per_project }}）</span>
           </label>
           <input v-model="form.tags" class="input" placeholder="逗号分隔，例如：前端, 验收, v2" />
           <div v-if="tagCheck.tags.length" class="tagprev">
@@ -346,7 +360,7 @@ async function submitLink() {
           </div>
           <span v-if="tagCheck.error" class="hint" style="color: var(--danger)">{{ tagCheck.error }}</span>
           <span v-else class="hint">
-            最多 {{ TAG_RULES.max_per_project }} 个、每个 ≤{{ TAG_RULES.max_len }} 字，只能用{{ allowedText }}；英文自动转小写
+            最多 {{ store.tagRules.max_per_project }} 个、每个 ≤{{ store.tagRules.max_len }} 字，只能用{{ allowedText }}；英文自动转小写
           </span>
         </div>
 
@@ -368,33 +382,56 @@ async function submitLink() {
           </span>
         </div>
 
-        <div class="frow">
-          <label>存活时长</label>
-          <select v-model="form.hours" class="input" :disabled="form.forever">
-            <option value="">跟随可见性默认（{{ ttlLabel() }}）</option>
-            <option value="1">1 小时</option>
-            <option value="6">6 小时</option>
-            <option value="12">12 小时</option>
-            <option value="24">24 小时</option>
-            <option value="72">3 天</option>
-            <option value="168">7 天</option>
-            <option value="720">30 天</option>
-          </select>
-          <span class="hint">本次将创建为：{{ effectiveTTL }}</span>
-        </div>
+        <div ref="advEl" class="adv" :class="{ open: advOpen }">
+          <button type="button" class="advhead" @click="toggleAdv">
+            <Icon name="sliders" :size="13" />
+            <span>高级设置</span>
+            <span class="advsum">{{ advSummary }}</span>
+            <Icon name="chevron" :size="13" class="advcaret" />
+          </button>
 
-        <label class="check">
-          <input v-model="form.forever" type="checkbox" /> 永久保存（不自动到期）
-        </label>
-        <label class="check">
-          <input v-model="form.allow_download" type="checkbox" /> 允许下载（整包 zip + 单个文件）
-        </label>
+          <div v-if="advOpen" class="advbody">
+            <div class="frow">
+              <label>存活时长</label>
+              <select v-model="form.hours" class="input" :disabled="form.forever">
+                <option value="">跟随可见性默认（{{ ttlLabel() }}）</option>
+                <option value="1">1 小时</option>
+                <option value="6">6 小时</option>
+                <option value="12">12 小时</option>
+                <option value="24">24 小时</option>
+                <option value="72">3 天</option>
+                <option value="168">7 天</option>
+                <option value="720">30 天</option>
+              </select>
+              <span class="hint">本次将创建为：{{ effectiveTTL }}</span>
+            </div>
 
-        <div class="frow">
-          <label>到期后</label>
-          <div class="seg" style="width: fit-content">
-            <button :class="{ on: form.expire_action === 'block' }" @click="form.expire_action = 'block'">停止访问</button>
-            <button :class="{ on: form.expire_action === 'delete' }" @click="form.expire_action = 'delete'">删除文件</button>
+            <div class="checkrow">
+              <label class="check">
+                <input v-model="form.forever" type="checkbox" /> 永久保存（不自动到期）
+              </label>
+              <label class="check">
+                <input v-model="form.allow_download" type="checkbox" /> 允许下载（整包 zip + 单个文件）
+              </label>
+            </div>
+
+            <div class="frow">
+              <label>到期后</label>
+              <div class="seg" style="width: fit-content">
+                <button
+                  :class="{ on: form.expire_action === 'block' }"
+                  @click="form.expire_action = 'block'"
+                >
+                  停止访问
+                </button>
+                <button
+                  :class="{ on: form.expire_action === 'delete' }"
+                  @click="form.expire_action = 'delete'"
+                >
+                  删除文件
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
