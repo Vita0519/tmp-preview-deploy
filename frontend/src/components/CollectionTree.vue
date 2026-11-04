@@ -146,11 +146,11 @@ function countOf(node) {
       <div
         v-for="v in VIS_ROWS"
         :key="v.key"
-        class="railrow"
-        :class="{ on: !active && visibility === v.key }"
+        class="railrow vis"
+        :class="{ on: visibility === v.key }"
         role="button"
         tabindex="0"
-        :title="`只看${v.label}的项目`"
+        :title="`在当前分类里只看${v.label}的项目`"
         @click="pick('vis:' + v.key)"
         @keydown.enter="pick('vis:' + v.key)"
       >
