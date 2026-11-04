@@ -222,9 +222,6 @@ p { margin: 0; }
 }
 .railrow:hover { background: var(--surface-3); }
 .railrow.on { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
-/* 可见性三档是叠加在当前分类之上的过滤条件，会跟收藏夹同时选中，
-   所以用描边而不是实心底，区分「所在位置」和「再加的过滤」 */
-.railrow.vis.on { background: transparent; box-shadow: inset 0 0 0 1px var(--brand-line); }
 .railrow .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .railrow .n { font-size: 10.5px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
 .railrow.on .n { color: var(--brand); }
