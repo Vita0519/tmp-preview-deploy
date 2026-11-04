@@ -53,6 +53,16 @@ const maxTagCount = computed(() =>
 )
 const tagsForBar = computed(() => (data.facets.tags || []).slice(0, 10))
 
+// 窄屏侧栏收起后，收藏夹（含「未归类」）只能靠工具栏这个下拉筛
+const collectionOptions = computed(() => {
+  const out = []
+  for (const n of colTree.value.items || []) {
+    out.push({ id: n.id, label: n.name })
+    for (const k of n.children || []) out.push({ id: k.id, label: `└ ${k.name}` })
+  }
+  return out
+})
+
 const saved = (() => {
   try {
     return JSON.parse(localStorage.getItem('pv_filters') || '{}')
@@ -376,10 +386,10 @@ onBeforeUnmount(() => {
         <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
       </div>
 
-      <!-- 窄屏时收藏夹侧栏会收起来，可见性筛选得有个落脚的地方 -->
+      <!-- 可见性筛选常驻：侧栏的分类是主入口，但窄屏侧栏会收起，工具栏不能没有 -->
       <select
         v-model="filters.visibility"
-        class="field visfallback"
+        class="field"
         style="min-width: 112px"
         title="按可见性筛选"
         @change="filters.collection = ''"
@@ -388,6 +398,21 @@ onBeforeUnmount(() => {
         <option value="portal">门户可见</option>
         <option value="link">持链接可见</option>
         <option value="private">仅自己可见</option>
+      </select>
+
+      <!-- 归类筛选：宽屏走左侧收藏夹栏，窄屏只剩这里，「未归类」得能一键筛出来 -->
+      <select
+        v-model="filters.collection"
+        class="field colfallback"
+        style="min-width: 118px"
+        title="按收藏夹筛选"
+        @change="filters.visibility = ''"
+      >
+        <option value="">全部归类</option>
+        <option value="none">未归类</option>
+        <option v-for="c in collectionOptions" :key="c.id" :value="String(c.id)">
+          {{ c.label }}
+        </option>
       </select>
 
       <select v-model="filters.status" class="field" style="min-width: 104px">

@@ -190,7 +190,9 @@ def run(args, slugs, portal_before):
         wrap = pg.eval_on_selector("#tagsbar", "e => getComputedStyle(e).flexWrap")
         check("标签条不换行", wrap == "nowrap", wrap)
         scrollable = pg.eval_on_selector("#tagsbar", "e => e.scrollWidth - e.clientWidth")
-        check("标签多于一行时可横滑", scrollable > 0 or pg.locator("#tagsbar button").count() <= 10,
+        check("标签多于一行时可横滑或折成「还有 N 个」",
+              scrollable > 0 or pg.locator("#tagsbar button.tmore").count() == 1
+              or pg.locator("#tagsbar button").count() <= 10,
               f"overflow={scrollable}px chips={pg.locator('#tagsbar button').count()}")
         if scrollable > 0:
             check("右侧有渐隐提示", "fade-r" in (pg.get_attribute("#tagsbar", "class") or ""),

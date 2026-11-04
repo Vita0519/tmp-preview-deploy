@@ -392,13 +392,41 @@ def log_event(action: str, user_id: int | None = None, project_id: int | None = 
         pass
 
 
+def tag_cap(conn: sqlite3.Connection | None = None) -> int:
+    """每个项目最多几个标签。管理员可在设置里调小（1–6），没配就按默认 6。"""
+    sql = "SELECT value FROM settings WHERE key='tag_max_per_project'"
+    try:
+        if conn is not None:
+            row = conn.execute(sql).fetchone()
+        else:
+            with db() as c:
+                row = c.execute(sql).fetchone()
+        return tagspec.clamp_max_tags(row["value"] if row else None)
+    except sqlite3.Error:
+        return tagspec.MAX_TAGS
+
+
+def tag_bar_limit(conn: sqlite3.Connection | None = None) -> int:
+    """门户标签条最多显示几个标签（0 = 全部）。项目一多标签就能排一长条，默认收着点。"""
+    sql = "SELECT value FROM settings WHERE key='tag_bar_limit'"
+    try:
+        if conn is not None:
+            row = conn.execute(sql).fetchone()
+        else:
+            with db() as c:
+                row = c.execute(sql).fetchone()
+        return tagspec.clamp_bar_limit(row["value"] if row else None)
+    except sqlite3.Error:
+        return 12
+
+
 def set_tags(conn: sqlite3.Connection, project_id: int, names: list[str]) -> None:
     """写项目的标签。规则在 tagspec 里（数量/长度/字符/归一化），这里只落库。
 
     池子上限也在这里把：调用方可能已经校验过单项目规则，但「全站不能无限长」必须
     看着库里的现状才好判断，放在唯一的写入口最省心。
     """
-    clean = tagspec.clean(names)
+    clean = tagspec.clean(names, max_tags=tag_cap(conn))
     existing = {r["name"] for r in conn.execute("SELECT name FROM tags").fetchall()}
     fresh = [n for n in clean if n not in existing]
     if len(existing) + len(fresh) > tagspec.POOL_MAX:

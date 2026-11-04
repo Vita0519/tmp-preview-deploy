@@ -160,7 +160,7 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
 | GET | `/api/settings` | 🛡 | 站点配置 + `ttl_defaults` + `theme` + `site_icon` + `author` + `author_types` + 运行信息 + 最近操作 |
-| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_series, theme_accent, author}` |
+| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_series, theme_accent, tag_max_per_project, tag_bar_limit, author}` |
 | POST | `/api/settings/icon` | 🛡 | `multipart/form-data` 上传站点图标，字段名 `file`；同时间只留一份 |
 | DELETE | `/api/settings/icon` | 🛡 | 删除自定义图标，回到内置沙漏图标 |
 | POST | `/api/settings/tags/prune` | 🛡 | 清理没有任何项目在用的标签，返回剩余占用 |
@@ -214,7 +214,7 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 
 | 项 | 规则 | 违规返回 |
 |---|---|---|
-| 每个项目数量 | ≤ 6 个 | `每个项目最多 6 个标签，你填了 8 个` |
+| 每个项目数量 | ≤ 6 个（**设置里可调到 1–6**） | `每个项目最多 3 个标签，你填了 8 个` |
 | 单个长度 | 1–12 字（中文按 1 字） | `标签「xxx」太长了：最多 12 个字` |
 | 允许字符 | 中英文、数字与 `+ # . - _`（不许空格） | `标签「数据/分析」含有不允许的字符…` |
 | 分隔符 | `,` `，` `、` `;` `；` 空白 | — |
@@ -224,7 +224,20 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 写入入口只有 `db.set_tags()` 一处：`POST /api/projects`、`POST /api/projects/link`、
 `PATCH /api/projects/{slug}`、`POST /api/projects/bulk`（`tag_add`）都走它。
 没人引用的标签会自动回收（改标签、删项目、到期清理时），所以池子不会越用越脏。
-批量 `tag_add` 是「合并」语义：已有标签在前，新标签塞到 6 个为止，塞不下的项目计入返回的 `trimmed`。
+批量 `tag_add` 是「合并」语义：已有标签在前，新标签塞到上限为止，塞不下的项目计入返回的 `trimmed`。
+
+两条软限制在设置页能改，都走 `PATCH /api/settings`：
+
+| 字段 | 默认 | 范围 | 作用 |
+|---|---|---|---|
+| `tag_max_per_project` | 6 | 1–6 | 每个项目最多几个标签；越界值会被夹到合法区间 |
+| `tag_bar_limit` | 12 | `0` 或 4–40 | 门户标签条放几个标签；`0` = 全部（仍以 40 封顶） |
+
+`GET /api/settings` 与 `GET /api/meta` 的 `tags` 字段会带上生效值
+（`max_per_project`、`max_per_project_cap`、`bar_limit`、`bar_limit_max`）。门户标签条按
+**被引用次数从多到少**取前 `tag_bar_limit` 个，同频按首次出现顺序，被折叠的用「还有 N 个」
+占位（无点击行为，鼠标悬停提示去设置里放宽）；如果当前筛选的标签不在前 N 个里，会强制顶到条上，
+避免出现「筛选中却看不到选中项」。
 
 **到期删除的视觉标记**
 
