@@ -138,19 +138,21 @@ function onCollectionPicked(key) {
   // 赋值本身会触发下面的 watch（重置到第 1 页并重新拉取），不用手动 load
   const k = String(key)
   if (k === '') {
-    // 「全部项目」= 回到无筛选
     filters.collection = ''
     filters.visibility = ''
     return
   }
   if (k.startsWith('vis:')) {
-    // 三档可见性是叠加在当前位置上的过滤：只收窄可见性，收藏夹不动，
-    // 这样「未归类里只看私有的」这类组合点得出来。再点一次同一档就取消。
+    // 三档可见性是「跳出收藏夹」的权限维度：选中它就脱离当前收藏夹，看全站这一档。
+    // 所以跟收藏夹互斥——同一时间只能站在一个维度上。再点一次同一档 = 回到全部。
     const v = k.slice(4)
     filters.visibility = filters.visibility === v ? '' : v
+    filters.collection = ''
     return
   }
+  // 选收藏夹就离开可见性维度，回到「这个夹里的全部项目」
   filters.collection = k
+  filters.visibility = ''
 }
 
 function onCollectionsChanged() {
@@ -398,12 +400,13 @@ onBeforeUnmount(() => {
         <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
       </div>
 
-      <!-- 可见性筛选：在「当前收藏夹 / 分类」的基础上再收窄，不改变收藏夹选择 -->
+      <!-- 可见性筛选：跟分类同一维度，选了它就跳出收藏夹，看全站这一档 -->
       <select
         v-model="filters.visibility"
         class="field"
         style="min-width: 112px"
-        title="按可见性筛选（在当前收藏夹范围内）"
+        title="按可见性筛选（会跳出当前收藏夹）"
+        @change="filters.collection = ''"
       >
         <option value="">全部可见性</option>
         <option value="portal">门户可见</option>
@@ -417,6 +420,7 @@ onBeforeUnmount(() => {
         class="field colfallback"
         style="min-width: 118px"
         title="按收藏夹筛选"
+        @change="filters.visibility = ''"
       >
         <option value="">全部归类</option>
         <option value="none">未归类</option>

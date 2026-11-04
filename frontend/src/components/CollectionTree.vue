@@ -147,10 +147,10 @@ function countOf(node) {
         v-for="v in VIS_ROWS"
         :key="v.key"
         class="railrow vis"
-        :class="{ on: visibility === v.key }"
+        :class="{ on: !active && visibility === v.key }"
         role="button"
         tabindex="0"
-        :title="`在当前分类里只看${v.label}的项目（右侧数字是全站该档的总数）`"
+        :title="`跳出收藏夹，看全站${v.label}的项目`"
         @click="pick('vis:' + v.key)"
         @keydown.enter="pick('vis:' + v.key)"
       >
