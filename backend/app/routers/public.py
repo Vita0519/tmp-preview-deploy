@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from .. import author, branding, config, defaults, namerule, pages, storage, tagspec, theme, views
-from ..db import db, get_setting
+from ..db import db, get_setting, tag_bar_limit, tag_cap
 from ..security import now_ms, resolve_user
 
 router = APIRouter(tags=["public"])
@@ -338,6 +338,7 @@ def portal(request: Request):
             author.load(),
             theme.current(),
             truncated=max(0, total_public - len(items)),
+            tag_limit=tag_bar_limit(),
         ),
         headers=NOINDEX,
     )
@@ -497,7 +498,7 @@ def meta():
         # 控制台首屏就要上色，不能等设置页接口
         "theme": theme.palette(theme.current()),
         "site_icon": _icon_info(),
-        "tags": tagspec.rules(),
+        "tags": tagspec.rules(max_per_project=tag_cap(), bar_limit=tag_bar_limit()),
         "title_rule": namerule.rules(),
         "rss": "/rss.xml",
     }

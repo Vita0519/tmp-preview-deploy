@@ -126,6 +126,8 @@ const form = reactive({
   default_expire_action: 'block',
   public_portal: false,
   author: { name: '', bio: '', links: [] },
+  tag_max: 6,
+  tag_bar: 12,
 })
 
 const authorTypes = ref([
@@ -209,6 +211,8 @@ async function load() {
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
     if (d.site_icon) siteIcon.value = d.site_icon
+    form.tag_max = d.tags?.max_per_project ?? 6
+    form.tag_bar = d.tags?.bar_limit ?? 12
     const th = d.theme || {}
     seriesList.value = Array.isArray(th.series_list) ? th.series_list : []
     seriesKey.value = th.series || 'classic'
@@ -257,6 +261,8 @@ async function save() {
       // 系列决定中性色画布，主色可以在此基础上手改（custom）
       theme_series: seriesKey.value,
       theme_accent: accent.value,
+      tag_max_per_project: Number(form.tag_max) || 6,
+      tag_bar_limit: Number(form.tag_bar) || 0,
       author: {
         name: form.author.name,
         bio: form.author.bio,
@@ -385,8 +391,11 @@ const tagInfo = computed(
   () =>
     data.value?.tags || {
       max_per_project: 6,
+      max_per_project_cap: 6,
       max_len: 12,
       pool_max: 300,
+      bar_limit: 12,
+      bar_limit_max: 40,
       used: 0,
       orphans: 0,
       tagged_projects: 0,
@@ -394,6 +403,8 @@ const tagInfo = computed(
       separators: ', ， 、 ; ； 和空格',
     }
 )
+// 标签条显示数量：0 = 全部（服务端还会按 bar_limit_max 封顶）
+const BAR_OPTS = [8, 12, 16, 24, 0]
 const tagPct = computed(() =>
   Math.min(100, Math.round((tagInfo.value.used / Math.max(1, tagInfo.value.pool_max)) * 100))
 )
@@ -419,6 +430,8 @@ const state = computed(() =>
     ac: accent.value,
     se: seriesKey.value,
     au: form.author,
+    tm: form.tag_max,
+    tb: form.tag_bar,
   })
 )
 const dirty = computed(() => !!snap.value && state.value !== snap.value)
@@ -675,6 +688,33 @@ onUnmounted(() => {
                   <i></i><span>分隔符支持 <b>{{ tagInfo.separators }}</b>，超额或非法字符会直接提示，不会静默截断</span>
                 </li>
               </ul>
+            </div>
+
+            <div class="frow">
+              <label>限制</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 16px 20px; align-items: center">
+                <label style="display: flex; align-items: center; gap: 7px; font-size: 13px">
+                  每个项目最多
+                  <select v-model.number="form.tag_max" class="field" style="width: 74px">
+                    <option v-for="n in tagInfo.max_per_project_cap || 6" :key="n" :value="n">
+                      {{ n }}
+                    </option>
+                  </select>
+                  个标签
+                </label>
+                <label style="display: flex; align-items: center; gap: 7px; font-size: 13px">
+                  门户标签条最多显示
+                  <select v-model.number="form.tag_bar" class="field" style="width: 96px">
+                    <option v-for="n in BAR_OPTS" :key="n" :value="n">
+                      {{ n === 0 ? '全部' : n + ' 个' }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <span class="hint">
+                标签条按被引用的次数从多到少排，只放常用的前几个，剩下的折成「还有 N 个」；
+                选「全部」则不限制（最多 {{ tagInfo.bar_limit_max || 40 }} 个）。调小后新建项目时超出直接提示，不会静默截断
+              </span>
             </div>
 
             <div class="frow">

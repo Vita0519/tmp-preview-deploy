@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from .. import collections as colls, config, defaults, namerule, storage, tagspec, views
-from ..db import db, get_setting, log_event, set_tags, tx
+from ..db import db, get_setting, log_event, set_tags, tag_cap, tx
 from ..security import current_user, now_ms, publisher_user
 from ..serializers import PROJECT_SELECT, project_dict
 
@@ -83,7 +83,7 @@ def _scope_clause(user: dict) -> tuple[str, list]:
 
 def _parse_tags(raw) -> list[str]:
     """标签一律过 tagspec：归一化 + 字符/长度/数量校验，不合规抛 TagError（→422）。"""
-    return tagspec.clean(raw)
+    return tagspec.clean(raw, max_tags=tag_cap())
 
 
 def _hours_to_expiry(hours) -> int | None:
@@ -738,6 +738,7 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
             # 批量打标签是「合并」：已有标签在前，新标签能塞几个塞几个，
             # 塞不下的记一笔 trimmed，而不是让整批因为某一个项目爆掉。
             names = _parse_tags(body.get("tags"))
+            cap = tag_cap()
             with db() as conn:
                 have = [
                     r["name"]
@@ -748,9 +749,9 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
                     ).fetchall()
                 ]
                 merged = have + [n for n in names if n not in have]
-                if len(merged) > tagspec.MAX_TAGS:
+                if len(merged) > cap:
                     trimmed += 1
-                    merged = merged[: tagspec.MAX_TAGS]
+                    merged = merged[:cap]
                 set_tags(conn, row["id"], merged)
         else:
             raise HTTPException(status_code=400, detail="未知操作")

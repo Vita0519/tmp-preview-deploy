@@ -22,9 +22,10 @@ import re
 import unicodedata
 
 # ---- 规则常量（前端通过 /api/settings 的 tags 字段拿到同一份） ----
-MAX_TAGS = 6          # 每个项目最多几个标签
+MAX_TAGS = 6          # 每个项目最多几个标签（硬上限；设置页可往小调）
 MAX_LEN = 12          # 单个标签最多几个字符（中文按 1 个算）
 POOL_MAX = 300        # 全站不同标签总数上限
+BAR_MAX = 40          # 门户标签条最多显示几个（0 = 全部，硬上限就是它）
 
 # 分隔符：半角/全角逗号、顿号、分号、空白
 SEP = re.compile(r"[,，、;；\s]+")
@@ -62,11 +63,13 @@ def why_bad(name: str) -> str | None:
     return None
 
 
-def clean(raw: object, *, limit: bool = True) -> list[str]:
+def clean(raw: object, *, limit: bool = True, max_tags: int | None = None) -> list[str]:
     """校验 + 归一化 + 去重，返回可以直接入库的标签列表。
 
     不合规抛 TagError（消息面向使用者，可直接展示）。
+    `max_tags` 由调用方从设置里取（管理员可以调低到 1–6），不传就用默认 6。
     """
+    cap = MAX_TAGS if max_tags is None else clamp_max_tags(max_tags)
     out: list[str] = []
     for name in split(raw):
         if name in out:
@@ -75,17 +78,40 @@ def clean(raw: object, *, limit: bool = True) -> list[str]:
         if bad:
             raise TagError(bad)
         out.append(name)
-    if limit and len(out) > MAX_TAGS:
-        raise TagError(f"每个项目最多 {MAX_TAGS} 个标签，你填了 {len(out)} 个")
+    if limit and len(out) > cap:
+        raise TagError(f"每个项目最多 {cap} 个标签，你填了 {len(out)} 个")
     return out
 
 
-def rules() -> dict:
+def clamp_max_tags(raw: object) -> int:
+    """把设置里的值收进 1–MAX_TAGS；空值或垃圾值回落到默认。"""
+    try:
+        n = int(float(str(raw).strip()))
+    except (TypeError, ValueError):
+        return MAX_TAGS
+    return max(1, min(MAX_TAGS, n))
+
+
+def clamp_bar_limit(raw: object) -> int:
+    """门户标签条显示数量：0（全部）或 4–BAR_MAX。"""
+    try:
+        n = int(float(str(raw).strip()))
+    except (TypeError, ValueError):
+        return 12
+    if n <= 0:
+        return 0
+    return max(4, min(BAR_MAX, n))
+
+
+def rules(max_per_project: int | None = None, bar_limit: int | None = None) -> dict:
     """给前端 / 文档用的规则说明。"""
     return {
-        "max_per_project": MAX_TAGS,
+        "max_per_project": MAX_TAGS if max_per_project is None else clamp_max_tags(max_per_project),
+        "max_per_project_cap": MAX_TAGS,
         "max_len": MAX_LEN,
         "pool_max": POOL_MAX,
+        "bar_limit": 12 if bar_limit is None else clamp_bar_limit(bar_limit),
+        "bar_limit_max": BAR_MAX,
         "allowed": "中英文、数字与 + # . - _",
         "separators": ", ， 、 ; ； 和空格",
         "note": "全角自动转半角、英文统一小写，重名标签会合并",

@@ -2,7 +2,15 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from .. import author, branding, config, defaults, tagspec, theme
-from ..db import all_settings, db, get_setting, log_event, set_setting
+from ..db import (
+    all_settings,
+    db,
+    get_setting,
+    log_event,
+    set_setting,
+    tag_bar_limit,
+    tag_cap,
+)
 from ..pages import ICONS
 from ..security import admin_user
 
@@ -101,6 +109,12 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         set_setting("theme_accent", theme.normalize(payload["theme_accent"]))
         theme.reset_cache()
 
+    # 标签的两条软限制：每个项目能打几个、门户标签条放几个
+    if "tag_max_per_project" in payload:
+        set_setting("tag_max_per_project", str(tagspec.clamp_max_tags(payload["tag_max_per_project"])))
+    if "tag_bar_limit" in payload:
+        set_setting("tag_bar_limit", str(tagspec.clamp_bar_limit(payload["tag_bar_limit"])))
+
     return {
         "ok": True,
         "site_title": get_setting("site_title") or config.SITE_TITLE,
@@ -123,7 +137,9 @@ def _tags_payload() -> dict:
     """标签规则 + 当前占用，设置页据此显示「已用 42 / 300」。"""
     with db() as conn:
         usage = tagspec.pool_usage(conn)
-    return {**tagspec.rules(), **usage}
+        cap = tag_cap(conn)
+        bar = tag_bar_limit(conn)
+    return {**tagspec.rules(max_per_project=cap, bar_limit=bar), **usage}
 
 
 @router.post("/tags/prune")

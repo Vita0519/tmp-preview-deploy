@@ -273,13 +273,14 @@ p { margin: 0; }
 .railkids { display: flex; flex-direction: column; gap: 1px; }
 .railmenu.kidmenu { margin-left: 20px; }
 
-.visfallback { display: none; }
+/* 归类下拉：宽屏用左侧收藏夹栏就够了，窄屏（侧栏隐藏）才需要它兜底 */
+.colfallback { display: none; }
 
 @media (max-width: 1120px) {
   .withrail { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
-  /* 侧栏收起后，可见性筛选改由工具栏下拉兜底 */
-  .visfallback { display: inline-flex; }
+  /* 侧栏收起后，收藏夹 / 未归类的筛选改由工具栏下拉接管 */
+  .colfallback { display: inline-flex; }
 }
 
 

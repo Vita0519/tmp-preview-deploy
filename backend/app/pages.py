@@ -363,6 +363,9 @@ cursor:pointer;transition:.16s;white-space:nowrap}
 .tagsbar button.tball{background:#fff;border-color:rgba(var(--ink-rgb),.12);color:var(--ink-2,#5b636d);padding:0 9px}
 .tagsbar button.tball:hover{background:var(--surface-3,#f4f6f4);color:var(--ink,#14161a)}
 .tagsbar button.tball.on{background:var(--brand-soft);border-color:rgba(var(--brand-rgb),.34);color:var(--brand)}
+.tagsbar button.tmore{background:transparent;border:1px dashed rgba(var(--ink-rgb),.2);
+color:var(--ink-3,#8a9099);cursor:help}
+.tagsbar button.tmore:hover{background:transparent;color:var(--ink-3,#8a9099)}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch;
 padding-top:14px;margin-bottom:18px}
 .grid[hidden]{display:none}
@@ -755,12 +758,27 @@ PORTAL_JS = """
     tb.classList.toggle('fade-r', more && tb.scrollLeft+tb.clientWidth<tb.scrollWidth-2);
   }
   if(tb){
-    var seen={}, order=[];
+    var BAR_LIMIT=__TAGBAR__;
+    var tagCount={}, order=[];
     cards.forEach(function(c){
       (c.dataset.tags||'').split('|').forEach(function(t){
-        if(t&&!seen[t]){ seen[t]=1; order.push(t); }
+        if(!t) return;
+        if(tagCount[t]===undefined){ tagCount[t]=0; order.push(t); }
+        tagCount[t]++;
       });
     });
+    // 标签条只放「最常用」的前 N 个：项目一多，末尾那些标签基本没人点，还白占一整行。
+    // 同频按首次出现顺序（order 的下标）排，保证每次刷新位置稳定。
+    var shown=order.slice().sort(function(a,b){
+      return (tagCount[b]-tagCount[a]) || (order.indexOf(a)-order.indexOf(b));
+    });
+    var hiddenTags=0;
+    if(BAR_LIMIT>0 && shown.length>BAR_LIMIT){
+      hiddenTags=shown.length-BAR_LIMIT;
+      shown=shown.slice(0,BAR_LIMIT);
+      // 正在筛的那个标签必须留在条上，不然会出现「筛选中却看不到选中项」
+      if(state.tag && shown.indexOf(state.tag)<0){ shown[shown.length-1]=state.tag; }
+    }
     function chip(text, val, cls){
       var b=document.createElement('button');
       b.type='button';
@@ -778,7 +796,15 @@ PORTAL_JS = """
     }
     // 头部固定一个「全部」：标签多了横滑到右边时，清空筛选不用往回滑
     chip('全部','','tball');
-    order.forEach(function(t){ chip(t, t, ''); });
+    shown.forEach(function(t){ chip(t, t, ''); });
+    if(hiddenTags){
+      var moreBtn=document.createElement('button');
+      moreBtn.type='button';
+      moreBtn.className='tmore';
+      moreBtn.textContent='还有 '+hiddenTags+' 个';
+      moreBtn.title='标签条只显示最常用的 '+BAR_LIMIT+' 个。要放宽：设置 → 标签规则 → 门户标签条';
+      tb.appendChild(moreBtn);
+    }
     tb.addEventListener('scroll',syncFade,{passive:true});
     // 鼠标滚轮竖着滚 → 横着滑，标签多的时候不用去抓滚动条
     tb.addEventListener('wheel',function(e){
@@ -950,6 +976,7 @@ def portal_page(
     author: dict | None = None,
     accent: str | None = None,
     truncated: int = 0,
+    tag_limit: int = 12,
 ) -> str:
     accent = accent or theme.current()
     max_views = max([(p.get("views") or 0) for p in items] or [0]) or 1
@@ -1155,7 +1182,7 @@ def portal_page(
 {foot}
 </div>
 <script>
-{PORTAL_JS.replace("__NOW__", str(server_now))}
+{PORTAL_JS.replace("__NOW__", str(server_now)).replace("__TAGBAR__", str(tag_limit))}
 </script></body></html>"""
 
 
