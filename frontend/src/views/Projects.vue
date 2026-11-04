@@ -81,6 +81,7 @@ else if (saved.visibility) filters.visibility = saved.visibility
 async function load(keepSelection = false) {
   loading.value = true
   err.value = ''
+  const prev = selected.value
   try {
     const query = qs({
       q: filters.q.trim(),
@@ -102,7 +103,12 @@ async function load(keepSelection = false) {
     data.facets = d.facets
     data.server_now = d.server_now
     offset = d.server_now - Date.now()
-    if (!keepSelection) selected.value = []
+    if (!keepSelection) {
+      // 刷新（筛选变化 / 定时轮询 / 操作完成）时只丢掉「已经不在结果里」的勾选，
+      // 还在的就留着——否则抽屉里改个标签回来，勾好的三个全白勾了
+      const alive = new Set(data.items.map((i) => i.slug))
+      selected.value = prev.filter((s) => alive.has(s))
+    }
   } catch (e) {
     if (e.status !== 401) err.value = e.message || '加载失败'
   } finally {
@@ -131,14 +137,20 @@ async function loadCollections() {
 function onCollectionPicked(key) {
   // 赋值本身会触发下面的 watch（重置到第 1 页并重新拉取），不用手动 load
   const k = String(key)
-  if (k.startsWith('vis:')) {
-    // 侧栏把三档可见性做成了常驻分类，跟收藏夹互斥
-    filters.visibility = k.slice(4)
+  if (k === '') {
+    // 「全部项目」= 回到无筛选
     filters.collection = ''
-  } else {
-    filters.collection = k
     filters.visibility = ''
+    return
   }
+  if (k.startsWith('vis:')) {
+    // 三档可见性是叠加在当前位置上的过滤：只收窄可见性，收藏夹不动，
+    // 这样「未归类里只看私有的」这类组合点得出来。再点一次同一档就取消。
+    const v = k.slice(4)
+    filters.visibility = filters.visibility === v ? '' : v
+    return
+  }
+  filters.collection = k
 }
 
 function onCollectionsChanged() {
@@ -386,13 +398,12 @@ onBeforeUnmount(() => {
         <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
       </div>
 
-      <!-- 可见性筛选常驻：侧栏的分类是主入口，但窄屏侧栏会收起，工具栏不能没有 -->
+      <!-- 可见性筛选：在「当前收藏夹 / 分类」的基础上再收窄，不改变收藏夹选择 -->
       <select
         v-model="filters.visibility"
         class="field"
         style="min-width: 112px"
-        title="按可见性筛选"
-        @change="filters.collection = ''"
+        title="按可见性筛选（在当前收藏夹范围内）"
       >
         <option value="">全部可见性</option>
         <option value="portal">门户可见</option>
@@ -406,7 +417,6 @@ onBeforeUnmount(() => {
         class="field colfallback"
         style="min-width: 118px"
         title="按收藏夹筛选"
-        @change="filters.visibility = ''"
       >
         <option value="">全部归类</option>
         <option value="none">未归类</option>
@@ -519,12 +529,13 @@ onBeforeUnmount(() => {
     >
       <option value="">移到收藏夹…</option>
       <option value="none">移出收藏夹</option>
-      <optgroup v-for="node in colTree.items" :key="node.id" :label="node.name">
+      <!-- 平铺而不是 optgroup：optgroup 的组名会和夹名重复显示一次，看着像同一个夹出现了两层 -->
+      <template v-for="node in colTree.items" :key="node.id">
         <option :value="node.id">{{ node.name }}</option>
         <option v-for="kid in node.children || []" :key="kid.id" :value="kid.id">
-          {{ node.name }} / {{ kid.name }}
+          　└ {{ kid.name }}
         </option>
-      </optgroup>
+      </template>
     </select>
     <span class="bulksep" aria-hidden="true"></span>
     <button class="btn sm" @click="bulk('extend', { hours: 24 })">+24 小时</button>

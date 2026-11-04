@@ -60,6 +60,15 @@ def main() -> int:
     print("[1] 规则下发")
     code, meta = admin.req("GET", "/api/meta")
     mt = meta.get("tags") or {}
+    # 站点可能被管理员把上限调小了（1–6）。本用例要验的是规则本身，
+    # 所以临时顶到 6，跑完在 [清理] 里还原，不留下痕迹。
+    global MAX
+    orig_cap = mt.get("max_per_project") or MAX
+    if orig_cap != MAX:
+        admin.req("PATCH", "/api/settings", {"tag_max_per_project": MAX})
+        code, meta = admin.req("GET", "/api/meta")
+        mt = meta.get("tags") or {}
+        print(f"  （上限原为 {orig_cap}，本次临时用 {MAX}）")
     check("/api/meta 带标签规则", code == 200 and mt.get("max_per_project") == MAX, mt)
     check("单个长度上限 12", mt.get("max_len") == MAX_LEN, mt.get("max_len"))
     code, st = admin.req("GET", "/api/settings")
@@ -90,7 +99,7 @@ def main() -> int:
 
     print("[3] 硬约束")
     code, d, _ = make("a,b,c,d,e,f,g")
-    check(f"超过 {MAX} 个 → 422", code == 422 and "最多 6 个" in str(d), f"{code} {d}")
+    check(f"超过 {MAX} 个 → 422", code == 422 and f"最多 {MAX} 个" in str(d), f"{code} {d}")
     code, d, _ = make("x" * (MAX_LEN + 1))
     check("超过 12 字 → 422", code == 422 and "太长" in str(d), f"{code} {d}")
     code, d, _ = make("数据/分析")
@@ -104,7 +113,7 @@ def main() -> int:
 
     print("[4] 改属性与批量")
     code, d = patch(s1, {"tags": ["一", "二", "三", "四", "五", "六"]})
-    check("改属性可以填满 6 个", code == 200 and len(d.get("tags") or []) == MAX, d.get("tags"))
+    check(f"改属性可以填满 {MAX} 个", code == 200 and len(d.get("tags") or []) == MAX, d.get("tags"))
     code, d = patch(s1, {"tags": ["一", "二", "三", "四", "五", "六", "七"]})
     check("改属性超限同样 422", code == 422, f"{code} {d}")
     code, d = patch(s1, {"tags": ["一", "二", "三", "四", "五", "六", "七"][:5]})
@@ -112,7 +121,7 @@ def main() -> int:
 
     code, d = admin.req("POST", "/api/projects/bulk", {"slugs": [s1], "action": "tag_add", "tags": "甲,乙,丙"})
     tags_after = detail(s1).get("tags") or []
-    check("批量补标签最多补到 6 个", len(tags_after) == MAX, tags_after)
+    check(f"批量补标签最多补到 {MAX} 个", len(tags_after) == MAX, tags_after)
     check("回报被截断的项目数", d.get("trimmed") == 1, d)
 
     code, d = admin.req("POST", "/api/projects/bulk", {"slugs": [s2], "action": "tag_add", "tags": "X/Y"})
@@ -140,6 +149,10 @@ def main() -> int:
     print("[清理]")
     left = [admin.req("DELETE", f"/api/projects/{s}")[0] for s in made]
     check("临时项目已清理", all(c in (200, 404) for c in left), left)
+    if orig_cap != MAX:
+        admin.req("PATCH", "/api/settings", {"tag_max_per_project": orig_cap})
+        now_cap = ((admin.req("GET", "/api/meta")[1] or {}).get("tags") or {}).get("max_per_project")
+        check(f"站点上限已还原为 {orig_cap}", now_cap == orig_cap, now_cap)
 
     print(f"\n{len(PASS)}/{len(PASS) + len(FAIL)} 通过")
     if FAIL:

@@ -143,6 +143,11 @@ def tree(conn, user: dict) -> dict:
         else:
             roots.append(node)
     loose = cnt.get(0, 0)
+    # 管理员可能把别人的项目归进了自己的夹。对项目主人来说，那个夹不在他的树里，
+    # 这些项目就成了「哪个分类都点不到」的幽灵——统一算进未归类，至少点得着。
+    for cid, n in cnt.items():
+        if cid and cid not in nodes:
+            loose += n
     return {
         "items": roots,
         "unassigned": loose,

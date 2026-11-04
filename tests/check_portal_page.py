@@ -26,16 +26,18 @@ def check(name, cond, extra=""):
     print(f"  {'✓' if cond else '✗'} {name}{('  → ' + str(extra)[:180]) if extra and not cond else ''}")
 
 
-def seed(c: Client, n: int) -> list[str]:
-    """建 n 个门户可见的外链项目，每个挂 3 个标签，用来撑满一页。
+def seed(c: Client, n: int, cap: int = 6) -> list[str]:
+    """建 n 个门户可见的外链项目，每个挂几个标签，用来撑满一页。
 
-    另外固定建一个「标签大户」（6 个长标签），专门验证卡片上的 +N 折叠。
+    标签数跟着站点设置走（`tag_max_per_project` 可能被管理员调到 1–6），
+    不然设置一改这里全 422。另外固定建一个「标签大户」，专门验证卡片上的 +N 折叠。
     """
+    per = min(3, cap)
     slugs = []
-    plan = [(f"pgtest-{i:02d}", [TAGS[(i * 3 + k) % len(TAGS)] for k in range(3)])
+    plan = [(f"pgtest-{i:02d}", [TAGS[(i * 3 + k) % len(TAGS)] for k in range(per)])
             for i in range(n)]
-    plan.append(("pgtest-tags", ["政务公开", "数据可视化看板", "技术调研",
-                                 "落地页原型", "组件库文档", "内部演示"]))
+    long_tags = ["政务公开", "数据可视化看板", "技术调研", "落地页原型", "组件库文档", "内部演示"]
+    plan.append(("pgtest-tags", long_tags[:max(1, cap)]))
     for i, (title, tags) in enumerate(plan):
         code, body = c.req("POST", "/api/projects/link", {
             "title": title,
@@ -64,17 +66,21 @@ def main():
     if code != 200:
         return 1
 
+    # 站点可能把「每个项目最多几个标签」调小了，造数据得跟着走
+    code, meta = c.req("GET", "/api/meta")
+    cap = int(((meta or {}).get("tags") or {}).get("max_per_project") or 6)
+
     # 直接数门户页里的卡片，比翻 API 再过滤更接近真实（含可见性/到期过滤）
     code, html = c.req("GET", "/portal", raw=True)
     if isinstance(html, bytes):
         html = html.decode("utf-8", "replace")
     portal_before = html.count('class="card"') + html.count('class="card del"')
     need = max(0, 27 - portal_before)
-    print(f"[准备] 门户现有 {portal_before} 个，补建 {need} 个")
-    slugs = seed(c, need)
+    print(f"[准备] 门户现有 {portal_before} 个，补建 {need} 个（每项最多 {cap} 个标签）")
+    slugs = seed(c, need, cap)
 
     try:
-        run(args, slugs, portal_before)
+        run(args, slugs, portal_before, cap)
     finally:
         print("[清理]")
         for s in slugs:
@@ -94,7 +100,7 @@ def main():
     return 0
 
 
-def run(args, slugs, portal_before):
+def run(args, slugs, portal_before, cap=6):
     total = portal_before + len(slugs)
     with sync_playwright() as p:
         b = p.chromium.launch(channel="chrome")
@@ -210,10 +216,13 @@ def run(args, slugs, portal_before):
             "#grid .card .tags", "els => els.filter(e => e.scrollWidth > e.clientWidth + 1).length")
         check("卡片内标签不溢出裁切", over == 0, f"{over} 张卡溢出")
         more = pg.locator("#grid .card .tag.more").count()
-        check("标签过多时折成 +N", more > 0, f"+N 标记 {more} 个")
-        if more:
-            tip = pg.eval_on_selector("#grid .card .tag.more", "e => e.title")
-            check("+N 的 title 列出剩余标签", "还有：" in tip, tip)
+        if cap >= 4:
+            check("标签过多时折成 +N", more > 0, f"+N 标记 {more} 个")
+            if more:
+                tip = pg.eval_on_selector("#grid .card .tag.more", "e => e.title")
+                check("+N 的 title 列出剩余标签", "还有：" in tip, tip)
+        else:
+            print(f"  - 站点把每项标签上限调到 {cap} 个，卡片放得下，跳过 +N 折叠检查")
 
         print("[4] 归属不出现「—」")
         bad = pg.eval_on_selector_all(

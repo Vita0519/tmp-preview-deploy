@@ -728,7 +728,9 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
                     raise HTTPException(status_code=400, detail="collection_id 不合法") from None
                 with db() as conn:
                     crow = colls.get(conn, cid, user)
-                if crow["owner_id"] != row["owner_id"]:
+                # 「收藏夹归属跟项目归属一致」只约束普通成员（他没权限把别人的项目挪走）。
+                # 管理员在「全部项目」里勾的常常就是别人的项目，一律跳过等于功能不可用。
+                if user["role"] != "admin" and crow["owner_id"] != row["owner_id"]:
                     skipped += 1
                     continue
                 with db() as conn:

@@ -49,6 +49,10 @@
 
 html, body, #app { height: 100%; }
 
+/* 竖向滚动条一直占位：切换收藏夹时列表长短变化，否则滚动条一出现/消失
+   内容区宽度就跳 15px，整页看着抖一下 */
+html { scrollbar-gutter: stable; }
+
 body {
   margin: 0;
   font-family: var(--font);
@@ -218,6 +222,9 @@ p { margin: 0; }
 }
 .railrow:hover { background: var(--surface-3); }
 .railrow.on { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+/* 可见性三档是叠加在当前分类之上的过滤条件，会跟收藏夹同时选中，
+   所以用描边而不是实心底，区分「所在位置」和「再加的过滤」 */
+.railrow.vis.on { background: transparent; box-shadow: inset 0 0 0 1px var(--brand-line); }
 .railrow .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .railrow .n { font-size: 10.5px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
 .railrow.on .n { color: var(--brand); }
