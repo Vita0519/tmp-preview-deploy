@@ -150,7 +150,7 @@ function countOf(node) {
         :class="{ on: visibility === v.key }"
         role="button"
         tabindex="0"
-        :title="`在当前分类里只看${v.label}的项目`"
+        :title="`在当前分类里只看${v.label}的项目（右侧数字是全站该档的总数）`"
         @click="pick('vis:' + v.key)"
         @keydown.enter="pick('vis:' + v.key)"
       >
