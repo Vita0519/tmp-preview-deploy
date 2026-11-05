@@ -7,7 +7,7 @@ import Icon from './Icon.vue'
 const props = defineProps({
   tree: { type: Object, default: () => ({ items: [], unassigned: 0, total: 0 }) },
   active: { type: String, default: '' }, // '' 全部 | 'none' 未归类 | '12' 收藏夹 id
-  visibility: { type: String, default: '' }, // '' | portal | link | private（选收藏夹时为空）
+  visibility: { type: String, default: '' }, // '' | portal | link | private；只有收藏夹为空时才归三档高亮
   loading: { type: Boolean, default: false },
 })
 const emit = defineEmits(['select', 'changed'])
@@ -17,7 +17,8 @@ const loose = computed(() => props.tree.unassigned || 0)
 const grandTotal = computed(() => props.tree.total || 0)
 const vis = computed(() => props.tree.visibility || { portal: 0, link: 0, private: 0 })
 
-// 三档可见性做成常驻分类，跟收藏夹抢同一个「当前选中」，所以工具栏里的可见性下拉可以收起来
+// 三档可见性是「跳全站」的导航，跟收藏夹抢同一个当前选中；
+// 工具栏那个下拉是「在当前夹里快筛」，两者不是一回事，所以这里高亮要排除 active 非空的情况
 const VIS_ROWS = [
   { key: 'portal', label: '门户可见', icon: 'eye' },
   { key: 'link', label: '持链接', icon: 'external' },
