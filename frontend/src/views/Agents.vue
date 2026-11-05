@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { confirmAction, store, toast } from '../store'
 import { fmtDate, fmtNum, relTime } from '../format'
@@ -17,6 +17,16 @@ const page = ref(1)
 const size = ref(20)
 const total = ref(0)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)))
+
+// 搜索 / 筛选 / 排序
+const q = ref('')
+const fRole = ref('')
+const fStatus = ref('')
+const sort = ref('') // '' = 默认顺序（管理员置顶 + 创建时间）
+const order = ref('desc')
+const hasFilter = computed(() => !!(q.value.trim() || fRole.value || fStatus.value || sort.value))
+// 下拉里管理员排最前，比权限低到高读着顺
+const roleOptions = computed(() => [...ROLES].reverse())
 
 const ROLES = [
   { key: 'viewer', label: '仅门户', short: '访客', desc: '只能浏览访客门户，不能看项目' },
@@ -53,10 +63,19 @@ async function setKeyLabel(item, value) {
 async function load() {
   loading.value = true
   try {
-    const d = await api.get(`/api/agents?limit=${size.value}&offset=${(page.value - 1) * size.value}`)
+    const qs = new URLSearchParams({
+      limit: String(size.value),
+      offset: String((page.value - 1) * size.value),
+    })
+    if (q.value.trim()) qs.set('q', q.value.trim())
+    if (fRole.value) qs.set('role', fRole.value)
+    if (fStatus.value) qs.set('status', fStatus.value)
+    if (sort.value) qs.set('sort', sort.value)
+    if (sort.value) qs.set('order', order.value)
+    const d = await api.get(`/api/agents?${qs}`)
     items.value = d.items
     total.value = d.total ?? d.items.length
-    // 删到最后一页空了就退回上一页，别让人对着空表发呆
+    // 筛选收紧后当前页可能越界，或者删到本页空了，都退到最后一页
     if (!d.items.length && page.value > 1) {
       page.value = Math.max(1, Math.ceil((d.total ?? 0) / size.value))
       return
@@ -70,6 +89,34 @@ async function load() {
 
 // 页码或每页条数一变就重取；越界由 load 里的兜底处理
 watch([page, size], load)
+
+/** 改了筛选条件就回第一页；已经在第一页时直接重取，避免 page 没变导致 watch 不触发 */
+function refetch() {
+  if (page.value !== 1) {
+    page.value = 1
+    return
+  }
+  load()
+}
+
+let searchTimer = null
+watch(q, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(refetch, 260)
+})
+watch([fRole, fStatus, sort, order], refetch)
+
+function resetFilters() {
+  clearTimeout(searchTimer)
+  q.value = ''
+  fRole.value = ''
+  fStatus.value = ''
+  sort.value = ''
+  order.value = 'desc'
+  refetch()
+}
+
+onUnmounted(() => clearTimeout(searchTimer))
 
 async function submit() {
   if (!form.username.trim()) return toast('请填写账号', 'err')
@@ -158,13 +205,63 @@ onMounted(load)
 <template>
   <header class="topbar">
     <h1>成员</h1>
-    <span class="sub">{{ total }} 个账号</span>
+    <span class="sub">
+      {{ total }} 个{{ hasFilter ? '匹配' : '账号' }}
+    </span>
     <div class="grow" />
     <span class="dim hide-sm" style="font-size: 12px">一个账号 = 一个 Agent = 一把 API Key，互相看不到对方项目</span>
     <button class="btn primary" @click="createOpen = true"><Icon name="plus" :size="13" /> 添加成员</button>
   </header>
 
   <div class="content">
+    <div
+      class="toolbar"
+      style="border-radius: var(--radius); border-bottom: 1px solid var(--line); margin-bottom: 10px"
+    >
+      <div class="search">
+        <Icon name="search" :size="13" />
+        <input v-model="q" class="field" placeholder="搜索账号 / 显示名 / 绑定 Agent" />
+      </div>
+
+      <select
+        v-model="fRole"
+        class="field"
+        style="min-width: 104px"
+        title="按角色筛选（权限档位）"
+      >
+        <option value="">全部角色</option>
+        <option v-for="r in roleOptions" :key="r.key" :value="r.key">{{ r.label }}</option>
+      </select>
+
+      <select v-model="fStatus" class="field" style="min-width: 96px" title="按启用状态筛选">
+        <option value="">全部状态</option>
+        <option value="active">已启用</option>
+        <option value="disabled">已停用</option>
+      </select>
+
+      <div class="grow" style="flex: 1" />
+
+      <select v-model="sort" class="field" style="min-width: 126px" title="排序字段">
+        <option value="">默认顺序</option>
+        <option value="created_at">按创建时间</option>
+        <option value="last_login_at">按最近登录</option>
+        <option value="views">按访问次数</option>
+        <option value="projects">按项目数</option>
+        <option value="key_used">按最近用 Key</option>
+        <option value="username">按账号名</option>
+      </select>
+      <button
+        class="btn icon"
+        :disabled="!sort"
+        :title="!sort ? '先选一个排序字段' : order === 'desc' ? '改为升序' : '改为降序'"
+        @click="order = order === 'desc' ? 'asc' : 'desc'"
+      >
+        {{ order === 'desc' ? '↓' : '↑' }}
+      </button>
+
+      <button v-if="hasFilter" class="btn ghost sm" @click="resetFilters">清除筛选</button>
+    </div>
+
     <div class="panel only-wide">
       <table>
         <thead>
@@ -243,6 +340,14 @@ onMounted(load)
           <tr v-if="loading && !items.length">
             <td colspan="7"><div class="skel" style="height: 14px; width: 40%; margin: 14px 0" /></td>
           </tr>
+          <tr v-else-if="!items.length">
+            <td colspan="7" class="dim" style="text-align: center; padding: 26px 0; font-size: 12.5px">
+              没有匹配的成员
+              <button v-if="hasFilter" class="btn ghost sm" style="margin-left: 6px" @click="resetFilters">
+                清除筛选
+              </button>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -313,9 +418,15 @@ onMounted(load)
         </div>
       </div>
       <div v-else-if="loading" class="acard"><div class="skel" style="height: 40px" /></div>
+      <div v-else class="acard dim" style="text-align: center; font-size: 12.5px">
+        没有匹配的成员
+        <button v-if="hasFilter" class="btn ghost sm" style="margin-left: 6px" @click="resetFilters">
+          清除筛选
+        </button>
+      </div>
     </div>
 
-    <div class="pager">
+    <div v-if="total > 0" class="pager">
       <span class="dim">
         共 {{ total }} 个成员 · 第 {{ page }} / {{ totalPages }} 页
         <span v-if="loading" style="margin-left: 6px">读取中…</span>

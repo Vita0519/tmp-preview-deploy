@@ -19,23 +19,69 @@ from ..storage import remove_project_files
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
+# 允许的排序字段：别名（views/projects/online）在 SQLite 里可以直接 ORDER BY
+_SORT_COLS = {
+    "created_at": "u.created_at",
+    "last_login_at": "u.last_login_at",
+    "key_used": "u.key_last_used_at",
+    "views": "views",
+    "projects": "projects",
+    "online": "online",
+    "username": "u.username",
+}
+
+
 @router.get("")
-def list_agents(limit: int = 0, offset: int = 0, user: dict = Depends(admin_user)):
+def list_agents(
+    q: str = "",
+    role: str = "",
+    status: str = "",
+    sort: str = "",
+    order: str = "desc",
+    limit: int = 0,
+    offset: int = 0,
+    user: dict = Depends(admin_user),
+):
     """成员列表。limit=0 表示不分页，返回全部（CLI 和老调用方要的就是全量）。"""
+    where: list[str] = []
+    wargs: list = []
+    if q.strip():
+        like = "%" + q.strip().replace("%", "").replace("_", "") + "%"
+        where.append("(u.username LIKE ? OR u.display_name LIKE ? OR u.key_label LIKE ?)")
+        wargs += [like, like, like]
+    if role and role in ROLES:
+        where.append("u.role = ?")
+        wargs.append(role)
+    if status == "active":
+        where.append("u.active = 1")
+    elif status == "disabled":
+        where.append("u.active = 0")
+    wsql = (" WHERE " + " AND ".join(where)) if where else ""
+
+    col = _SORT_COLS.get(sort)
+    if col:
+        direction = "ASC" if order == "asc" else "DESC"
+        if sort in ("last_login_at", "key_used"):
+            # 「从没登录/没用过」的永远垫底，正序倒序都一样，否则它们会挤在最前面当"最早"
+            order_sql = f"ORDER BY ({col} IS NULL), {col} {direction}, u.id"
+        else:
+            order_sql = f"ORDER BY {col} {direction}, u.id"
+    else:
+        # 不加排序条件时维持原样：管理员置顶，再按创建顺序
+        order_sql = "ORDER BY u.role='admin' DESC, u.created_at, u.id"
+
     sql = (
         "SELECT u.*, "
         "(SELECT COUNT(*) FROM projects p WHERE p.owner_id=u.id AND p.status<>'deleted') projects, "
         "(SELECT COUNT(*) FROM projects p WHERE p.owner_id=u.id AND p.status='active' "
         " AND (p.expires_at IS NULL OR p.expires_at>?)) online, "
         "(SELECT COALESCE(SUM(p.views),0) FROM projects p WHERE p.owner_id=u.id) views "
-        "FROM users u "
-        # 末尾补 u.id：同一毫秒建的两个账号光按 created_at 排是不稳定的，翻页会重复或漏人
-        "ORDER BY u.role='admin' DESC, u.created_at, u.id"
+        "FROM users u" + wsql + " " + order_sql
     )
     skip = max(0, offset)
     with db() as conn:
-        total = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
-        args: list = [now_ms()]
+        total = conn.execute("SELECT COUNT(*) AS c FROM users u" + wsql, wargs).fetchone()["c"]
+        args: list = [now_ms()] + wargs
         if limit > 0:
             sql += " LIMIT ? OFFSET ?"
             args += [limit, skip]
