@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { confirmAction, store, toast } from '../store'
 import { fmtDate, fmtNum, relTime } from '../format'
@@ -11,6 +11,12 @@ const createOpen = ref(false)
 const created = ref(null)
 const form = reactive({ username: '', display_name: '', password: '', role: 'publisher', key_label: '' })
 const busy = ref(false)
+
+// 成员一多就翻不完，列表按页取（默认 20，一屏放得下还能看清 Key 绑定）
+const page = ref(1)
+const size = ref(20)
+const total = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / size.value)))
 
 const ROLES = [
   { key: 'viewer', label: '仅门户', short: '访客', desc: '只能浏览访客门户，不能看项目' },
@@ -47,14 +53,23 @@ async function setKeyLabel(item, value) {
 async function load() {
   loading.value = true
   try {
-    const d = await api.get('/api/agents')
+    const d = await api.get(`/api/agents?limit=${size.value}&offset=${(page.value - 1) * size.value}`)
     items.value = d.items
+    total.value = d.total ?? d.items.length
+    // 删到最后一页空了就退回上一页，别让人对着空表发呆
+    if (!d.items.length && page.value > 1) {
+      page.value = Math.max(1, Math.ceil((d.total ?? 0) / size.value))
+      return
+    }
   } catch (e) {
     toast(e.message || '读取失败', 'err')
   } finally {
     loading.value = false
   }
 }
+
+// 页码或每页条数一变就重取；越界由 load 里的兜底处理
+watch([page, size], load)
 
 async function submit() {
   if (!form.username.trim()) return toast('请填写账号', 'err')
@@ -143,7 +158,7 @@ onMounted(load)
 <template>
   <header class="topbar">
     <h1>成员</h1>
-    <span class="sub">{{ items.length }} 个账号</span>
+    <span class="sub">{{ total }} 个账号</span>
     <div class="grow" />
     <span class="dim hide-sm" style="font-size: 12px">一个账号 = 一个 Agent = 一把 API Key，互相看不到对方项目</span>
     <button class="btn primary" @click="createOpen = true"><Icon name="plus" :size="13" /> 添加成员</button>
@@ -298,6 +313,22 @@ onMounted(load)
         </div>
       </div>
       <div v-else-if="loading" class="acard"><div class="skel" style="height: 40px" /></div>
+    </div>
+
+    <div class="pager">
+      <span class="dim">
+        共 {{ total }} 个成员 · 第 {{ page }} / {{ totalPages }} 页
+        <span v-if="loading" style="margin-left: 6px">读取中…</span>
+      </span>
+      <div class="pager-ops">
+        <select v-model.number="size" class="field" style="min-width: 92px" title="每页显示多少个成员">
+          <option :value="20">20 / 页</option>
+          <option :value="50">50 / 页</option>
+          <option :value="100">100 / 页</option>
+        </select>
+        <button class="btn sm" :disabled="page <= 1" @click="page--">上一页</button>
+        <button class="btn sm" :disabled="page >= totalPages" @click="page++">下一页</button>
+      </div>
     </div>
 
     <p class="dim" style="font-size: 12px; margin-top: 12px">

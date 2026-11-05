@@ -149,7 +149,7 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/agents` | 🛡 | 成员列表（含项目数、在线数、访问数、Key 末 6 位） |
+| GET | `/api/agents` | 🛡 | 成员列表（含项目数、在线数、访问数、Key 末 6 位）。`?limit=&offset=` 分页，`limit=0`（默认）返回全部；响应带 `total` |
 | POST | `/api/agents` | 🛡 | 创建：`{username, display_name, password, role}` → 返回 password/api_key |
 | PATCH | `/api/agents/{id}` | 🛡 | `{display_name, active, password, rotate_key, role}`。`role` ∈ `viewer/publisher/admin`，不能改自己，也不会让管理员数量归零 |
 | DELETE | `/api/agents/{id}` | 🛡 | 删除成员及其全部项目 |
