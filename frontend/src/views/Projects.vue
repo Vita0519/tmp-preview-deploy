@@ -74,9 +74,9 @@ if (saved.status) filters.status = saved.status
 if (saved.sort) filters.sort = saved.sort
 if (saved.order) filters.order = saved.order
 if (saved.size) size.value = saved.size
-// 收藏夹与可见性分类共用一条选中线，只能有一个生效：老版本存过两个的，按收藏夹优先
+// 收藏夹是范围、可见性是范围内的过滤，两者正交：都恢复（老版本只存过一个，也不会串）
 if (saved.collection) filters.collection = String(saved.collection)
-else if (saved.visibility) filters.visibility = saved.visibility
+if (saved.visibility) filters.visibility = saved.visibility
 
 async function load(keepSelection = false) {
   loading.value = true
@@ -143,11 +143,16 @@ function onCollectionPicked(key) {
     return
   }
   if (k.startsWith('vis:')) {
-    // 三档可见性是「跳出收藏夹」的权限维度：选中它就脱离当前收藏夹，看全站这一档。
-    // 所以跟收藏夹互斥——同一时间只能站在一个维度上。再点一次同一档 = 回到全部。
+    // 侧栏这三档是「跳出收藏夹」的权限维度：点它就脱离当前收藏夹，看全站这一档。
+    // 注意跟工具栏那个下拉不是一回事——那个是「在当前收藏夹里按可见性快筛」，不换范围。
     const v = k.slice(4)
+    if (filters.collection) {
+      // 从夹里往外跳：哪怕夹内筛的正好也是这一档，也应该切到全站这一档，而不是取消
+      filters.collection = ''
+      filters.visibility = v
+      return
+    }
     filters.visibility = filters.visibility === v ? '' : v
-    filters.collection = ''
     return
   }
   // 选收藏夹就离开可见性维度，回到「这个夹里的全部项目」
@@ -400,15 +405,18 @@ onBeforeUnmount(() => {
         <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
       </div>
 
-      <!-- 可见性筛选：跟分类同一维度，选了它就跳出收藏夹，看全站这一档 -->
+      <!-- 可见性快筛：只在当前范围内过滤，不换收藏夹。跳全站那三档在左侧分类里 -->
       <select
         v-model="filters.visibility"
         class="field"
-        style="min-width: 112px"
-        title="按可见性筛选（会跳出当前收藏夹）"
-        @change="filters.collection = ''"
+        style="min-width: 122px"
+        :title="
+          filters.collection
+            ? '在当前收藏夹里按可见性筛选，不改变收藏夹'
+            : '按可见性筛选全部项目（要按分类跳转，用左侧的分类型）'
+        "
       >
-        <option value="">全部可见性</option>
+        <option value="">{{ filters.collection ? '本夹全部可见性' : '全部可见性' }}</option>
         <option value="portal">门户可见</option>
         <option value="link">持链接可见</option>
         <option value="private">仅自己可见</option>
