@@ -20,18 +20,30 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
 @router.get("")
-def list_agents(user: dict = Depends(admin_user)):
+def list_agents(limit: int = 0, offset: int = 0, user: dict = Depends(admin_user)):
+    """成员列表。limit=0 表示不分页，返回全部（CLI 和老调用方要的就是全量）。"""
+    sql = (
+        "SELECT u.*, "
+        "(SELECT COUNT(*) FROM projects p WHERE p.owner_id=u.id AND p.status<>'deleted') projects, "
+        "(SELECT COUNT(*) FROM projects p WHERE p.owner_id=u.id AND p.status='active' "
+        " AND (p.expires_at IS NULL OR p.expires_at>?)) online, "
+        "(SELECT COALESCE(SUM(p.views),0) FROM projects p WHERE p.owner_id=u.id) views "
+        "FROM users u "
+        # 末尾补 u.id：同一毫秒建的两个账号光按 created_at 排是不稳定的，翻页会重复或漏人
+        "ORDER BY u.role='admin' DESC, u.created_at, u.id"
+    )
+    skip = max(0, offset)
     with db() as conn:
-        rows = conn.execute(
-            "SELECT u.*, "
-            "(SELECT COUNT(*) FROM projects p WHERE p.owner_id=u.id AND p.status<>'deleted') projects, "
-            "(SELECT COUNT(*) FROM projects p WHERE p.owner_id=u.id AND p.status='active' "
-            " AND (p.expires_at IS NULL OR p.expires_at>?)) online, "
-            "(SELECT COALESCE(SUM(p.views),0) FROM projects p WHERE p.owner_id=u.id) views "
-            "FROM users u ORDER BY u.role='admin' DESC, u.created_at",
-            (now_ms(),),
-        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+        args: list = [now_ms()]
+        if limit > 0:
+            sql += " LIMIT ? OFFSET ?"
+            args += [limit, skip]
+        rows = conn.execute(sql, args).fetchall()
     return {
+        "total": total,
+        "limit": limit,
+        "offset": skip,
         "items": [
             {
                 "id": r["id"],

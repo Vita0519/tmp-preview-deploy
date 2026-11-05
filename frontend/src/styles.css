@@ -416,6 +416,16 @@ select.field { cursor: pointer; padding-right: 26px; appearance: none;
 .search .field { width: 100%; padding-left: 30px; }
 .search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-4); pointer-events: none; }
 
+/* 列表底部的分页条：左边计数、右边每页条数与翻页 */
+.pager {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 12px; padding: 0 2px; flex-wrap: wrap;
+}
+.pager > span { font-size: 12px; }
+.pager-ops { display: flex; align-items: center; gap: 6px; }
+/* 跟 .btn.sm 同高，不然下拉比按钮高出一截 */
+.pager-ops .field { height: 27px; font-size: 12px; padding: 0 24px 0 8px; }
+
 .seg {
   display: inline-flex; padding: 2px; gap: 2px;
   background: var(--surface-3); border: 1px solid var(--line); border-radius: var(--radius-sm);
