@@ -1,7 +1,7 @@
 """服务端渲染的轻页面：访客预览外壳 / 门户 / 错误页（无框架，首屏快）。"""
 from html import escape
 
-from . import branding, theme
+from . import branding, config, theme
 
 FONT = (
     '-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",'
@@ -560,6 +560,9 @@ color:#8b9298;font-size:12px;line-height:1.5}
 font-weight:500;transition:color .16s}
 .flink:hover{color:var(--brand)}
 .flink svg{opacity:.85;flex:0 0 auto}
+/* AGPL 署名链接：别太抢眼，但也不能被截断或藏起来 */
+.flink.credit{color:#9aa1a8;font-size:11.5px;letter-spacing:.01em}
+.flink.credit:hover{color:var(--brand)}
 @media (max-width:560px){.pfoot{justify-content:flex-start;gap:10px}}
 """
 
@@ -1090,6 +1093,10 @@ def portal_page(
     )
     foot_right = (
         f'<a class="flink" href="/rss.xml" title="用阅读器订阅门户更新">{rss_icon}<span>RSS 订阅</span></a>'
+        # AGPL-3.0 §7(b) 附加条款要求的署名，不要删（见仓库 NOTICE）
+        f'<a class="flink credit" href="{escape(config.PROJECT_URL, quote=True)}" target="_blank" rel="noopener"'
+        f' title="Powered by {escape(config.PROJECT_NAME)} · {config.PROJECT_LICENSE} · 保留署名">'
+        f'Powered by {escape(config.PROJECT_NAME)}</a>'
     )
     foot = (
         '<footer class="pfoot">'

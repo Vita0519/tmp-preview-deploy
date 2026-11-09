@@ -1,0 +1,12 @@
+tmp-preview-agent（tmp-preview 的 Agent 侧技能包）
+Copyright (C) 2026 Vita0519
+https://github.com/Vita0519/tmp-preview-deploy
+
+以 GNU Affero 通用公共许可证第 3 版（AGPL-3.0-only）发布，全文见仓库根目录的 LICENSE
+（<https://www.gnu.org/licenses/agpl-3.0.txt>），附加署名条款见仓库根目录的 NOTICE。
+
+这个目录经常被单独拷给别的 Agent 用，所以在这里重述一句：
+`scripts/agentctl.py` 头部的版权声明、本文件，以及部署出来的站点上
+登录页 / 门户页脚 / 设置页「关于 / 许可」里的署名，都**不许删**——
+那是 AGPL-3.0 §7(b) 附加条款要求的，不是装饰。改了代码要在显著位置写明
+「基于 tmp-preview 修改」及修改日期；闭源商用请先取得书面授权。

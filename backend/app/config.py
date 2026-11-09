@@ -38,6 +38,13 @@ ZIPS_DIR = DATA_DIR / "zips"
 SITE_TITLE = _env("SITE_TITLE", "临时预览站")
 SITE_SUBTITLE = _env("SITE_SUBTITLE", "到期自动回收 · 多 Agent 共享")
 
+# 项目标识：AGPL-3.0 §7(b) 附加条款要求再分发/对外服务时保留署名，
+# 所以这几项会在门户页脚、登录页、设置页「关于」里显示，改之前先看 NOTICE。
+PROJECT_NAME = _env("PROJECT_NAME", "tmp-preview")
+PROJECT_URL = _env("PROJECT_URL", "https://github.com/Vita0519/tmp-preview-deploy")
+PROJECT_AUTHOR = _env("PROJECT_AUTHOR", "Vita0519")
+PROJECT_LICENSE = "AGPL-3.0-only"
+
 # 门户顶部「作者名片」的初始值。刻意用中性占位身份，不写任何真实姓名/联系方式。
 AUTHOR_NAME = _env("AUTHOR_NAME", "vita")
 AUTHOR_BIO = _env("AUTHOR_BIO", "互联网混子")

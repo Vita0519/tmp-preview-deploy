@@ -197,7 +197,7 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/meta` | 🟢 | 站点标题 / 在线项目数 / `theme` 色板 / `site_icon` / `tags` 标签规则 / `title_rule` 项目名规则（SPA 启动用） |
+| GET | `/api/meta` | 🟢 | 站点标题 / 在线项目数 / `theme` 色板 / `site_icon` / `tags` 标签规则 / `title_rule` 项目名规则 / `project` 署名信息（SPA 启动用） |
 | GET | `/api/public/p/{slug}` | 🟢 | 项目公开信息 + `server_now` |
 | GET | `/v/{slug}` | 🟢 | 预览外壳（倒计时、下载、复制链接）；外链项目 **记一次访问后 302 直达目标站**，失效/无权访问 **302 回 `/portal?gone=1`** |
 | GET | `/p/{slug}/{path}` | 🟢 | 项目文件；无扩展名补 `index.html`；SPA 回退到 `entry` |
@@ -206,6 +206,18 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 | GET | `/portal` | 🟢/👤 | 门户列表（`PUBLIC_PORTAL=1` 或已登录） |
 | GET | `/rss.xml`、`/feed.xml` | 🟢/👤 | 门户 RSS（最近 50 个门户可见且未过期项目）；门户不公开且未登录 → 404 |
 | GET | `/site-icon` | 🟢 | 自定义站点图标；没上传过 → `404`（页面回落到内置图标） |
+
+`/api/meta` 的 `project` 是署名信息，前端登录页与设置页「关于 / 许可」直接用它，别在别处另抄一份：
+
+```json
+{"project": {"name": "tmp-preview",
+             "url": "https://github.com/Vita0519/tmp-preview-deploy",
+             "author": "Vita0519",
+             "license": "AGPL-3.0-only"}}
+```
+
+来源是 `backend/app/config.py` 的 `PROJECT_*`（可用环境变量覆盖）。**这几项与门户页脚的
+`Powered by …` 是 AGPL-3.0 §7(b) 附加条款要求保留的署名，不是可配置的装饰**，详见仓库根目录 `NOTICE`。
 | GET | `/site.webmanifest` | 🟢 | 动态 manifest：`icons` 跟自定义图标走，`theme_color` 跟主色走 |
 | GET | `/api/health` | 🟢 | 健康检查（容器探针） |
 

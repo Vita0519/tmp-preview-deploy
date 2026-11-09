@@ -1,11 +1,14 @@
-# tmp-preview · 临时预览站（自托管版）
+# tmp-preview · 临时预览站
 
-把任意本地目录（静态站 / HTML 单页 / WebGL 作品 / 构建产物）**一键变成带到期时间的预览链接**：
-默认按可见性给不同寿命（门户 6 小时 / 持链接 12 小时 / 私有永久，可改），多成员共享同一套服务，
-管理员能看到全部项目。
+把任意本地目录（静态站 / 单页 HTML / WebGL 作品 / 构建产物）**一键变成带到期时间的预览链接**。
+按可见性给寿命（门户 6 小时 / 持链接 12 小时 / 私有永久，可改），多成员共用一套服务，管理员看全部。
 
-从 Cloudflare Workers + KV 迁移而来（旧实现保留在 [`legacy/cloudflare/`](legacy/cloudflare/)），
-现在跑在自己的机器上：**FastAPI + SQLite + 本地磁盘 + Vue 3**，一个容器，`docker compose up` 即用。
+自托管：**FastAPI + SQLite + 本地磁盘 + Vue 3**，一个进程一块盘，`docker compose up -d --build` 即用。
+从 Cloudflare Workers + KV 迁移而来，旧实现留在 [`legacy/cloudflare/`](legacy/cloudflare/)。
+
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-a8332b.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-3c5f8f.svg)](backend/requirements.txt)
+[![Docker](https://img.shields.io/badge/docker-compose-2f6f78.svg)](docker-compose.yml)
 
 ```
 浏览器 ──┬── /v/<slug>          访客预览外壳（倒计时 + 下载）
@@ -16,123 +19,118 @@
               FastAPI (uvicorn) ── SQLite(WAL) + /data 磁盘
 ```
 
-## 特性
-
-- **多 Agent 共享**：每个成员一把 API Key，上传的项目自带归属，互相看不到；管理员看全部。**一个账号只绑一个 Agent**——成员页可给 Key 标「绑定给谁」，并显示尾号、最近使用时间与累计调用次数，共用了就能看出来。
-- **三种角色**：`viewer` 只能浏览访客门户、`publisher` 能上传并管理自己的项目、`admin` 管全部成员与设置；管理员在成员页直接下拉改角色，改完立即生效（不能改自己，也不会把最后一个管理员降级）。
-- **权限清晰**：项目可见性分「门户可见 / 持链接可见 / 仅自己」，三档各自一套默认时长。**注意「门户」和「持链接」在权限上完全一样**（有 URL 就能看），区别只是会不会被列进门户；「仅自己」不是登录就能看，而是只有作者本人或管理员能看。详见 [docs/visibility.md](docs/visibility.md)。
-- **批量改可见性**：项目页勾选若干条后，底部工具条可直接「门户可见 / 持链接 / 仅自己」一键切换，返回里会单独报出「已到期、需先续期」的条数。
-- **Agent 侧真能动手**：`cli/agentctl.py` 是可执行的单文件客户端（`login / whoami / health / deploy / link / ls / show / set / extend / rm / bulk / stats / members / selfcheck`），部署完自动探活，直接告诉你「预览地址 + HTTP 200」；`--json` 时 stdout 只有一行 JSON，好接上游程序。
-- **并发安全**：多个 agent 同时上传、同一 slug 被 6 路同时覆盖、混合读写都不会写串也不会 500——slug 级锁 + 每次上传独立临时目录 + 原子替换 + Windows 文件句柄重试。删除时若文件被占用，记录照样删掉，残留目录交给孤儿清理收尾。
-- **项目自带图标**：预览页优先用项目自带的 `favicon.ico / favicon.svg / favicon.png / apple-touch-icon.png`，没有才退回站点默认图标，标签页不会一水的空白页。
-- **项目名不重名**：同一个成员名下不允许两个同名项目（忽略大小写与首尾空格），新建、登记外链、改名三条路径都会拦，撞上返回 409 并点名占用的 slug。覆盖更新同一个 slug 不算冲突，跨成员同名互不影响。
-- **失效链接回门户**：链接过期、被删除、改私有或根本不存在时，`/v/` 一律 `302` 回门户首页并给一条「你打开的链接已失效」提示——**不再原地渲染一个「项目已到期」的破页面**。在 iframe 里被引用时返回的是能 `window.top` 跳走的失效页，顶层窗口直接被带走；css/js/图片之类的子资源请求则静默 404，不会把资源跳成一张 HTML。门户本身要登录时继续 302 到 `/login`，所以**看 URL 也猜不出项目在不在**。
-- **外链当短链用**：`kind=link` 的项目（Figma / 在线文档 / 别人的站）分享出去的是本站的 `/v/<slug>`，点开先记一次访问、再 302 到源站——**一次跳转，没有中间页，也不套 iframe 空壳**，但访问数有了，门户圆环不再是死的 0。
-- **配色系列可换**：设置页给了 6 套「主色 + 中性色画布」的整套方案（经典墨绿 / 科技感 / 马卡龙 / 莫兰迪 / 新中式 / 极简黑白），卡片本身就是该配色的缩略预览，点一下即时预览、保存后全站生效。控制台、访客门户、预览页、错误页、浏览器 `theme-color` 共用同一套变量。设计上按 **60-30-10** 分：画布与留白占 60%、卡片容器占 30%、主色只占 10%（按钮/圆环/进度条/选中态）；每套只给「画布底 + 正文色 + 次级文字色」三个锚点，其余 8 个中性色由它们混出来。主色仍全部派生 hover / 浅底 / 描边 / 渐变深色；**主色在白底上对比度不足 3:1 时会自动等比压深**（色相不动），设置页会写明「实际按 #xxxxxx 渲染」，免得选个淡黄把按钮和浅底文字一起糊掉。
-- **门户 RSS**：`/rss.xml`（`/feed.xml` 同）输出最近 50 个门户可见且未过期的项目，带标题、绝对链接、创建时间、简介与标签；门户 `<head>` 里有 `alternate` 自动发现，入口放在页脚右侧（不占顶栏，也不跟「进入控制台」抢位置）。门户不公开且访客未登录时返回 404，不会把 HTML 登录页塞给阅读器。
-- **入口规则简单**：**单个 HTML 不管叫 index.html 还是 report.html 都能直接打开**（单个 PDF/图片同理）；**多文件项目必须有根目录 `index.html`**，没有就上传时 422 直接说清楚，不会传上去才发现是一团空白。
-- **到期自动化**：到期后可选「停止访问保留文件」或「连同文件删除」，后台每 60s 巡检；站点级可设默认策略。
-- **访客门户** `/portal`：标题＋筛选区整体吸顶（滚动时标签以上不动），提供卡片/列表两种视图（记在本地），卡片右上角圆环显示访问量、底部是实时倒计时与进度条；支持按**类型 / 成员 / 标签 / 关键词**筛选，按创建、到期、访问、名称排序。每张卡片（含列表行）右上角有**快捷复制**按钮，一点即复制完整直链，按钮自分绿打勾并冒出「已复制」气泡，1.6 秒后自动复原。
-- **门户分页**：默认每页 24 个（可切 48 / 96 / 全部，记在本地），底部页码条 + 「第 1–24 / 共 37 个」计数；翻页只改可见性不重新请求，筛选条件一变就回到第 1 页，不会停在空页上。服务端一次最多取 500 个，超出会在底部明确写出「另有 N 个更早的未显示」，不静默截断。
-- **归属跟着人走**：谁上传的、谁挂的外链就归谁——外链项目一律记在创建者名下，删除成员时项目记录随之清掉（不会留下 owner 为空的孤儿记录让门户显示一条「—」）；历史上遗留的无主项目会自动收归到最早的管理员。
-- **标签多也不撑破版面**：门户标签条永远单行横滑（鼠标滚轮可横滚，两端渐隐，起始固定一个「全部」用于清空筛选），并且**按被引用的次数从多到少只放前 N 个**（默认 12，可在设置里改成 8 / 12 / 16 / 24 或「全部」），多出来的折成「还有 N 个」虚线按钮，悬停告诉你该去哪儿放宽——项目一多，末尾那些标签基本没人点，没必要全铺在首屏；卡片和列表行的标签同样只排一行，按实际字宽算预算，装不下的折成 `+N`，鼠标悬停能看到被折起的是哪几个。
-- **作者名片**：设置里填显示名、一句话介绍和几个链接（GitHub / 邮箱 / 抖音 / 博客 / X / B站 / 知乎 / RSS / 自定义），门户顶部就多出一条作者名片，图标 + 标签，移动端自动收成图标。出厂默认显示名 `vita`、介绍「互联网混子」，**不含任何真实个人信息**；改 `.env` 的 `AUTHOR_NAME` / `AUTHOR_BIO` 或直接在设置页改。
-- **「到期删除」看得见**：到期动作是「删除文件」的项目，在门户卡片上带琥珀色左边条 + 「到期删除」徽章、进度条也变琥珀；列表行、预览页顶栏、控制台项目表与详情抽屉同样标记。停访型项目保持原样，两种后果一眼分得开。
-- **标签有规矩**：每个项目最多 6 个（**设置里可往小调到 1–6**）、单个最长 12 字、只允许中英文/数字与 `+ # . - _`；全角转半角、英文转小写、重名合并。全站标签池上限 300 个，没人引用的标签随手回收（改标签、删项目、到期清理都会触发），设置页能看占用并手动清。超规则直接 422 并说清原因，不静默截断——调小之后新建或改标签，超出的那个会当场报「最多 N 个」。
-- **站点图标**：一枚「沙漏」标记（限时可用 = 临时预览），SVG + ICO + PNG 全尺寸齐全，门户、控制台、访客预览栏、错误页统一使用；项目自带的 favicon 仍然优先。位图由 `tools/gen_icons.py` 从同一份 SVG 生成。想换成自己的图标：设置页 →「站点图标」→ 上传（`png / svg / ico / jpg / webp`，≤512KB），顶栏、门户、manifest、手机主屏图标一起换；点「恢复默认」随时退回沙漏。
-- **收藏夹归类**：项目列表左侧多了一条「分类 + 收藏夹」栏：常驻的**全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类**按可见性与是否归类自动统计（三档之和 = 全部项目），再往下是自己建的两级收藏夹（收藏夹 → 子收藏夹）；点一下就筛、勾选多个项目可一键「移到收藏夹」（**管理员能跨成员归类**，在「全部项目」里勾别人的项目也不会被拦；普通成员只能把自己的项目放进自己的夹）。删收藏夹默认**只删壳**——里面的项目退回「未归类」而不是跟着消失；要连项目一起删得显式说。计数口径跟列表一致（父夹合计含子夹，非管理员只数自己名下）。
-- **侧栏三档是「跳出收藏夹」的权限维度，工具栏下拉是范围快筛**：左侧 **全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类** 里，点三档可见性中的任意一档，就跳出当前收藏夹、直接看全站这一档；点收藏夹则回到「这个夹里的全部项目」。而工具栏常驻的**可见性下拉不换范围**——它是在当前收藏夹里按可见性快筛（选中收藏夹时文案变成「本夹全部可见性」），两个条件同时成立，比如「power 夹 + 门户可见」就是这 26 条里的那 4 条；真想跳全站看这一档，回左侧点三档。窄屏（<1120px）侧栏收起时再补一个**归类下拉**（全部归类 / 未归类 / 各收藏夹），「未归类」在任何宽度下都点得着。
-- **收藏夹归属可见（管理员）**：每个夹节点都带创建者，侧栏在管理员视角下**按成员分组**（自己的组排最前，组头有成员色点、夹数与折叠箭头），想只看某个人就拉右上角的成员下拉——它只收侧栏这几根枝，**不改项目列表的查询范围**。夹里混了别人的项目时数字后面补 `+N`（`39+1` = 39 个项目里有 1 个不属于这个夹的创建者）。窄屏的归类下拉在多人时会带上「· 成员名」，同名夹也分得清。
-- **导入 / 导出浏览器书签**：「导入书签」直接吃 Chrome / Edge / Firefox / Safari 导出的 HTML，先预览（能导入几条、建几个收藏夹、跳过几个重复）再落库。**文件夹变收藏夹、书签变外链项目**，同一个网址重复导入自动跳过；导出的就是标准书签 HTML，塞回浏览器就能用。
-- **整站备份 / 恢复**：设置页一个按钮打出一个 zip（数据库在线快照 + 项目文件 + 下载包 + 站点图标 + manifest），也能拿这个 zip 一键覆盖恢复。恢复前会把现网数据整体挪进 `data/.backup-before-restore-<时间>/`（只留 3 份），**恢复错了还能挪回来**。只有管理员能做。
-- **侧栏可折叠**：控制台左侧导航右上角一键收起，228px → 64px 只留图标，内容区跟着变宽；状态记在本地，刷新后保持。
-- **下载更细**：上传即可下载成为默认（不用再单独开），整包 zip 之外，抽屉里的文件清单每行都能**单独下载单个文件**（`/download/<slug>/<相对路径>`）。文件夹上传本来就能拖整个目录、保留相对路径。
-- **访问统计**：只统计项目首页文档访问，内存累加 + 3s 批量落库（不牺牲响应速度），带 14 天趋势。
-- **管理台**：按成员 / 类型 / 可见性 / 状态 / 标签筛选，按访问、创建、更新、到期、体积排序，表格直接展示可见性列，抽屉里一键续期、改标签、开关下载。
-- **轻**：前端 gzip 后约 65KB；后端只依赖 fastapi / uvicorn / python-multipart，无 ORM、无 Redis。
-- **迁移友好**：自带 Cloudflare KV → 本地的搬运脚本，保留原 slug、创建时间、到期时间与访问数。
-
-## 资源占用
-
-单进程、无 Redis、无 ORM，整套东西的体量基本就是「一个 Python 进程 + 一块磁盘」。
-
-| 项目 | 实测 / 估算 | 说明 |
-|---|---|---|
-| 镜像体积 | 约 **160 MB**（拉取压缩后 ~65 MB） | `python:3.12-slim` 基础镜像 ~130 MB，运行时依赖约 22 MB，应用与前端产物不到 1 MB |
-| 内存（空载） | **35 MB**（Private Bytes） | 启动完成、无请求时 |
-| 内存（12 并发压测后） | **49 MB** | 900 个混合请求跑完，涨完就稳住，不随请求数线性增长 |
-| 打包大文件时的峰值 | **+0.2 MB** | 80 MB 文件按需打 zip，全程流式，不把文件读进内存 |
-| 上传时的内存 | 基本不涨 | 按 512 KB 分块写盘 |
-| CPU | 单核足够 | `--workers 1`；压测约 50 req/s，瓶颈在单进程 + 同步 SQLite，不在资源 |
-| 磁盘（数据卷） | 上传总量 × 约 2 | 项目文件 + 按需生成的 zip 缓存（开了下载的项目多占一份） |
-| 数据库 | 10 个项目约 **230 KB** | SQLite + WAL，千级项目也就几 MB |
-
-**建议配置**：`1C / 512MB / 5GB` 能跑起来；`2C / 1GB` 更从容（构建镜像时 npm install 会吃点内存）。
-磁盘按「预计上传总量的 2 倍」留，这是唯一会真正吃紧的资源。
-
-需要限制一下的话，`docker-compose.yml` 里加：
-
-```yaml
-    deploy:
-      resources:
-        limits: { cpus: "1.0", memory: 512M }
-```
-
-> 内存上限别压到 128M 以下：容器里的 Python 解释器 + 依赖本身就要几十 MB，
-> Linux 下 RSS 通常在 45–60 MB，留 256M 才不会在打包/并发时被 OOM kill。
-
 ## 快速开始
 
 ```bash
-cp .env.example .env           # 改 ADMIN_PASSWORD、SITE_TITLE、PORT
-docker compose up -d --build    # 首次构建约 1-2 分钟
-docker compose logs -f preview  # 若未指定密码，日志里会打印初始管理员密码
+cp .env.example .env            # 至少改 ADMIN_PASSWORD；SITE_TITLE / PORT 一并看看
+docker compose up -d --build    # 首次构建 1-2 分钟
+docker compose logs -f preview  # 没指定密码时，日志里会打印初始管理员密码
 ```
 
 打开 `http://<机器IP>:8080`，用 `.env` 里的 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录。
 
-> 没装 Docker？本地也能跑：
-> `python -m venv .venv && .venv/Scripts/pip install -r backend/requirements.txt`（Linux 用 `.venv/bin/pip`），
-> `cd frontend && npm i && npm run build`，然后
-> `DATA_DIR=./data .venv/Scripts/python -m uvicorn app.main:app --app-dir backend --port 8080`。
+<details>
+<summary>没装 Docker，本地跑</summary>
 
-## 给成员（Agent）用
+```bash
+python -m venv .venv && .venv/Scripts/pip install -r backend/requirements.txt   # Linux/macOS: .venv/bin/pip
+cd frontend && npm i && npm run build && cd ..
+DATA_DIR=./data .venv/Scripts/python -m uvicorn app.main:app --app-dir backend --port 8080
+```
 
-命令行是**真能增删改查**的，不是说明书。单文件、只用标准库，拷到任何有 Python 3.10+ 的机器上就能跑：
+</details>
+
+## 能力
+
+### 项目与链接
+
+| 能力 | 说明 |
+|---|---|
+| **入口规则简单** | 单个文件（`report.html` / `menu.pdf` 都行）直接当入口；多文件必须有根目录 `index.html`，没有就上传时 422 说清楚，不会传完才发现是白屏 |
+| **到期自动化** | 每 60s 巡检；到期可选「停访留文件」或「连文件删除」，站点级可设默认策略，两种后果在界面上分得开 |
+| **失效链接回门户** | 过期 / 删除 / 改私有 / 不存在，`/v/` 一律 302 回门户并提示「链接已失效」，不再原地渲染破页面；iframe 里引用时用能 `window.top` 跳走的失效页，子资源请求静默 404。看 URL 猜不出项目在不在 |
+| **外链当短链** | `kind=link` 项目分享出去的是本站 `/v/<slug>`，点开记一次访问再 302 到源站——一次跳转、没有中间页、也不套 iframe，但访问数有了 |
+| **下载** | 上传即可下载是默认；整包 zip 之外，抽屉里的文件清单每行都能单独下载（`/download/<slug>/<相对路径>`）。文件夹上传保留相对路径 |
+| **项目名有规矩** | 最多 10 个中文字符（按显示宽度算），同成员名下不允许重名（忽略大小写/首尾空格），新建/外链/改名三条路都拦；改名不动链接 |
+| **项目自带图标** | 预览页优先用项目里的 `favicon.ico/svg/png`、`apple-touch-icon.png`，没有才退回站点图标 |
+
+### 权限与成员
+
+| 能力 | 说明 |
+|---|---|
+| **三档可见性** | 门户可见 / 持链接可见 / 仅自己，各有一套默认时长。**门户与持链接在权限上完全一样**（有 URL 就能看），区别只是会不会被列进门户；「仅自己」不是登录就能看，而是只有作者本人或管理员能看。详见 [docs/visibility.md](docs/visibility.md) |
+| **三种角色** | `viewer` 只能浏览门户、`publisher` 管自己的项目、`admin` 管全部。成员页下拉即改、立即生效，不能改自己，也不会把最后一个管理员降级 |
+| **一账号 = 一 Agent = 一把 Key** | 每个成员一把 `pv_...`，成员页可给 Key 标「绑定给谁」并显示尾号、最近使用时间、累计次数——共用了能看出来 |
+| **归属跟着人走** | 谁上传、谁挂的外链就归谁；删成员时项目记录一起清掉，不留 `owner` 为空的孤儿；历史遗留的无主项目自动收归最早的管理员 |
+| **批量改可见性** | 勾选若干条后在底部工具条一键切换三档，返回里单独报出「已到期、需先续期」的条数 |
+
+### 收藏夹与门户
+
+| 能力 | 说明 |
+|---|---|
+| **收藏夹归类** | 左侧「分类 + 收藏夹」二合一：常驻按可见性统计的**全部 / 门户 / 持链接 / 仅自己 / 未归类**（三档之和 = 全部），再往下是两级收藏夹（夹 → 子夹）。点一下筛、勾选后可「移到收藏夹」，管理员能跨成员归类。删夹默认**只删壳**，项目退回未归类 |
+| **两套筛选不打架** | 侧栏三档是「跳出收藏夹、看全站这一档」，工具栏的可见性下拉是「在当前夹里快筛」（选中夹时文案变「本夹全部可见性」），互不换范围；窄屏侧栏收起时再补一个归类下拉兜底 |
+| **收藏夹归属可见** | 管理员视角下侧栏**按成员分组**（自己的组排最前，组头有成员色点、夹数、折叠箭头），右上角成员下拉可只看某个人——只收侧栏不换列表范围。夹里混了别人的项目时数字后补 `+N`（`39+1` = 39 个里有 1 个不是夹主的） |
+| **书签导入 / 导出** | 直接吃 Chrome / Edge / Firefox / Safari 导出的 HTML，先预览再落库；**文件夹变收藏夹、书签变外链项目**，同一网址重复导入自动跳过；导出的仍是标准书签 HTML |
+| **访客门户** `/portal` | 标题与筛选区整体吸顶；卡片 / 列表两种视图（记在本地）；卡片右上角圆环是访问量、底部是实时倒计时与进度条；按类型 / 成员 / 标签 / 关键词筛选，按创建 / 到期 / 访问 / 名称排序。每张卡片都有快捷复制，点一下复制直链并冒「已复制」气泡 |
+| **门户分页** | 默认 24 / 页（可切 48、96、全部），底部页码 + 「第 1–24 / 共 37 个」；翻页不重新请求，筛选一变回第 1 页。服务端一次最多 500 个，超出明确写出「另有 N 个更早的未显示」 |
+| **标签有规矩** | 每项目最多 6 个（可调到 1–6）、单个 12 字、只允许中英文 / 数字 / `+ # . - _`；全角转半角、英文转小写、重名合并。门户标签条永远单行横滑，按引用次数只放前 N 个（8/12/16/24/全部），多的折成「还有 N 个」；卡片上的标签装不下就折成 `+N` |
+| **作者名片** | 设置里填显示名、一句话介绍和若干链接（GitHub / 邮箱 / 抖音 / 博客 / X / B站 / 知乎 / RSS / 自定义），门户顶部多出一条名片，移动端收成图标。默认 `vita` /「互联网混子」，**不含真实个人信息** |
+| **RSS** | `/rss.xml`（`/feed.xml` 同）输出最近 50 个门户可见且未过期的项目，带绝对链接与标签；门户 `<head>` 有自动发现，入口在页脚。门户不公开且未登录时 404，不会把登录页塞给阅读器 |
+
+### 界面与观感
+
+| 能力 | 说明 |
+|---|---|
+| **配色系列可换** | 设置页 6 套整套方案（经典墨绿 / 科技感 / 马卡龙 / 莫兰迪 / 新中式 / 极简黑白），卡片即缩略预览，保存后控制台、门户、预览页、错误页、`theme-color` 一起换 |
+| **配色不是随手配的** | 按 60-30-10 分：画布留白 60%、卡片容器 30%、主色 10%（按钮 / 圆环 / 进度条 / 选中态）。每套只给「画布底 + 正文色 + 次级文字」三个锚点，其余中性色由它们混出；主色在白底对比度不足 3:1 时自动等比压深（色相不动），设置页写明「实际按 #xxxxxx 渲染」 |
+| **「到期删除」看得见** | 到期动作是删文件的项目，门户卡片带琥珀色左边条 + 徽章 + 琥珀进度条，列表行、预览页顶栏、控制台表格与抽屉同样标记 |
+| **站点图标** | 出厂是枚「沙漏」（限时可用 = 临时预览），SVG + ICO + PNG 齐全，`tools/gen_icons.py` 从同一份 SVG 生成；设置页可上传替换（`png/svg/ico/jpg/webp`，≤512KB），随时恢复默认 |
+| **侧栏可折叠** | 228px → 64px 只留图标，状态记在本地，刷新后保持 |
+| **管理台** | 按成员 / 类型 / 可见性 / 状态 / 标签筛选，按访问、创建、更新、到期、体积排序；抽屉里续期、改标签、开关下载、看文件清单与 14 天趋势 |
+| **访问统计** | 只统计项目首页文档访问，内存累加 + 3s 批量落库（不牺牲响应速度），带 14 天趋势 |
+
+### 运行与运维
+
+| 能力 | 说明 |
+|---|---|
+| **轻** | 前端 gzip 后约 65KB；后端只依赖 fastapi / uvicorn / python-multipart，无 ORM、无 Redis、无消息队列 |
+| **并发安全** | 多 agent 同时上传、同一 slug 6 路覆盖、混合读写都不写串不 500：slug 级锁 + 每次上传独立临时目录 + 原子替换 + Windows 文件句柄重试。删除时文件被占用，记录照样删，残留目录交给孤儿清理 |
+| **备份 / 恢复** | 设置页一个按钮打出 zip（数据库在线快照 + 项目文件 + 下载包 + 图标 + manifest），也能拿它一键覆盖恢复；恢复前把现网数据整体挪进 `data/.backup-before-restore-<时间>/`（留 3 份），**恢复错了还能挪回来** |
+| **迁移友好** | 自带 Cloudflare KV → 本地的搬运脚本，保留 slug / 标题 / 文件 / 创建与到期时间 / 访问数 |
+
+## 给 Agent 用
+
+命令行是**真能增删改查**的：单文件、只用标准库，拷到任何 Python 3.10+ 的机器上就能跑。
 
 ```bash
 # 1) 登录一次，Key 存到 ~/.config/tmp-preview/config.json（0600）
-python cli/agentctl.py login --url http://<站点地址>:8080 --username alice --password xxx
-python cli/agentctl.py whoami          # 我是谁、什么角色、能干什么
+python cli/agentctl.py login --url http://<站点>:8080 --username alice --password xxx
+python cli/agentctl.py whoami                    # 我是谁、什么角色、能干什么
 
-# 2) 部署：上传完直接探活，返回可点开的预览地址 + HTTP 状态
+# 2) 部署：传完自己去探活，返回可点开的地址 + HTTP 状态
 python cli/agentctl.py deploy ./dist --title "落地页 v3" --tags "前端,v3" --ttl 24
 #   → 预览地址  http://.../v/landing-v3
 #     已验证    HTTP 200
 
 # 3) 日常
 python cli/agentctl.py ls --status online --sort views
-python cli/agentctl.py ls --tag 前端 --visibility portal
-python cli/agentctl.py show landing-v3
 python cli/agentctl.py set landing-v3 --visibility private   # 门户可见 / 持链接 / 仅自己
 python cli/agentctl.py extend landing-v3 48                  # 或 --forever
 python cli/agentctl.py rm landing-v3
 
 # 4) 批量 / 统计 / 管理员
 python cli/agentctl.py bulk --action visibility --visibility portal --slugs a,b,c
-python cli/agentctl.py bulk --action delete --slugs a,b,c --yes
-python cli/agentctl.py stats --days 14
-python cli/agentctl.py members list
 python cli/agentctl.py members set alice --label "claude-code@笔记本" --rotate-key
 
-# 5) 自检：用当前身份真跑一遍 建→探活→改私有(打不开)→改回(200)→续期→删除→链接失效
+# 5) 自检：建→探活→改私有(打不开)→改回(200)→续期→删除→链接失效
 python cli/agentctl.py selfcheck
 ```
 
-加 `--json` 时 stdout 只有一行 JSON（给上游程序读），人读的提示全部走 stderr，两者不混。
-完整能力边界与调用示例见 [skills/tmp-preview-agent/SKILL.md](skills/tmp-preview-agent/SKILL.md)。
+`--json` 时 stdout 只有一行 JSON（给上游程序读），人读的提示全走 stderr，两者不混。
+完整命令与权限边界见 [skills/tmp-preview-agent/SKILL.md](skills/tmp-preview-agent/SKILL.md)。
 
-机器调用也可以直接走 API：
+也可以直接打 API：
 
 ```bash
 curl -X POST http://127.0.0.1:8080/api/projects \
@@ -142,26 +140,63 @@ curl -X POST http://127.0.0.1:8080/api/projects \
   -F "files=@dist/assets/app.js;filename=assets/app.js"
 ```
 
+## 部署与运维
+
+| 事项 | 做法 |
+|---|---|
+| 看日志 | `docker compose logs -f --tail=100 preview` |
+| 升级 | `git pull && docker compose up -d --build`（数据在 `./data`，不受影响） |
+| 改端口 | `.env` 里 `PORT=9000` |
+| 反向代理 | 交给 Nginx / Caddy 终止 TLS，转发到 `127.0.0.1:8080`，并设 `COOKIE_SECURE=1` |
+| 备份 | 设置页「打包下载」（数据库走在线快照，不用停服）；兜底也可以打包 `./data`，或 `sqlite3 data/db.sqlite3 ".backup backup.db"` 单独热备 |
+| 恢复 | 设置页传 zip →「先看看里面有什么」→「覆盖恢复」，旧数据留在 `data/.backup-before-restore-<时间>/` |
+| 进程数 | **保持 1 个 worker**：访问计数与到期巡检是进程内任务，要横向扩展得换成外置计数 / 锁 |
+| 并发上限 | 多 agent 同时上传安全，同一 slug 同时写只有最后一次生效；实测 18 路并发上传单次约 3.3s，再高建议排队 |
+| 清残留目录 | 文件被占用会留下目录，后台约 30 分钟内自动清；要立刻清就重启（启动时扫 `.tmp-*` / `.old-*`） |
+
+### 资源占用
+
+单进程、无 Redis、无 ORM，整套东西基本就是「一个 Python 进程 + 一块磁盘」。
+
+| 项目 | 实测 / 估算 | 说明 |
+|---|---|---|
+| 镜像体积 | 约 **160 MB**（拉取压缩后 ~65 MB） | `python:3.12-slim` 基础镜像 ~130 MB，运行时依赖 ~22 MB，应用与前端产物不到 1 MB |
+| 内存（空载） | **35 MB** | 启动完成、无请求时 |
+| 内存（12 并发压测后） | **49 MB** | 900 个混合请求跑完就稳住，不随请求数线性增长 |
+| 打包大文件的峰值 | **+0.2 MB** | 80 MB 文件按需打 zip，全程流式 |
+| 上传时的内存 | 基本不涨 | 按 512 KB 分块写盘 |
+| CPU | 单核足够 | `--workers 1`；压测约 50 req/s，瓶颈在单进程 + 同步 SQLite |
+| 磁盘（数据卷） | 上传总量 × 约 2 | 项目文件 + 按需生成的 zip 缓存 |
+| 数据库 | 10 个项目约 **230 KB** | SQLite + WAL，千级项目也就几 MB |
+
+建议配置：`1C / 512MB / 5GB` 能跑，`2C / 1GB` 更从容（构建镜像时 npm install 吃点内存）。
+磁盘按「预计上传总量的 2 倍」留，这是唯一会真正吃紧的资源。要限额就在 `docker-compose.yml` 里加：
+
+```yaml
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+```
+
+> 别把内存压到 128M 以下：解释器 + 依赖本身就要几十 MB，Linux 下 RSS 通常 45–60 MB，
+> 留 256M 才不会在打包 / 并发时被 OOM kill。
+
 ## 从 Cloudflare 迁到本地
 
 ```bash
-docker compose stop            # 先停服务，避免与后台任务抢写
-
-export CF_API_TOKEN=xxx        # 只需 Workers KV 读取权限
-export CF_ACCOUNT_ID=xxx
-export CF_KV_NAMESPACE_ID=xxx
-
-python migrate/from_cloudflare.py --dry-run   # 先看清单
+docker compose stop                 # 先停服务，避免与后台任务抢写
+export CF_API_TOKEN=xxx CF_ACCOUNT_ID=xxx CF_KV_NAMESPACE_ID=xxx
+python migrate/from_cloudflare.py --dry-run
 python migrate/from_cloudflare.py --agent admin
 docker compose start
 ```
 
-迁移会保留：slug、标题、说明、文件内容、zip、创建/更新时间、到期时间、到期策略、访问次数。
-详见 [docs/migration.md](docs/migration.md)。
+保留 slug、标题、说明、文件、zip、创建/更新时间、到期时间与策略、访问次数。详见 [docs/migration.md](docs/migration.md)。
 
 ## 目录结构
 
 ```
+LICENSE / NOTICE     AGPL-3.0 正文 与 附加署名条款（分发/对外服务时别删）
 backend/app/
   main.py            FastAPI 入口（API + 访客页 + SPA 托管）
   config.py          全部配置走环境变量
@@ -175,70 +210,80 @@ backend/app/
   routers/           auth · projects · agents · settings · public
 frontend/src/        Vue 3 控制台（零 UI 框架，手写设计系统）
 frontend/public/     站点图标与 manifest（favicon.svg 是唯一矢量源）
-cli/agentctl.py      成员侧命令行入口（兼容壳，实现见下）
-skills/tmp-preview-agent/  Agent 侧技能包：scripts/agentctl.py 是真实实现（单文件、仅标准库）+ SKILL.md 权限边界
+cli/agentctl.py      成员侧命令行入口（兼容壳）
+skills/tmp-preview-agent/  Agent 技能包：scripts/agentctl.py 是真实实现 + SKILL.md 权限边界
 migrate/             Cloudflare KV → 本地
-tools/               gen_icons.py（从 favicon.svg 生成 ICO/PNG）、push_api.py（推 GitHub）
+tools/               gen_icons.py、push_api.py
 tests/               冒烟测试 / 截图脚本 / 演示数据
 legacy/cloudflare/   旧版 Worker 实现（仅存档，不再维护）
 docs/                架构、接口、可见性、迁移说明
 ```
 
-## 常用运维
-
-| 事项 | 做法 |
-|---|---|
-| 看日志 | `docker compose logs -f --tail=100 preview` |
-| 备份 | 设置页「备份恢复 → 打包下载」（数据库走在线快照，不用停服）；手工兜底也可以打包 `./data`，或热备 `sqlite3 data/db.sqlite3 ".backup backup.db"` |
-| 恢复 | 设置页传 zip → 「先看看里面有什么」确认条数 → 「覆盖恢复」；旧数据留在 `data/.backup-before-restore-<时间>/` |
-| 升级 | `git pull && docker compose up -d --build`（数据在 `./data`，不受影响） |
-| 改端口 | `.env` 里 `PORT=9000` |
-| 反向代理 | 交给 Nginx/Caddy 终止 TLS，转发到 `127.0.0.1:8080`，并把 `COOKIE_SECURE=1` |
-| 单进程 | 计数与清理是进程内任务，**保持 1 个 worker**；要横向扩展需改用外置计数/锁 |
-| 并发上限 | 多个 agent 同时上传是安全的（slug 级锁 + 原子替换），但同一个 slug 同时写只有最后一次生效；打满约 18 路并发上传时单次约 3.3s，再高建议排队 |
-| 清残留目录 | 删除时文件被占用会留下目录，`data/projects/` 下无人认领的目录会在后台约 30 分钟内自动清掉；要立刻清就重启一次（启动时会扫 `.tmp-*` / `.old-*`） |
-
 ## 自检与测试
 
-全部测试都是「打真服务的黑盒脚本」，跑之前先起好后端（Playwright 那几项还要起前端 `npm run dev`）：
+全部是「打真服务的黑盒脚本」，跑前先起后端（带 `需 chrome` 的那几项还要有 Chrome）：
 
 ```bash
-python tests/smoke_test.py       --url http://127.0.0.1:8000   # 26 项：上传/列表/改属性/批量/下载/删除/成员
-python tests/check_ttl.py        --url http://127.0.0.1:8000   # 16 项：三档可见性各自的默认时长与到期策略
-python tests/check_roles.py      --url http://127.0.0.1:8000   # 26 项：三档角色的接口权限与页面权限
-python tests/check_collections.py --url http://127.0.0.1:8000  # 61 项：收藏夹树 / 归类 / 筛选 / 删夹去向 / 侧栏折叠
-python tests/check_bookmarks.py  --url http://127.0.0.1:8000   # 46 项：书签导入预览 / 判重 / 导出回灌（需 chrome）
-python tests/check_backup.py     --url http://127.0.0.1:8000   # 40 项：打包 / 预览 / 恢复 / 保留策略（会真恢复一次）
-python tests/check_migrate.py    --url http://127.0.0.1:8000   # 19 项：老库加列迁移、悬空外键自愈
-python tests/check_portal.py     --url http://127.0.0.1:8000   # 41 项：门户页结构、吸顶、卡片/列表、复制按钮
-python tests/check_visibility.py --url http://127.0.0.1:8000   # 41 项：三档可见性的真实访问结果 + Key 使用痕迹
-python tests/check_cli.py        --url http://127.0.0.1:8000   # 57 项：CLI 真子进程跑一遍所有命令与越权
-python tests/check_concurrency.py --url http://127.0.0.1:8000 # 20 项：6 agent 并发部署 / 同 slug 抢占 / 混合读写
-python tests/check_copy.py       --url http://127.0.0.1:8000   # 26 项：复制按钮的层级、剪贴板内容、移动端、无溢出
-python tests/check_title.py      --url http://127.0.0.1:8000   # 22 项：同一成员重名拦截（新建/外链/改名/跨成员）
-python tests/check_gone.py       --url http://127.0.0.1:8000   # 34 项：失效链接一律 302 回门户，不泄露项目是否存在
-python tests/check_entry.py      --url http://127.0.0.1:8000   # 23 项：单文件任意名 / 多文件必须有 index.html / 覆盖上传
-python tests/check_rss.py        --url http://127.0.0.1:8000   # 24 项：RSS 结构、绝对链接、门户不公开时的 404、页脚入口
-python tests/check_theme.py      --url http://127.0.0.1:8000   # 54 项：主色派生、可读性兜底、非法值回落、站点图标
-python tests/check_tags.py       --url http://127.0.0.1:8000   # 28 项：标签归一化/数量/长度/字符、批量截断、孤儿回收
-python tests/check_del_badge.py  --url http://127.0.0.1:8000   # 27 项：到期删除在门户卡片/列表/预览页的标记与切换
-python tests/check_portal_page.py --url http://127.0.0.1:8000  # 31 项：门户分页、按成员筛选、标签单行横滑与 +N 折叠
-python tests/check_series.py     --url http://127.0.0.1:8000   # 93 项：6 套配色系列下发/切换/回落、对比度、画布变量
-python tests/check_visfilter.py  --url http://127.0.0.1:8000   # 14 项：侧栏三档=跳全站、工具栏下拉=夹内快筛（需 chrome）
-python tests/check_agents_page.py --url http://127.0.0.1:8000  # 14 项：成员管理分页、越界归位、每页条数切换（需 chrome）
-python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 21 项：成员搜索/角色/状态/排序及其叠加（需 chrome）
-python tests/check_agent_copy.py --url http://127.0.0.1:8000   # 10 项：复制登录命令真的进剪贴板、失败能降级（需 chrome）
-python tests/check_upload.py     --url http://127.0.0.1:8000   # 6 项：新建项目弹窗一屏放下、两列不塌、标签上限跟随站点（需 chrome）
-python tests/check_owner_rail.py --url http://127.0.0.1:8000   # 36 项：收藏夹归属 / 侧栏按成员分组与筛选 / +N 计数（需 chrome，会自建自删一个成员）
+python tests/smoke_test.py       --url http://127.0.0.1:8000   # 上传/列表/改属性/批量/下载/删除/成员
+python tests/check_ttl.py        --url http://127.0.0.1:8000   # 三档默认时长与到期策略
+python tests/check_roles.py      --url http://127.0.0.1:8000   # 三档角色的接口与页面权限
+python tests/check_visibility.py --url http://127.0.0.1:8000   # 三档可见性的真实访问结果 + Key 使用痕迹
+python tests/check_collections.py --url http://127.0.0.1:8000  # 收藏夹树 / 归类 / 筛选 / 删夹去向 / 侧栏折叠
+python tests/check_owner_rail.py --url http://127.0.0.1:8000   # 收藏夹归属 / 侧栏分组与筛选 / +N 计数（需 chrome）
+python tests/check_visfilter.py  --url http://127.0.0.1:8000   # 侧栏三档=跳全站、工具栏=夹内快筛（需 chrome）
+python tests/check_bookmarks.py  --url http://127.0.0.1:8000   # 书签导入预览 / 判重 / 导出回灌（需 chrome）
+python tests/check_portal.py     --url http://127.0.0.1:8000   # 门户结构、吸顶、卡片/列表、复制按钮
+python tests/check_portal_page.py --url http://127.0.0.1:8000  # 门户分页、按成员筛选、标签横滑与 +N
+python tests/check_rss.py        --url http://127.0.0.1:8000   # RSS 结构、绝对链接、门户不公开时 404
+python tests/check_title.py      --url http://127.0.0.1:8000   # 同成员重名拦截（新建/外链/改名/跨成员）
+python tests/check_rename.py     --url http://127.0.0.1:8000   # 改名链路 + 项目名长度规则
+python tests/check_entry.py      --url http://127.0.0.1:8000   # 单文件任意名 / 多文件必须有 index.html / 覆盖上传
+python tests/check_gone.py       --url http://127.0.0.1:8000   # 失效链接一律 302 回门户，不泄露是否存在
+python tests/check_tags.py       --url http://127.0.0.1:8000   # 标签归一化/数量/长度/字符、批量截断、孤儿回收
+python tests/check_del_badge.py  --url http://127.0.0.1:8000   # 到期删除在卡片/列表/预览页的标记
+python tests/check_theme.py      --url http://127.0.0.1:8000   # 主色派生、可读性兜底、非法值回落、站点图标
+python tests/check_series.py     --url http://127.0.0.1:8000   # 6 套配色下发/切换/回落、对比度、画布变量
+python tests/check_copy.py       --url http://127.0.0.1:8000   # 复制按钮的层级、剪贴板内容、移动端、无溢出
+python tests/check_backup.py     --url http://127.0.0.1:8000   # 打包/预览/恢复/保留策略（会真恢复一次）
+python tests/check_migrate.py    --url http://127.0.0.1:8000   # 老库加列迁移、悬空外键自愈
+python tests/check_cli.py        --url http://127.0.0.1:8000   # CLI 全命令与越权
+python tests/check_concurrency.py --url http://127.0.0.1:8000  # 6 agent 并发 / 同 slug 抢占 / 混合读写
+python tests/check_icon.py       --url http://127.0.0.1:8000   # 站点图标上传/恢复（需 chrome）
+python tests/check_agents_page.py --url http://127.0.0.1:8000  # 成员管理分页、越界归位、每页条数（需 chrome）
+python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 成员搜索/角色/状态/排序及叠加（需 chrome）
+python tests/check_agent_copy.py --url http://127.0.0.1:8000   # 复制登录命令进剪贴板、失败能降级（需 chrome）
+python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗一屏放下、两列不塌（需 chrome）
+python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 完整 + 门户页脚/登录页/关于页署名（需 chrome）
 ```
 
 ## 安全约定
 
-- 密钥只在 `.env` 与环境变量里，不写入仓库；
+- 密钥只在 `.env` 与环境变量里，不写进仓库；
 - 项目文件路径全部做穿越校验，只有 `data/projects/<slug>/` 下的文件可读；
-- 上传/管理接口都要认证，`publisher` 只能操作自己的项目，`viewer` 连项目列表都读不到；
+- 上传 / 管理接口都要认证，`publisher` 只能动自己的项目，`viewer` 连项目列表都读不到；
 - 访客页与项目响应均带 `X-Robots-Tag: noindex, nofollow`。
+
+## 许可与署名
+
+本项目以 **GNU Affero 通用公共许可证第 3 版（AGPL-3.0-only）** 发布，
+全文见 [LICENSE](LICENSE)，著作权与附加署名要求见 [NOTICE](NOTICE)。
+
+Copyright (C) 2026 Vita0519· <https://github.com/Vita0519/tmp-preview-deploy>
+
+这意味着：
+
+- **改了要开源。** 分发修改版要按 AGPL 提供完整源码；
+- **提供网络服务也要给源码。** AGPL 第 13 条：即使不分发二进制，只要让它对外提供服务，
+  就要向使用者提供完整对应源码（自建自用、内部部署同样适用）；
+- **署名要保留。** 依据 AGPL-3.0 第 7(b) 条，本项目另加要求：任何再分发、修改版或对外提供的服务，
+  都必须保留 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)、保留「关于 / 许可」页面与登录页、门户页脚里
+  指向本项目的署名与链接（页脚那句 `Powered by tmp-preview` 不许删），并在显著位置注明
+  「基于 tmp-preview 修改」及修改日期；不得用原作者名义为修改版背书；
+- **不想开源就谈授权。** 闭源商用、白标分发等需要豁免上述条款，请单独联系作者取得书面许可。
+
+第三方依赖各自保留其原许可：FastAPI / uvicorn / python-multipart（MIT）、
+Vue 3（MIT）、Vite（MIT）；`legacy/cloudflare/` 里的旧实现同样适用本项目许可。
 
 ## 接口
 
-完整列表见 [docs/api.md](docs/api.md)，架构与设计取舍见 [docs/architecture.md](docs/architecture.md)。
+完整列表见 [docs/api.md](docs/api.md)，架构与取舍见 [docs/architecture.md](docs/architecture.md)。

@@ -19,6 +19,7 @@ description: 以「一个账号 = 一个 Agent = 一把 API Key」的身份，�
 ```
 skills/tmp-preview-agent/
 ├── SKILL.md              你正在读的这份
+├── NOTICE                版权与署名要求（AGPL-3.0 §7(b)），单独拷走时别丢
 └── scripts/agentctl.py   真正的客户端：单文件、只用标准库、Python 3.10+ 免安装
 ```
 
@@ -271,9 +272,22 @@ PATCH  /api/projects/{slug}                 # {"collection_id": 12} / {"collecti
 - `GET /api/projects?collection=abc`（既不是数字也不是 `none`）会 400，不会静默返回全部。
 
 返回里的 `visibility` 是三档可见性的数量（三者之和 = `total`）。控制台侧栏把
-「全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类」做成了常驻分类，用的就是这几个数——
-**API 侧没变**，筛可见性仍然走 `GET /api/projects?visibility=portal|link|private`，
-只是控制台不再单独放一个可见性下拉（窄屏除外）。
+「全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类」做成了常驻分类，用的就是这几个数，
+再往下才是收藏夹；**API 侧没变**，筛可见性仍然走 `GET /api/projects?visibility=portal|link|private`
+（工具条那个下拉只是夹内快筛，同样走这个参数，不换收藏夹范围）。
+
+**归属字段**（服务端已就位，Agent 读树时能直接用）：
+
+| 字段 | 含义 |
+|---|---|
+| `owner_id` / `owner` / `owner_display` | 夹的创建者：id、账号、显示名 |
+| `count` / `count_own` / `count_foreign` | **直挂本层**的项目数：合计 / 我名下的 / 别人名下的 |
+| `total` / `total_foreign` | **含子夹**的合计 / 其中别人的 |
+| `owners`（仅管理员） | `[{id, username, display_name, count, total, total_foreign}]`，自己的组排第一 |
+
+`own / foreign` 是相对**发起请求的人**算的：publisher 看自己的夹全是 `own`，
+管理员看别人的夹全是 `foreign`（侧栏那个 `+N` 就是它）。普通成员的 `owners` 是 `[]`——
+他本来就只看得见自己的夹。成员筛选是纯前端行为，没有对应的查询参数。
 
 ### 7. 导入 / 导出浏览器书签
 
@@ -353,3 +367,19 @@ GET    /api/agents/{id}/key            # 取回完整 Key
 - `docs/visibility.md`：三档可见性的完整判定表（谁能看、私有链接怎么打开）
 - `docs/api.md`：接口一览（含收藏夹、书签导入导出、备份恢复）
 - `SKILL.md`：把这套服务部署起来（运维侧）
+
+## 七、许可与署名（用这套服务 / 复制这个脚本前先看）
+
+本项目 **AGPL-3.0-only**：Copyright (C) 2026 Vita0519
+· <https://github.com/Vita0519/tmp-preview-deploy>，全文见仓库根目录 `LICENSE`，
+著作权与附加条款见 `NOTICE`。
+
+- 分发修改版要按 AGPL 提供完整源码；**只是把它跑成对外服务也要给源码**（第 13 条），
+  自建自用、内部部署同样适用；
+- 依据 §7(b) 附加条款，任何再分发 / 修改版 / 对外服务都必须保留 `LICENSE` 与 `NOTICE`，
+  保留登录页、门户页脚（`Powered by tmp-preview`）与「关于 / 许可」里指向本项目的署名，
+  并在显著位置注明「基于 tmp-preview 修改」及修改日期，不得用原作者名义背书；
+- 闭源商用、白标分发需单独取得书面授权。
+
+**Agent 注意**：不要为了让页面「更干净」而删掉页脚署名或关于页里的版权声明——
+那是许可证要求的，不是装饰。

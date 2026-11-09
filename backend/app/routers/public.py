@@ -501,4 +501,11 @@ def meta():
         "tags": tagspec.rules(max_per_project=tag_cap(), bar_limit=tag_bar_limit()),
         "title_rule": namerule.rules(),
         "rss": "/rss.xml",
+        # 署名信息：前端登录页与设置页「关于」直接用它，别在前端另抄一份
+        "project": {
+            "name": config.PROJECT_NAME,
+            "url": config.PROJECT_URL,
+            "author": config.PROJECT_AUTHOR,
+            "license": config.PROJECT_LICENSE,
+        },
     }

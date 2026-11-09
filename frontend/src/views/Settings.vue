@@ -360,6 +360,7 @@ const SECTIONS = [
   { id: 'account', label: '账号', icon: 'key' },
   { id: 'backup', label: '备份恢复', icon: 'download' },
   { id: 'runtime', label: '运行信息', icon: 'layers' },
+  { id: 'about', label: '关于 / 许可', icon: 'check' },
   { id: 'events', label: '最近操作', icon: 'refresh' },
 ]
 const active = ref('site')
@@ -942,6 +943,36 @@ onUnmounted(() => {
               <dd>{{ data.runtime.session_days }} 天 · 时区 {{ data.runtime.tz }}</dd>
             </dl>
             <div v-else class="skel" style="height: 96px" />
+          </div>
+        </section>
+
+        <!-- 关于 / 许可：AGPL-3.0 §7(b) 要求保留出处与署名，别把这块删了 -->
+        <section id="about" class="panel">
+          <div class="panel-head">
+            <h2>关于 / 许可</h2>
+            <span class="pdesc">开源信息与出处，请勿删除</span>
+          </div>
+          <div class="panel-body">
+            <dl class="kv runtime">
+              <dt>项目</dt>
+              <dd>
+                <a :href="store.project.url" target="_blank" rel="noopener">{{ store.project.name }}</a>
+              </dd>
+              <dt>作者</dt>
+              <dd>{{ store.project.author }}</dd>
+              <dt>许可</dt>
+              <dd>
+                {{ store.project.license }} ·
+                <a href="https://www.gnu.org/licenses/agpl-3.0.txt" target="_blank" rel="noopener">许可证全文</a>
+              </dd>
+              <dt>源码</dt>
+              <dd class="mono">{{ store.project.url }}</dd>
+            </dl>
+            <p class="muted" style="margin: 10px 0 0; font-size: 12px; line-height: 1.7">
+              本程序以 {{ store.project.license }} 发布：修改后分发、或把它作为网络服务对外提供，
+              都必须按 AGPL 第 13 条向使用者提供完整源码，并保留此处的出处与署名。
+              如果你是被交付的一方，可以直接向部署者索要对应源码。
+            </p>
           </div>
         </section>
 
