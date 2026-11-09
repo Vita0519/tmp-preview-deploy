@@ -192,10 +192,35 @@ async function remove(item) {
   }
 }
 
-function copy(text) {
-  navigator.clipboard?.writeText(text).then(
-    () => toast('已复制'),
-    () => toast('复制失败', 'err')
+async function copy(text) {
+  if (!text) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // 局域网 http 不是安全上下文，没有 Clipboard API，退回老办法
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.setAttribute('readonly', '')
+      ta.style.cssText = 'position:fixed;top:-1000px;opacity:0'
+      document.body.appendChild(ta)
+      ta.select()
+      const done = document.execCommand('copy')
+      document.body.removeChild(ta)
+      if (!done) throw new Error('execCommand copy failed')
+    }
+    toast('已复制')
+  } catch {
+    toast('复制失败，请手动选中复制', 'err')
+  }
+}
+
+// 模板里不能直接写 location：Vue 的全局白名单里没有它，编译成 _ctx.location 后一点就抛错
+function copyLoginCmd() {
+  const c = created.value
+  if (!c?.username || !c.password) return
+  copy(
+    `agentctl login --url ${window.location.origin} --username ${c.username} --password '${c.password}'`
   )
 }
 
@@ -519,13 +544,7 @@ onMounted(load)
       </dl>
       <div style="display: flex; gap: 6px; margin-top: 14px">
         <button v-if="created.api_key" class="btn sm" @click="copy(created.api_key)">复制 Key</button>
-        <button
-          v-if="created.password"
-          class="btn sm"
-          @click="copy(`agentctl login --url ${location.origin} --username ${created.username} --password '${created.password}'`)"
-        >
-          复制登录命令
-        </button>
+        <button v-if="created.password" class="btn sm" @click="copyLoginCmd">复制登录命令</button>
       </div>
     </div>
     <div class="modal-foot">
