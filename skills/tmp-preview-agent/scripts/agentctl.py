@@ -14,6 +14,15 @@
   agentctl deploy ./dist --tags 前端 --ttl 24 --json
   agentctl selfcheck          # 用当前身份跑一遍增删改查，确认权限没问题
 """
+
+# ---------------------------------------------------------------------------
+# tmp-preview（临时预览站）
+# Copyright (C) 2026 孟庆炜（Vita0519）<https://github.com/Vita0519/tmp-preview-deploy>
+#
+# 本程序以 GNU AGPL-3.0 发布（AGPL-3.0-only），全文见仓库根目录 LICENSE，
+# 著作权与附加署名要求见 NOTICE。分发修改版或对外提供服务时，请保留本声明。
+# ---------------------------------------------------------------------------
+
 import argparse
 import io
 import json

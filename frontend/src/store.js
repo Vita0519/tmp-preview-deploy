@@ -9,6 +9,13 @@ export const store = reactive({
   // 标签规则由站点设置决定（管理员可调小），启动时从 /api/meta 同步过来。
   // 初值只是兜底，别写死 6 就当准了——否则界面允许填 6 个、后端按 2 个打回。
   tagRules: { max_per_project: 6, max_len: 12 },
+  // 署名信息由 /api/meta 下发（AGPL-3.0 §7(b) 要求保留，别在前端另抄一份）
+  project: {
+    name: 'tmp-preview',
+    url: 'https://github.com/Vita0519/tmp-preview-deploy',
+    author: '孟庆炜（Vita0519）',
+    license: 'AGPL-3.0-only',
+  },
 })
 
 /** 用 /api/meta 下发的实际规则覆盖前端兜底值 */

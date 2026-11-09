@@ -17,6 +17,14 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DATA_DIR=/data
 
+# OCI 标注：镜像里也带上许可与出处（AGPL-3.0 要求保留署名，见 NOTICE）
+LABEL org.opencontainers.image.title="tmp-preview" \
+      org.opencontainers.image.description="临时预览站：带到期时间的自托管预览 / 下载服务" \
+      org.opencontainers.image.authors="孟庆炜 (Vita0519)" \
+      org.opencontainers.image.url="https://github.com/Vita0519/tmp-preview-deploy" \
+      org.opencontainers.image.source="https://github.com/Vita0519/tmp-preview-deploy" \
+      org.opencontainers.image.licenses="AGPL-3.0-only"
+
 WORKDIR /app
 
 COPY backend/requirements.txt backend/requirements.txt
@@ -24,6 +32,9 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY backend/ backend/
 COPY --from=web /web/dist frontend/dist
+
+# 镜像里也留一份许可与署名声明（AGPL-3.0 要求随分发保留）
+COPY LICENSE NOTICE /app/
 
 RUN mkdir -p /data/projects /data/zips
 

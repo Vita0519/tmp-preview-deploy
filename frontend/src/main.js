@@ -1,3 +1,8 @@
+/*
+ * tmp-preview（临时预览站）
+ * Copyright (C) 2026 孟庆炜（Vita0519）<https://github.com/Vita0519/tmp-preview-deploy>
+ * AGPL-3.0-only：全文见仓库根目录 LICENSE，署名要求见 NOTICE。保留本声明。
+ */
 import { createApp } from 'vue'
 import App from './App.vue'
 import { router, ensureUser } from './router'
@@ -21,6 +26,8 @@ async function boot() {
     applyTagRules(meta?.tags)
     // 自定义站点图标同样在首屏换掉，免得标签页闪一下旧图标
     applySiteIcon(meta?.site_icon || null)
+    // 署名跟着仓库走：fork 了要改就改后端 config，前端不另设一份
+    if (meta?.project) store.project = { ...store.project, ...meta.project }
   } catch {}
   await ensureUser()
   app.mount('#app')

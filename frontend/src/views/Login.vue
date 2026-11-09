@@ -69,6 +69,17 @@ onMounted(() => pwInput.value?.focus())
           {{ busy ? '登录中…' : '进入控制台' }}
         </button>
       </form>
+
+      <!-- AGPL-3.0 §7(b) 附加条款要求的署名，别删 -->
+      <a
+        class="credit"
+        :href="store.project.url"
+        target="_blank"
+        rel="noopener"
+        :title="`${store.project.name} · ${store.project.license} · 作者 ${store.project.author}`"
+      >
+        Powered by {{ store.project.name }} · {{ store.project.license }}
+      </a>
     </div>
   </div>
 </template>

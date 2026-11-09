@@ -1,4 +1,7 @@
-"""FastAPI 入口：API + 访客页 + 构建后的 SPA 同端口托管。"""
+"""FastAPI 入口：API + 访客页 + 构建后的 SPA 同端口托管。
+
+Copyright (C) 2026 孟庆炜（Vita0519）· AGPL-3.0-only（见仓库根目录 LICENSE / NOTICE）
+"""
 import asyncio
 import mimetypes
 from contextlib import asynccontextmanager

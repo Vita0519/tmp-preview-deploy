@@ -786,6 +786,12 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
   background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-line);
   border-radius: var(--radius-xs); padding: 7px 10px; font-size: 12px; margin-bottom: 10px;
 }
+/* 页脚署名：许可证要求保留，所以给个能点的位置，但别喧宾夺主 */
+.login-card .credit {
+  display: block; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line);
+  text-align: center; font-size: 11px; color: var(--ink-4); letter-spacing: 0.01em;
+}
+.login-card .credit:hover { color: var(--brand); }
 
 /* ---------------- 响应式 ---------------- */
 

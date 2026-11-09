@@ -84,8 +84,11 @@ python cli/agentctl.py selfcheck                               # 建→探活→
 - 常驻分类：**全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类**——按可见性和是否归类自动算，
   不用手动维护；数量跟列表页的总数同源（三档之和 = 全部项目）
 - 再往下才是自己建的收藏夹（两级：**收藏夹 → 子收藏夹**）
-- 因为可见性已经在这里了，宽屏下工具栏里那个「全部可见性」下拉被去掉；
-  窗口窄于 1120px 侧栏会收起，这时工具栏里会补一个同样的下拉兜底
+- **侧栏三档 = 跳全站，工具栏下拉 = 夹内快筛**：点侧栏三档会跳出当前收藏夹看全站这一档；
+  工具栏那个「可见性」下拉不换范围，是在当前夹里再筛（选中夹时文案变「本夹全部可见性」）。
+  窗口窄于 1120px 侧栏收起时，工具栏另外补一个**归类下拉**兜底
+- 管理员视角下侧栏**按成员分组**：自己的组排最前（组头有色点、夹数、折叠箭头），
+  右上角成员下拉可只看某个人（只收侧栏、不改项目列表范围）；夹里混了别人的项目时数字后补 `+N`
 
 控制台左侧导航栏右上角有一个折叠按钮（`‹` / `›`）：收起后只留图标，宽度 228px → 64px，
 内容区跟着往左扩 164px；选择记在 localStorage，刷新后保持。
@@ -105,6 +108,8 @@ python cli/agentctl.py collections rm 办公 --with-projects  # 连项目一起�
 - **同名拦截**：同一层不允许两个同名夹（忽略大小写/首尾空格），撞上返回 409。
 - **计数口径**：`count` 是直属项目数，`total` 含子夹；侧栏「全部项目」= 各夹合计 + 未归类，
   跟列表总数一致。非管理员只统计自己名下，看不到别人的项目数。
+  管理员额外拿到 `count_own / count_foreign / total_foreign`（相对**看的人**：我名下 vs 别人名下），
+  夹上那个 `+N` 就是 `total_foreign`。
 
 ## 导入 / 导出浏览器书签
 
@@ -155,6 +160,10 @@ python cli/agentctl.py rm <slug>
 浏览器控制台还能做：按成员/标签/类型/可见性（左侧分类）/状态筛选，按访问、创建、更新、到期、体积排序，
 勾选后一键批量改可见性/续期/转永久/开放下载/删除，抽屉里看文件清单与 14 天访问趋势，
 **点抽屉标题就能改项目名**（实时显示 当前宽度/10，超了保存按钮直接禁用）。
+
+成员页：搜索（账号 / 显示名 / 绑定 Agent 名）、角色与状态筛选、按创建时间 / 最近登录 / 访问次数等排序
+（可切升降序），一页 20 条（可切 20 / 50 / 100），筛选条件叠加后仍能清除回默认；
+新建账号后弹窗里「复制登录命令」直接给一条能跑的 `agentctl login` 命令。
 
 ## 访客门户
 
@@ -219,19 +228,38 @@ docker compose start
 ## 自检
 
 ```bash
-python tests/smoke_test.py       --url http://127.0.0.1:8000   # 26 项端到端
-python tests/check_ttl.py        --url http://127.0.0.1:8000   # 16 项：三档默认时长与到期策略
-python tests/check_roles.py      --url http://127.0.0.1:8000   # 26 项：三档角色接口/页面权限
-python tests/check_migrate.py    --url http://127.0.0.1:8000   # 19 项：加列迁移、悬空外键自愈
-python tests/check_portal.py     --url http://127.0.0.1:8000   # 41 项门户结构回归
-python tests/check_visibility.py --url http://127.0.0.1:8000   # 41 项：三档可见性 + 批量切换 + Key 绑定
-python tests/check_cli.py        --url http://127.0.0.1:8000   # 57 项：CLI 全命令 + 越权
-python tests/check_concurrency.py --url http://127.0.0.1:8000  # 20 项：6 agent 并发 / 同 slug 抢占
-python tests/check_copy.py       --url http://127.0.0.1:8000   # 26 项复制按钮（需 chrome）
-python tests/check_title.py      --url http://127.0.0.1:8000   # 22 项：同一成员重名拦截
-python tests/check_rename.py     --url http://127.0.0.1:8000   # 29 项：改名链路 + 项目名长度规则
-python tests/check_collections.py --url http://127.0.0.1:8000  # 61 项：收藏夹树 / 归类 / 筛选 / 删夹去向 / 侧栏折叠
-python tests/check_bookmarks.py --url http://127.0.0.1:8000   # 46 项：书签导入预览/判重/导出回灌（需 chrome）
-python tests/check_backup.py    --url http://127.0.0.1:8000   # 40 项：打包/预览/恢复/保留策略（会真恢复一次）
-python tests/check_icon.py       --url http://127.0.0.1:8000   # 35 项：站点图标上传/恢复（含 .off 残骸回归，需 chrome）
+python tests/smoke_test.py       --url http://127.0.0.1:8000   # 端到端
+python tests/check_ttl.py        --url http://127.0.0.1:8000   # 三档默认时长与到期策略
+python tests/check_roles.py      --url http://127.0.0.1:8000   # 三档角色接口/页面权限
+python tests/check_migrate.py    --url http://127.0.0.1:8000   # 加列迁移、悬空外键自愈
+python tests/check_portal.py     --url http://127.0.0.1:8000   # 门户结构回归
+python tests/check_visibility.py --url http://127.0.0.1:8000   # 三档可见性 + 批量切换 + Key 绑定
+python tests/check_cli.py        --url http://127.0.0.1:8000   # CLI 全命令 + 越权
+python tests/check_concurrency.py --url http://127.0.0.1:8000  # 6 agent 并发 / 同 slug 抢占
+python tests/check_copy.py       --url http://127.0.0.1:8000   # 复制按钮（需 chrome）
+python tests/check_title.py      --url http://127.0.0.1:8000   # 同一成员重名拦截
+python tests/check_rename.py     --url http://127.0.0.1:8000   # 改名链路 + 项目名长度规则
+python tests/check_collections.py --url http://127.0.0.1:8000  # 收藏夹树 / 归类 / 筛选 / 删夹去向 / 侧栏折叠
+python tests/check_bookmarks.py --url http://127.0.0.1:8000   # 书签导入预览/判重/导出回灌（需 chrome）
+python tests/check_backup.py    --url http://127.0.0.1:8000   # 打包/预览/恢复/保留策略（会真恢复一次）
+python tests/check_icon.py       --url http://127.0.0.1:8000   # 站点图标上传/恢复（含 .off 残骸回归，需 chrome）
+python tests/check_owner_rail.py --url http://127.0.0.1:8000   # 收藏夹归属/侧栏分组与筛选/+N（需 chrome）
+python tests/check_visfilter.py  --url http://127.0.0.1:8000   # 三档跳全站 vs 工具栏夹内快筛（需 chrome）
+python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 成员搜索/角色/状态/排序（需 chrome）
+python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗排版与标签上限（需 chrome）
+python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 与页面署名（需 chrome）
 ```
+
+## 许可与署名
+
+本项目以 **AGPL-3.0-only** 发布，全文见仓库根目录 [LICENSE](LICENSE)，
+著作权与附加署名要求见 [NOTICE](NOTICE)：
+
+- Copyright (C) 2026 孟庆炜（Vita0519）· <https://github.com/Vita0519/tmp-preview-deploy>
+- 分发修改版要按 AGPL 提供完整源码；**对外提供服务也要给源码（第 13 条）**，自建自用同样适用；
+- 依据 §7(b) 附加条款：任何再分发 / 修改版 / 对外服务都必须保留 LICENSE 与 NOTICE、
+  保留「关于 / 许可」界面与登录页、门户页脚里指向本项目的署名（`Powered by tmp-preview` 不许删），
+  并在显著位置注明「基于 tmp-preview 修改」及修改日期，不得用原作者名义背书；
+- 闭源商用 / 白标分发需另取书面授权。
+
+把这份 SKILL 交给 Agent 执行时，上面这几条同样成立：部署出来的站点页脚署名不能删。
