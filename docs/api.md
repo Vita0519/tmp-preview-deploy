@@ -72,7 +72,7 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/collections` | ✍ | 树：`{items:[{id,name,parent_id,icon,sort,count,total,children}], unassigned, total, visibility:{portal,link,private}, max_depth}` |
+| GET | `/api/collections` | ✍ | 树：`{items:[{id,name,parent_id,owner_id,owner,owner_display,icon,sort,count,count_own,count_foreign,total,total_foreign,children}], owners, unassigned, total, visibility:{portal,link,private}, max_depth}` |
 | POST | `/api/collections` | ✍ | 新建：`{name, parent_id?, icon?}`。同名（同层）→ 409；挂到子夹下（第三层）→ 422 |
 | PATCH | `/api/collections/{id}` | ✍ | 改名 / 换图标 / 调顺序 / 移动：`{name?,icon?,sort?,parent_id?}` |
 | DELETE | `/api/collections/{id}` | ✍ | 删夹。默认**只删壳**，里面的项目退回「未归类」；`?with_projects=1` 才连项目与文件一起删 |
@@ -81,6 +81,25 @@
 所以侧栏的「全部项目」跟项目列表的 `total` 永远对得上。非管理员只统计**自己名下**的项目。
 `visibility` 是三档可见性的数量（`portal/link/private`，三者之和 = `total`），
 控制台侧栏把它们当成常驻分类，所以工具栏里的可见性下拉只在窄屏兜底时才出现。
+
+### 归属（管理员视角）
+
+每个节点带上创建者：`owner_id` / `owner`（账号）/ `owner_display`（显示名）。
+计数按**看的人**拆成两半：`count_own` / `count_foreign` 是直属的「我的 / 别人的」，
+`total_foreign` 是含子夹滚上来的别人的项目数；侧栏在数字后面补一个 `+N` 就表示这个。
+
+管理员额外拿到一份 `owners` 汇总，按「自己排第一 → 项目多的靠前」排序：
+
+```json
+{"owners": [{"id": 1, "username": "admin", "display_name": "管理员", "count": 3, "total": 39, "total_foreign": 1},
+            {"id": 7, "username": "alice", "display_name": "Alice", "count": 1, "total": 2, "total_foreign": 0}]}
+```
+
+`count` 是根夹个数、`total` 是这些夹里的项目数（含子夹）。普通成员这个字段是 `[]`——
+他本来就只看得见自己的夹，再分组纯属噪音。
+
+侧栏据此按成员分组、并给一个成员筛选下拉；**筛掉一个人不会改变 `/api/projects` 的查询范围**，
+它只是把侧栏这几根枝收起来（工具栏那个「可见性」是夹内快筛，两者都不换范围）。
 
 删夹的返回：
 

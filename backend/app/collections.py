@@ -53,10 +53,16 @@ def ensure_parent(conn, parent_id, owner_id: int) -> None:
 
 
 def visible_rows(conn, user: dict) -> list:
+    """侧栏要用的行。带上归属成员，管理员看到的是所有人的夹混在一起，不标归属就分不清。"""
+    sql = (
+        "SELECT c.*, u.username AS owner, "
+        "COALESCE(NULLIF(u.display_name, ''), u.username) AS owner_display "
+        "FROM collections c LEFT JOIN users u ON u.id = c.owner_id"
+    )
     if user["role"] == "admin":
-        return conn.execute("SELECT * FROM collections ORDER BY sort, id").fetchall()
+        return conn.execute(sql + " ORDER BY c.sort, c.id").fetchall()
     return conn.execute(
-        "SELECT * FROM collections WHERE owner_id=? ORDER BY sort, id", (user["id"],)
+        sql + " WHERE c.owner_id=? ORDER BY c.sort, c.id", (user["id"],)
     ).fetchall()
 
 
@@ -79,25 +85,47 @@ def subtree_ids(conn, cid: int) -> list[int]:
 
 
 def counts(conn, user: dict) -> dict:
-    """每个收藏夹下**直属**项目数（父级的合计由前端把子级加上去）。
+    """每个收藏夹下**直属**项目数，返回 `{cid: (自己的, 别人的)}`。
 
-    计数口径跟项目列表一致：管理员算全站，其他成员只算自己名下的——
-    否则侧栏的「未归类」会带出别人的项目数，看着像能看见别人的东西。
+    计数口径跟项目列表一致：管理员算全站，其他成员只算自己名下的。
+    管理员的侧栏会把所有人的夹并列，所以还要把「夹里有多少是别人的」拆出来——
+    否则夹上写着 41、点进去一半是别人的项目，对不上账。
     """
     where = "status='active'"
     args: list = []
-    if user["role"] != "admin":
+    is_admin = user["role"] == "admin"
+    if not is_admin:
         where += " AND owner_id=?"
         args.append(user["id"])
-    rows = conn.execute(
-        f"SELECT collection_id AS cid, COUNT(*) AS n FROM projects "
-        f"WHERE {where} AND collection_id IS NOT NULL GROUP BY collection_id", args
-    ).fetchall()
-    out = {r["cid"]: r["n"] for r in rows}
-    unassigned = conn.execute(
+
+    out: dict = {}
+    if is_admin:
+        rows = conn.execute(
+            f"SELECT collection_id AS cid, owner_id, COUNT(*) AS n FROM projects "
+            f"WHERE {where} AND collection_id IS NOT NULL GROUP BY collection_id, owner_id",
+            args,
+        ).fetchall()
+        for r in rows:
+            own, foreign = out.get(r["cid"], (0, 0))
+            if r["owner_id"] == user["id"]:
+                own += r["n"]
+            else:
+                foreign += r["n"]
+            out[r["cid"]] = (own, foreign)
+    else:
+        rows = conn.execute(
+            f"SELECT collection_id AS cid, COUNT(*) AS n FROM projects "
+            f"WHERE {where} AND collection_id IS NOT NULL GROUP BY collection_id",
+            args,
+        ).fetchall()
+        for r in rows:
+            out[r["cid"]] = (r["n"], 0)
+
+    loose = conn.execute(
         f"SELECT COUNT(*) AS n FROM projects WHERE {where} AND collection_id IS NULL", args
     ).fetchone()
-    out[0] = unassigned["n"] if unassigned else 0
+    # 未归类是单独一行，不区分归属（管理员看到的就是全站没归类的数）
+    out[0] = (loose["n"] if loose else 0, 0)
     return out
 
 
@@ -119,20 +147,28 @@ def visibility_counts(conn, user: dict) -> dict:
 
 
 def tree(conn, user: dict) -> dict:
-    """返回 {items: 树, unassigned: N, total: N}。"""
+    """返回 {items: 树, owners: 归属成员汇总, unassigned: N, total: N}。"""
     rows = visible_rows(conn, user)
     cnt = counts(conn, user)
-    nodes = {}
+    nodes: dict = {}
     roots: list[dict] = []
     for r in rows:
+        own, foreign = cnt.get(r["id"], (0, 0))
         nodes[r["id"]] = {
             "id": r["id"],
             "name": r["name"],
             "parent_id": r["parent_id"],
+            # 归属跟着节点走：管理员侧栏是所有人的夹并列，不标归属就分不清同名夹是谁的
+            "owner_id": r["owner_id"],
+            "owner": r["owner"] or "",
+            "owner_display": r["owner_display"] or "",
             "icon": r["icon"] or "",
             "sort": r["sort"],
-            "count": cnt.get(r["id"], 0),
-            "total": cnt.get(r["id"], 0),
+            "count": own + foreign,
+            "count_own": own,
+            "count_foreign": foreign,
+            "total": own + foreign,
+            "total_foreign": foreign,
             "children": [],
         }
     for r in rows:
@@ -140,16 +176,44 @@ def tree(conn, user: dict) -> dict:
         if r["parent_id"] and r["parent_id"] in nodes:
             nodes[r["parent_id"]]["children"].append(node)
             nodes[r["parent_id"]]["total"] += node["count"]
+            nodes[r["parent_id"]]["total_foreign"] += node["count_foreign"]
         else:
             roots.append(node)
-    loose = cnt.get(0, 0)
+
+    loose = cnt.get(0, (0, 0))[0]
     # 管理员可能把别人的项目归进了自己的夹。对项目主人来说，那个夹不在他的树里，
     # 这些项目就成了「哪个分类都点不到」的幽灵——统一算进未归类，至少点得着。
-    for cid, n in cnt.items():
+    for cid, (n, _foreign) in cnt.items():
         if cid and cid not in nodes:
             loose += n
+
+    # 归属汇总只给管理员（普通成员的树里本来就只有自己的）
+    owners: list[dict] = []
+    if user["role"] == "admin":
+        agg: dict = {}
+        for node in roots:
+            e = agg.get(node["owner_id"])
+            if not e:
+                e = {
+                    "id": node["owner_id"],
+                    "username": node["owner"],
+                    "display_name": node["owner_display"],
+                    "count": 0,
+                    "total": 0,
+                    "total_foreign": 0,
+                }
+                agg[node["owner_id"]] = e
+            e["count"] += 1
+            e["total"] += node["total"]
+            e["total_foreign"] += node["total_foreign"]
+        # 自己排最前，其余按项目数降序，同数按名字
+        owners = sorted(
+            agg.values(), key=lambda o: (o["id"] != user["id"], -o["total"], o["username"])
+        )
+
     return {
         "items": roots,
+        "owners": owners,
         "unassigned": loose,
         # 「全部项目」= 各收藏夹合计 + 未归类，跟列表页的总数对得上
         "total": sum(n["total"] for n in roots) + loose,
