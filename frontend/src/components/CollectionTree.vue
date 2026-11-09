@@ -1,21 +1,78 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { api } from '../api'
-import { confirmAction, toast } from '../store'
+import { confirmAction, store, toast } from '../store'
 import Icon from './Icon.vue'
 
 const props = defineProps({
   tree: { type: Object, default: () => ({ items: [], unassigned: 0, total: 0 }) },
   active: { type: String, default: '' }, // '' 全部 | 'none' 未归类 | '12' 收藏夹 id
   visibility: { type: String, default: '' }, // '' | portal | link | private；只有收藏夹为空时才归三档高亮
+  owners: { type: Array, default: () => [] }, // 管理员的归属汇总 [{id, display_name, count, total}]
+  ownerFilter: { type: String, default: '' },
   loading: { type: Boolean, default: false },
 })
-const emit = defineEmits(['select', 'changed'])
+const emit = defineEmits(['select', 'changed', 'filter-owner'])
 
 const items = computed(() => props.tree.items || [])
 const loose = computed(() => props.tree.unassigned || 0)
 const grandTotal = computed(() => props.tree.total || 0)
 const vis = computed(() => props.tree.visibility || { portal: 0, link: 0, private: 0 })
+
+const selfId = computed(() => String(store.user?.id ?? ''))
+// 服务端给的 id 是数字，store 里也未必同型，统一转字符串再比，别指望 === 能对上
+const isSelf = (id) => String(id) === selfId.value
+// 只有管理员、且不止一个人有夹时才分组——只有一堆自己的夹时多一层标题纯属噪音
+const showGroups = computed(() => (props.owners || []).length > 1)
+
+// 分组色点：按成员 id 取一个固定色，纯装饰，跟品牌色无关
+const DOTS = ['#a8332b', '#3f6f52', '#3c5f8f', '#8a6a2f', '#6b4a86', '#2f6f78', '#a05a2c']
+const dotColor = (id) => DOTS[Math.abs(Number(id) || 0) % DOTS.length]
+
+const ownerPick = ref(props.ownerFilter || '')
+watch(
+  () => props.ownerFilter,
+  (v) => {
+    ownerPick.value = v || ''
+  }
+)
+function emitFilter() {
+  emit('filter-owner', ownerPick.value)
+}
+
+const groups = computed(() => {
+  if (!showGroups.value) {
+    // 平铺：普通成员视角，或者站上只有一个人建过夹
+    return [{ key: '_all', id: null, flat: true, nodes: items.value }]
+  }
+  const list = [...(props.owners || [])]
+  // 管理员自己还没建夹时也要有一组，否则「新建收藏夹」的输入框没地方落
+  if (store.user && !list.some((o) => String(o.id) === selfId.value)) {
+    list.unshift({
+      id: store.user.id,
+      username: store.user.username,
+      display_name: store.user.display_name || store.user.username,
+      count: 0,
+      total: 0,
+    })
+  }
+  const pick = ownerPick.value ? list.filter((o) => String(o.id) === ownerPick.value) : list
+  return pick.map((o) => ({
+    ...o,
+    key: String(o.id),
+    flat: false,
+    nodes: items.value.filter((n) => String(n.owner_id) === String(o.id)),
+  }))
+})
+
+const gopen = ref({})
+const groupOpen = (key) => gopen.value[key] !== false // 默认展开
+function toggleGroup(key) {
+  gopen.value = { ...gopen.value, [key]: !groupOpen(key) }
+}
+
+// 空状态要按「筛完之后还剩几个夹」判断，不能看 items.length
+const visibleCount = computed(() => groups.value.reduce((s, g) => s + g.nodes.length, 0))
 
 // 三档可见性是「跳全站」的导航，跟收藏夹抢同一个当前选中；
 // 工具栏那个下拉是「在当前夹里快筛」，两者不是一回事，所以这里高亮要排除 active 非空的情况
@@ -61,6 +118,11 @@ function pick(key) {
 
 function startNew(parentId = null) {
   menu.value = ''
+  // 根级新建的输入框只挂在「我的」分组里，若当前正筛着别人的夹就先放开筛选，否则框没处落
+  if (!parentId && ownerPick.value && ownerPick.value !== selfId.value) {
+    ownerPick.value = ''
+    emitFilter()
+  }
   edit.value = { mode: 'new', parentId, value: '' }
   if (parentId) open.value = { ...open.value, [parentId]: true }
   focusEditor()
@@ -167,114 +229,153 @@ function countOf(node) {
       </div>
 
       <div class="railsep" />
-      <div class="raillabel">收藏夹</div>
+      <div class="raillabel">
+        <span>收藏夹</span>
+        <select
+          v-if="showGroups"
+          v-model="ownerPick"
+          class="railpick"
+          title="只看某个成员名下的收藏夹"
+          @change="emitFilter"
+        >
+          <option value="">全部成员</option>
+          <option v-for="o in owners" :key="o.id" :value="String(o.id)">
+            {{ isSelf(o.id) ? '我的' : o.display_name }} ({{ o.count }})
+          </option>
+        </select>
+      </div>
 
-      <div v-for="node in items" :key="node.id" class="railnode">
+      <div v-for="g in groups" :key="g.key" class="railgw">
         <div
-          class="railrow"
-          :class="{ on: active === String(node.id) }"
+          v-if="!g.flat"
+          class="railgroup"
+          :class="{ open: groupOpen(g.key) }"
           role="button"
           tabindex="0"
-          @click="pick(node.id)"
-          @keydown.enter="pick(node.id)"
+          :title="`@${g.username || ''} 名下的收藏夹`"
+          @click="toggleGroup(g.key)"
+          @keydown.enter="toggleGroup(g.key)"
         >
-          <span
-            class="caret"
-            :class="{ open: open[node.id], leaf: !node.children?.length }"
-            @click.stop="node.children?.length && toggle(node.id)"
+          <i class="dot" :style="{ background: dotColor(g.id) }" />
+          <span class="gn">{{ isSelf(g.id) ? '我的收藏夹' : g.display_name }}</span>
+          <span class="gc num">{{ g.count }}</span>
+          <Icon name="chevron" :size="10" class="crt" />
+        </div>
+
+        <template v-if="g.flat || groupOpen(g.key)">
+        <div v-for="node in g.nodes" :key="node.id" class="railnode">
+          <div
+            class="railrow"
+            :class="{ on: active === String(node.id) }"
+            role="button"
+            tabindex="0"
+            @click="pick(node.id)"
+            @keydown.enter="pick(node.id)"
           >
-            <Icon v-if="node.children?.length" name="chevron" :size="10" />
-          </span>
-          <span class="nm" :title="node.name">{{ node.name }}</span>
-          <span class="n num">{{ countOf(node) }}</span>
-          <span class="dots" title="更多" @click.stop="menu = menu === node.id ? '' : node.id">⋯</span>
-        </div>
-
-        <div v-if="menu === node.id" class="railmenu">
-          <button @click="startNew(node.id)">新建子收藏夹</button>
-          <button @click="startRename(node)">重命名</button>
-          <button class="danger" @click="remove(node)">删除</button>
-        </div>
-
-        <div v-if="editKey === 'r' + node.id" class="railedit">
-          <input
-            :ref="bindEditor"
-            class="input"
-            :value="edit.value"
-            :disabled="busy"
-            @input="edit.value = $event.target.value"
-            @keyup.enter="submitEdit"
-            @keydown.esc.stop.prevent="cancelEdit"
-            @blur="submitEdit"
-          />
-        </div>
-
-        <div v-if="editKey === 'n' + node.id" class="railedit kid">
-          <input
-            :ref="bindEditor"
-            class="input"
-            placeholder="子收藏夹名"
-            :value="edit.value"
-            :disabled="busy"
-            @input="edit.value = $event.target.value"
-            @keyup.enter="submitEdit"
-            @keydown.esc.stop.prevent="cancelEdit"
-            @blur="submitEdit"
-          />
-        </div>
-
-        <div v-if="open[node.id] && node.children?.length" class="railkids">
-          <div v-for="kid in node.children" :key="kid.id" class="railnode">
-            <div
-              class="railrow kid"
-              :class="{ on: active === String(kid.id) }"
-              role="button"
-              tabindex="0"
-              @click="pick(kid.id)"
-              @keydown.enter="pick(kid.id)"
+            <span
+              class="caret"
+              :class="{ open: open[node.id], leaf: !node.children?.length }"
+              @click.stop="node.children?.length && toggle(node.id)"
             >
-              <span class="nm" :title="kid.name">{{ kid.name }}</span>
-              <span class="n num">{{ countOf(kid) }}</span>
-              <span class="dots" title="更多" @click.stop="menu = menu === kid.id ? '' : kid.id">⋯</span>
-            </div>
+              <Icon v-if="node.children?.length" name="chevron" :size="10" />
+            </span>
+            <span class="nm" :title="node.name">{{ node.name }}</span>
+            <span class="n num">
+              {{ countOf(node) }}<em v-if="node.total_foreign" class="xf" title="其中含其他成员的项目">+{{ node.total_foreign }}</em>
+            </span>
+            <span class="dots" title="更多" @click.stop="menu = menu === node.id ? '' : node.id">⋯</span>
+          </div>
 
-            <div v-if="menu === kid.id" class="railmenu kidmenu">
-              <button @click="startRename(kid)">重命名</button>
-              <button class="danger" @click="remove(kid)">删除</button>
-            </div>
+          <div v-if="menu === node.id" class="railmenu">
+            <button @click="startNew(node.id)">新建子收藏夹</button>
+            <button @click="startRename(node)">重命名</button>
+            <button class="danger" @click="remove(node)">删除</button>
+          </div>
 
-            <div v-if="editKey === 'r' + kid.id" class="railedit kid">
-              <input
-                :ref="bindEditor"
-                class="input"
-                :value="edit.value"
-                :disabled="busy"
-                @input="edit.value = $event.target.value"
-                @keyup.enter="submitEdit"
-                @keydown.esc.stop.prevent="cancelEdit"
-                @blur="submitEdit"
-              />
+          <div v-if="editKey === 'r' + node.id" class="railedit">
+            <input
+              :ref="bindEditor"
+              class="input"
+              :value="edit.value"
+              :disabled="busy"
+              @input="edit.value = $event.target.value"
+              @keyup.enter="submitEdit"
+              @keydown.esc.stop.prevent="cancelEdit"
+              @blur="submitEdit"
+            />
+          </div>
+
+          <div v-if="editKey === 'n' + node.id" class="railedit kid">
+            <input
+              :ref="bindEditor"
+              class="input"
+              placeholder="子收藏夹名"
+              :value="edit.value"
+              :disabled="busy"
+              @input="edit.value = $event.target.value"
+              @keyup.enter="submitEdit"
+              @keydown.esc.stop.prevent="cancelEdit"
+              @blur="submitEdit"
+            />
+          </div>
+
+          <div v-if="open[node.id] && node.children?.length" class="railkids">
+            <div v-for="kid in node.children" :key="kid.id" class="railnode">
+              <div
+                class="railrow kid"
+                :class="{ on: active === String(kid.id) }"
+                role="button"
+                tabindex="0"
+                @click="pick(kid.id)"
+                @keydown.enter="pick(kid.id)"
+              >
+                <span class="nm" :title="kid.name">{{ kid.name }}</span>
+                <span class="n num">
+                  {{ countOf(kid) }}<em v-if="kid.count_foreign" class="xf" title="其中含其他成员的项目">+{{ kid.count_foreign }}</em>
+                </span>
+                <span class="dots" title="更多" @click.stop="menu = menu === kid.id ? '' : kid.id">⋯</span>
+              </div>
+
+              <div v-if="menu === kid.id" class="railmenu kidmenu">
+                <button @click="startRename(kid)">重命名</button>
+                <button class="danger" @click="remove(kid)">删除</button>
+              </div>
+
+              <div v-if="editKey === 'r' + kid.id" class="railedit kid">
+                <input
+                  :ref="bindEditor"
+                  class="input"
+                  :value="edit.value"
+                  :disabled="busy"
+                  @input="edit.value = $event.target.value"
+                  @keyup.enter="submitEdit"
+                  @keydown.esc.stop.prevent="cancelEdit"
+                  @blur="submitEdit"
+                />
+              </div>
             </div>
           </div>
         </div>
+
+          <div v-if="isSelf(g.id) && editKey === 'n0'" class="railedit">
+            <input
+              :ref="bindEditor"
+              class="input"
+              placeholder="收藏夹名，回车保存"
+              :value="edit.value"
+              :disabled="busy"
+              @input="edit.value = $event.target.value"
+              @keyup.enter="submitEdit"
+              @keydown.esc.stop.prevent="cancelEdit"
+              @blur="submitEdit"
+            />
+          </div>
+        </template>
       </div>
 
-      <div v-if="editKey === 'n0'" class="railedit">
-        <input
-          :ref="bindEditor"
-          class="input"
-          placeholder="收藏夹名，回车保存"
-          :value="edit.value"
-          :disabled="busy"
-          @input="edit.value = $event.target.value"
-          @keyup.enter="submitEdit"
-          @keydown.esc.stop.prevent="cancelEdit"
-          @blur="submitEdit"
-        />
-      </div>
-
-      <div v-if="!items.length && !loading" class="railempty">
-        还没有收藏夹。<br />新建一个，或从浏览器导入书签。
+      <div v-if="!visibleCount && !loading" class="railempty">
+        <template v-if="ownerPick">这个成员名下还没有收藏夹。</template>
+        <template v-else>还没有收藏夹。<br />新建一个，或从浏览器导入书签。</template>
       </div>
     </div>
   </aside>

@@ -38,7 +38,9 @@ const selected = ref([])
 const openSlug = ref('')
 const uploadOpen = ref(false)
 const importOpen = ref(false)
-const colTree = ref({ items: [], unassigned: 0, total: 0 })
+const colTree = ref({ items: [], unassigned: 0, total: 0, owners: [] })
+// 侧栏「只看某个成员的收藏夹」——纯前端视图筛选，不参与 /api/projects 的查询参数
+const ownerFilter = ref('')
 const colLoading = ref(false)
 const now = ref(Date.now())
 let offset = 0
@@ -54,10 +56,13 @@ const maxTagCount = computed(() =>
 const tagsForBar = computed(() => (data.facets.tags || []).slice(0, 10))
 
 // 窄屏侧栏收起后，收藏夹（含「未归类」）只能靠工具栏这个下拉筛
+const multiOwner = computed(() => (colTree.value.owners || []).length > 1)
 const collectionOptions = computed(() => {
   const out = []
+  // 管理员视角下不同成员的夹可能同名，带上归属才分得清
+  const tag = (n) => (multiOwner.value && n.owner_display ? ` · ${n.owner_display}` : '')
   for (const n of colTree.value.items || []) {
-    out.push({ id: n.id, label: n.name })
+    out.push({ id: n.id, label: n.name + tag(n) })
     for (const k of n.children || []) out.push({ id: k.id, label: `└ ${k.name}` })
   }
   return out
@@ -382,9 +387,12 @@ onBeforeUnmount(() => {
         :tree="colTree"
         :active="filters.collection"
         :visibility="filters.visibility"
+        :owners="colTree.owners || []"
+        :owner-filter="ownerFilter"
         :loading="colLoading"
         @select="onCollectionPicked"
         @changed="onCollectionsChanged"
+        @filter-owner="ownerFilter = $event"
       />
 
       <div class="maincol">

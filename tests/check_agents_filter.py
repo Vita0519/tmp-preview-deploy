@@ -98,12 +98,13 @@ with sync_playwright() as p:
 
     # ---------- 2. 角色筛选 ----------
     for role, label in (("admin", "全部角色"), ("viewer", "仅门户"), ("publisher", "可发布")):
-        want = [a["username"] for a in base["items"] if a["role"] == role]
+        # 页面一页 20 条，直接拿后端全量比会漏掉第 21 个，所以按同样的一页口径取
+        want = [a["username"] for a in api(pg, f"limit=20&role={role}")["items"]]
         pg.select_option(".toolbar select", role)  # 第 1 个下拉 = 角色
         pg.wait_for_timeout(850)
         got = page_state(pg)["users"]
-        print(f"筛角色 {role}：{len(got)} 人（后端 {len(want)} 人）")
-        check(f"角色筛选 {role} 与后端一致", sorted(got) == sorted(want), f"{got} vs {want}")
+        print(f"筛角色 {role}：{len(got)} 人（后端同页 {len(want)} 人）")
+        check(f"角色筛选 {role} 与后端一致", got == want, f"{got} vs {want}")
 
     pg.select_option(".toolbar select", "")
     pg.wait_for_timeout(700)
