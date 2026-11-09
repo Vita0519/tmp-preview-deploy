@@ -248,6 +248,7 @@ python tests/check_visfilter.py  --url http://127.0.0.1:8000   # 三档跳全站
 python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 成员搜索/角色/状态/排序（需 chrome）
 python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗排版与标签上限（需 chrome）
 python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 与页面署名（需 chrome）
+python tests/check_count_sync.py --url http://127.0.0.1:8000   # 删除/新建后侧栏收藏夹与分类计数当场同步（需 chrome）
 ```
 
 ## 许可与署名

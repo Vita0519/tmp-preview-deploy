@@ -254,6 +254,7 @@ python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 成员搜索/�
 python tests/check_agent_copy.py --url http://127.0.0.1:8000   # 复制登录命令进剪贴板、失败能降级（需 chrome）
 python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗一屏放下、两列不塌（需 chrome）
 python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 完整 + 门户页脚/登录页/关于页署名（需 chrome）
+python tests/check_count_sync.py --url http://127.0.0.1:8000   # 删除/新建后侧栏收藏夹与分类计数当场同步（需 chrome）
 ```
 
 ## 安全约定

@@ -108,6 +108,12 @@ async function load(keepSelection = false) {
     data.facets = d.facets
     data.server_now = d.server_now
     offset = d.server_now - Date.now()
+    // 删掉最后一页的最后几条时，页码会越过新的总页数——原地退回第 1 页，
+    // 否则页面空着、侧栏数字也变了，看着像「没删掉」
+    if (!d.items.length && d.total > 0 && page.value > 1) {
+      page.value = 1
+      return
+    }
     if (!keepSelection) {
       // 刷新（筛选变化 / 定时轮询 / 操作完成）时只丢掉「已经不在结果里」的勾选，
       // 还在的就留着——否则抽屉里改个标签回来，勾好的三个全白勾了
@@ -128,15 +134,27 @@ async function loadTrend() {
   } catch {}
 }
 
-async function loadCollections() {
-  colLoading.value = true
+/** silent：定时轮询用，别把侧栏的加载态闪一下 */
+async function loadCollections(silent = false) {
+  if (!silent) colLoading.value = true
   try {
     colTree.value = await api.get('/api/collections')
   } catch {
     /* 收藏夹接口挂了不该拦着项目列表 */
   } finally {
-    colLoading.value = false
+    if (!silent) colLoading.value = false
   }
+}
+
+/**
+ * 任何「改了项目数量」的操作之后都走这里。
+ * 漏掉 loadCollections 就会出现「删了三个，侧栏还是 45」——
+ * 列表和侧栏是两份数据，只刷一份必然对不上。
+ */
+function refreshAll(keepSelection = false) {
+  load(keepSelection)
+  loadTrend()
+  loadCollections()
 }
 
 function onCollectionPicked(key) {
@@ -275,8 +293,8 @@ async function bulk(action, extra = {}, label = '') {
         (extraBits.length ? `，${extraBits.join('，')}` : ''),
     )
     selected.value = []
-    load()
-    loadTrend()
+    // 批量删除/续期/改可见性都会动到侧栏的数字，一起刷
+    refreshAll()
   } catch (e) {
     toast(e.message || '操作失败', 'err')
   }
@@ -286,12 +304,12 @@ const VIS_LABEL = { portal: '门户可见', link: '持链接可见', private: '�
 
 async function bulkMove(cid) {
   if (!selected.value.length) return
+  // bulk() 里已经带 refreshAll，别在这里再补一次收藏夹请求
   await bulk(
     'collection',
     { collection_id: cid || null },
     cid ? '已归入收藏夹' : '已移出收藏夹',
   )
-  loadCollections()
 }
 
 async function bulkVisibility(v) {
@@ -310,8 +328,8 @@ async function bulkVisibility(v) {
 }
 
 function onCreated(d) {
-  load()
-  loadTrend()
+  // 新建也是「多了一个项目」，侧栏计数得跟着涨
+  refreshAll()
   if (d?.slug) openSlug.value = d.slug
 }
 
@@ -321,15 +339,12 @@ function onAction({ type, item }) {
 }
 
 function onDrawerChanged() {
-  load(true)
-  loadTrend()
-  loadCollections()
+  // 抽屉里可能改名 / 改标签 / 续期 / 甚至删掉，统一全刷
+  refreshAll(true)
 }
 
 function onImported(d) {
-  load()
-  loadTrend()
-  loadCollections()
+  refreshAll()
   if (d?.created) {
     filters.status = 'online'
   }
@@ -347,6 +362,8 @@ onMounted(() => {
     if (document.hidden) return
     if (openSlug.value || uploadOpen.value) return
     load(true)
+    // 别人删了/加了项目，侧栏那些数字也得跟着对——静默刷，别闪加载态
+    loadCollections(true)
   }, 30000)
   tickTimer = setInterval(tick, 1000)
 })
