@@ -224,6 +224,9 @@ docker compose start
   同 slug 并发覆盖只有最后一次生效、不会写串。实测 18 路并发上传全 200，单次约 3.3s。
 - **删除**：文件被占用时记录先删、目录留下，后台约 30 分钟内由孤儿清理收尾；启动时另清 `.tmp-*` / `.old-*`。
 - **图标**：预览页优先用项目自带的 `favicon.ico/svg/png/apple-touch-icon.png`，否则退回站点图标。
+- **升级 / 恢复的兼容**：`./data` 不动，启动时自动补列、改角色、收归无主项目；
+  **上一个版本的备份包可以直接恢复**——换完当场跑迁移，不用重启；更老的包（缺 `kind` 这类核心列）
+  会被 422 拒绝并说明缺什么，此时现网数据不动。恢复会把 `sessions` 一起换掉，**所有人都要重新登录**。
 
 ## 自检
 
@@ -249,6 +252,7 @@ python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 成员搜索/�
 python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗排版与标签上限（需 chrome）
 python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 与页面署名（需 chrome）
 python tests/check_count_sync.py --url http://127.0.0.1:8000   # 删除/新建后侧栏收藏夹与分类计数当场同步（需 chrome）
+python tests/check_compat.py    --url http://127.0.0.1:8000   # 老备份恢复+自动迁移/更老的包被拒/老书签/老字段/老 CLI（会覆盖数据，跑完自动恢复）
 ```
 
 ## 许可与署名

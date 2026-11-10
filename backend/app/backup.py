@@ -5,7 +5,7 @@
 不能直接复制 .sqlite3 文件（正写着会拷到半截）。
 
 恢复 = 校验 → 解压到临时目录 → 把现网数据整体挪到 `.backup-before-restore-<时间>/`
-→ 换上新数据 → 清进程内缓存。**旧数据永远留在那里**，恢复坏了还能手工挪回来。
+→ 换上新数据 → 跑一遍迁移 → 清进程内缓存。**旧数据永远留在那里**，恢复坏了还能手工挪回来。
 """
 from __future__ import annotations
 
@@ -23,6 +23,26 @@ from . import config, theme
 
 MANIFEST = "manifest.json"
 LOCK = threading.Lock()
+
+# 表结构里「迁移能自己补上」的列：老备份缺这些没关系，restore 完 init_db 会加。
+MIGRATABLE_COLS = {
+    "projects": {"collection_id"},
+    "users": {"key_label", "key_created_at", "key_last_used_at", "key_uses"},
+}
+
+# 新代码会用到的列。缺了迁不回来的，说明这个包比「上一个版本」还老，
+# 提前拒绝（不动现网），而不是换上去之后每个接口都 500。
+REQUIRED_COLS = {
+    "projects": {
+        "id", "slug", "title", "owner_id", "kind", "visibility", "allow_download",
+        "expire_action", "expires_at", "status", "views", "downloads",
+        "created_at", "updated_at",
+    },
+    "users": {
+        "id", "username", "display_name", "role", "password_hash", "api_key",
+        "active", "created_at",
+    },
+}
 
 
 def now_ms() -> int:
@@ -103,6 +123,30 @@ def _site_title() -> str:
         return config.SITE_TITLE
 
 
+def _preflight(conn) -> None:
+    """换数据之前先看这个库能不能被当前版本用。
+
+    只差 collection_id / key_* 这类「迁移能补」的列 → 放行，restore 完会自动补；
+    连 kind / status 这种都没有 → 说明包比上一个版本还老，直接拒绝，别把现网换了再炸。
+    """
+    problems: list[str] = []
+    for table, want in REQUIRED_COLS.items():
+        try:
+            have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        except sqlite3.Error as exc:
+            problems.append(f"{table}（{exc}）")
+            continue
+        missing = want - have - MIGRATABLE_COLS.get(table, set())
+        if missing:
+            problems.append(f"{table} 缺少 {', '.join(sorted(missing))}")
+    if problems:
+        raise ValueError(
+            "这个备份比当前版本老太多，恢复后会缺字段："
+            + "；".join(problems)
+            + "。请先用保存这个备份时的版本升级到新版，再重新备份后恢复。"
+        )
+
+
 def inspect(zip_path: Path) -> dict:
     """看一个备份包里有什么，恢复前先给用户确认。"""
     with zipfile.ZipFile(zip_path) as z:
@@ -148,6 +192,7 @@ def restore(zip_path: Path) -> dict:
                 missing = {"projects", "users"} - tables
                 if missing:
                     raise ValueError(f"备份里的数据库缺少表：{', '.join(sorted(missing))}")
+                _preflight(conn)
                 counts = _counts(conn)
             finally:
                 conn.close()
@@ -203,12 +248,36 @@ def restore(zip_path: Path) -> dict:
             # 3) 进程内的缓存（配色等）跟着换
             theme.reset_cache()
 
+            # 4) 老备份包里的库是旧结构：恢复完必须立刻跑一遍迁移。
+            #    不然新代码去查 collection_id / key_label 会直接 500，
+            #    得等重启（启动时才 init_db）才正常——「恢复成功但打不开」就是这么来的。
+            migrated, migrate_error = True, None
+            try:
+                from .db import init_db
+
+                init_db()
+            except Exception as exc:  # noqa: BLE001 - 迁移失败也要把话说清楚，别吞
+                migrated, migrate_error = False, str(exc)
+                print(f"[backup] 恢复后迁移失败：{exc}", flush=True)
+
+            # 迁移会改数据（无主项目收归管理员、agent 角色改名），计数按迁移后的库再数一遍
+            try:
+                conn = sqlite3.connect(str(config.DB_PATH), timeout=10)
+                try:
+                    counts = _counts(conn)
+                finally:
+                    conn.close()
+            except sqlite3.Error as exc:
+                print(f"[backup] 恢复后重新计数失败：{exc}", flush=True)
+
             return {
                 "ok": True,
                 "counts": counts,
                 "backup_dir": str(safety),
                 "files": info["files"],
                 "zips": info["zips"],
+                "migrated": migrated,
+                "migrate_error": migrate_error,
             }
         finally:
             _rm_tree(tmp)

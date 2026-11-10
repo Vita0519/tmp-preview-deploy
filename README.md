@@ -154,6 +154,26 @@ curl -X POST http://127.0.0.1:8080/api/projects \
 | 并发上限 | 多 agent 同时上传安全，同一 slug 同时写只有最后一次生效；实测 18 路并发上传单次约 3.3s，再高建议排队 |
 | 清残留目录 | 文件被占用会留下目录，后台约 30 分钟内自动清；要立刻清就重启（启动时扫 `.tmp-*` / `.old-*`） |
 
+### 版本兼容（升级前看这一段）
+
+**升级不迁数据**：`./data` 原样留着，新版本启动时自动把老库补齐（加列、放开角色、收归无主项目、
+规范化存量标签）。这几步都是幂等的，重复启动不会重复改。
+
+**老备份能恢复**：上一个版本打的包拿过来直接「覆盖恢复」就行——恢复完会**当场跑一遍迁移**，
+不用重启、不用重启后再点一次。更老的包（缺 `kind` 这类核心列）会被**明确拒绝**并列出缺哪些字段，
+而且**不动现网**：与其换上去之后每个接口 500，不如先告诉你「用保存这个包时的版本升级到新版再备份」。
+
+**书签导入导出是标准格式**：导入吃的是 Netscape Bookmark HTML，Chrome / Edge / Firefox / Safari
+各自的写法（`PERSONAL_TOOLBAR_FOLDER`、`<DD>` 描述、`ICON`、没有 `<!DOCTYPE>`）都认；
+本站导出的文件也能原样回灌（同网址自动跳过）。
+
+**接口只加不改**：新版本只往响应里**加**字段（`owner_display`、`total_foreign`、`meta.project`…），
+不重命名、不删除老的（`count`、`total`、`children`、`visibility`、`urls` 这些照旧），
+旧的 CLI 与脚本不用改。`--collection 名字`、`set --visibility` 这类老写法仍然有效。
+
+> 一个副作用要提前说：备份包里带着 `sessions` 表，**恢复之后所有人都要重新登录**
+> （旧会话属于被覆盖的那个库）。这是有意的——恢复就该把「谁登录着」也一起回到过去。
+
 ### 资源占用
 
 单进程、无 Redis、无 ORM，整套东西基本就是「一个 Python 进程 + 一块磁盘」。
@@ -255,6 +275,7 @@ python tests/check_agent_copy.py --url http://127.0.0.1:8000   # 复制登录命
 python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗一屏放下、两列不塌（需 chrome）
 python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 完整 + 门户页脚/登录页/关于页署名（需 chrome）
 python tests/check_count_sync.py --url http://127.0.0.1:8000   # 删除/新建后侧栏收藏夹与分类计数当场同步（需 chrome）
+python tests/check_compat.py    --url http://127.0.0.1:8000   # 老备份恢复+自动迁移/更老的包被拒/老书签/老字段/老 CLI（会覆盖数据，跑完自动恢复）
 ```
 
 ## 安全约定
