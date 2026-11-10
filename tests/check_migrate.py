@@ -117,7 +117,14 @@ def main() -> int:
         projects_sql = schema_of(conn, "projects")
         check("projects 外键仍指向 users", '"users_old"' not in projects_sql and "users" in projects_sql, projects_sql)
         fk = conn.execute("PRAGMA foreign_key_list(projects)").fetchall()
-        check("外键目标表 = users", all(r["table"] == "users" for r in fk), str([r["table"] for r in fk]))
+        # projects 现在有两个外键：owner_id → users、collection_id → collections。
+        # 要盯的是「没有任何外键还指着已经被删掉的 users_old」
+        targets = [r["table"] for r in fk]
+        check(
+            "外键目标都在合法表里（users / collections），没有 users_old",
+            set(targets) <= {"users", "collections"} and "users" in targets,
+            str(targets),
+        )
         check("foreign_key_check 干净", conn.execute("PRAGMA foreign_key_check").fetchall() == [], "")
 
         # 真正的问题点：迁移后还能不能插项目

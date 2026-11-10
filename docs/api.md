@@ -152,17 +152,29 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 |---|---|---|---|
 | GET | `/api/backup` | 👑 | 直接下载 `preview-backup-<时间>.zip`；打完临时文件自动清掉 |
 | POST | `/api/backup/inspect` | 👑 | 上传 zip，只读检查：`{db, files, zips, branding, manifest}`。不是本站备份 → 422 |
-| POST | `/api/backup/restore` | 👑 | 用 zip 覆盖现网数据，返回 `{ok, counts, backup_dir, files, zips}` |
+| POST | `/api/backup/restore` | 👑 | 用 zip 覆盖现网数据，返回 `{ok, counts, backup_dir, files, zips, migrated, migrate_error}` |
 
 恢复是**整体换血**，但旧数据不会消失：现网的 `db.sqlite3`（连同 `-wal`/`-shm`）、`projects/`、`zips/`、`branding/` 会被整体挪进
 `data/.backup-before-restore-<时间>/`，只保留最近 3 份。实在删不掉的会被改名丢进 `data/.trash/`，不会悄悄占满磁盘。
 
 ```json
 {"ok": true, "counts": {"projects": 25, "users": 6, "collections": 3, "tags": 15},
- "backup_dir": ".../data/.backup-before-restore-20261102-083925", "files": 324, "zips": 3}
+ "backup_dir": ".../data/.backup-before-restore-20261102-083925", "files": 324, "zips": 3,
+ "migrated": true, "migrate_error": null}
 ```
 
 `counts.projects` 只数 `status='active'`，跟控制台列表的总数一致。
+
+**老备份包兼容**：恢复前会先做结构体检——
+
+- 只差「迁移能补」的列（`projects.collection_id`、`users.key_*`）→ 照常恢复，换完立刻 `init_db()` 补齐，
+  `migrated` 为 `true`，**不需要重启**；
+- 连 `kind` / `status` 这类核心列都没有（比上一个版本还老）→ **422 拒绝**并列出缺哪些字段，
+  此时现网数据**一个字节都没动**；
+- 迁移本身失败时 `migrated=false` + `migrate_error` 给出原因，数据已经换上了，
+  但旧库还在 `.backup-before-restore-<时间>/` 里可以挪回来。
+
+> 恢复会连 `sessions` 表一起换，**所有登录状态回到备份那一刻**——恢复后通常需要重新登录。
 
 ## 成员
 
