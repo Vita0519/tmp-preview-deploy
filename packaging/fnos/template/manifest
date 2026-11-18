@@ -1,5 +1,5 @@
 appname               = tmp-preview
-version               = 2.0.0
+version               = 2.0.1
 display_name          = 临时预览站
 desc                  = <p><b>临时预览站</b>：把本地目录、静态站或构建产物一键部署成带到期时间的预览 / 下载链接，到点自动回收，不占地方也不怕链接乱飞。</p><p>适用场景：客户验收、临时演示、团队内部共享、多个 Agent 共用一套预览服务。</p><p>功能：上传与在线预览、到期自动停止访问或删除、收藏夹与标签、门户与 RSS、多成员与 API Key、全量备份与恢复。</p><p>许可：AGPL-3.0-only，再分发或作为网络服务对外提供时须保留出处与署名。</p><p>作者 vita0519 · <a href="https://github.com/Vita0519">github.com/Vita0519</a> · 邮箱 admin@allfather.de5.net · QQ 群 154578485</p><p>赞赏作者：<br><img src="https://pre.allfather.top/p/qr/qr-wechat.png" width="160"> <img src="https://pre.allfather.top/p/qr/qr-alipay.png" width="160"></p>
 platform              = all
