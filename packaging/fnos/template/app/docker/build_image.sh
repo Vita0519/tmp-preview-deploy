@@ -5,7 +5,7 @@ set -e
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 SRC="${1:-$HERE/src}"
-IMAGE="tmp-preview:2.0.0"
+IMAGE="ghcr.io/vita0519/tmp-preview:2.0.0"
 
 if [ ! -f "$SRC/Dockerfile" ]; then
     echo "找不到 Dockerfile：$SRC/Dockerfile" >&2

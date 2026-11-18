@@ -13,10 +13,11 @@ if [ -n "${TRIM_PKGVAR}" ]; then
 fi
 
 if command -v docker >/dev/null 2>&1; then
-    if docker image inspect tmp-preview:2.0.0 >/dev/null 2>&1; then
-        echo "[ok] 镜像 tmp-preview:2.0.0 已存在" >> "$LOG" 2>/dev/null
+    IMG="ghcr.io/vita0519/tmp-preview:2.0.0"
+    if docker image inspect "$IMG" >/dev/null 2>&1; then
+        echo "[ok] 镜像 $IMG 已在本地" >> "$LOG" 2>/dev/null
     else
-        echo "[warn] 镜像 tmp-preview:2.0.0 不存在：应用启动会失败，请先执行 app.tgz 内 docker/build_image.sh 构建" >> "$LOG" 2>/dev/null
+        echo "[i] 本地无 $IMG，启动时将从 ghcr 拉取；若拉取失败请用 app.tgz 内 docker/build_image.sh 构建" >> "$LOG" 2>/dev/null
     fi
 fi
 
