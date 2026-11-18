@@ -18,6 +18,53 @@ APP = OUT / 'tmp-preview'
 FNPACK = os.environ.get('FNPACK') or shutil.which('fnpack') or r'C:\tmp\fnpack.exe'
 
 
+def normalize_lf(root: Path) -> int:
+    """Windows 上模板会被写成 CRLF；fnOS 用 shell 解析 manifest，带 \\r 会解析错。"""
+    binary = {'.png', '.jpg', '.jpeg', '.ico', '.gz', '.tgz', '.fpk', '.zip'}
+    fixed = 0
+    for p in root.rglob('*'):
+        if not p.is_file() or p.suffix.lower() in binary:
+            continue
+        data = p.read_bytes()
+        if b'\r\n' in data:
+            p.write_bytes(data.replace(b'\r\n', b'\n'))
+            fixed += 1
+    return fixed
+
+
+def fix_manifest_lf(fpk: Path) -> bool:
+    """Windows 版 fnpack 打包时会把 manifest 转成 CRLF，fnOS 解析会带 \\r。
+    这里重建一次 tar.gz，把 manifest 换回 LF，其余条目原样保留。"""
+    import io
+    import tarfile
+
+    with tarfile.open(fpk, 'r:gz') as src:
+        entries = []
+        for m in src.getmembers():
+            data = src.extractfile(m).read() if m.isfile() else None
+            entries.append((m, data))
+
+    tmp = fpk.with_suffix('.tmp.fpk')
+    changed = False
+    with tarfile.open(tmp, 'w:gz') as dst:
+        for m, data in entries:
+            if m.name == 'manifest' and data and b'\r\n' in data:
+                data = data.replace(b'\r\n', b'\n')
+                m.size = len(data)
+                changed = True
+            # Windows 上打包不出执行位，cmd/ 下全是脚本，统一补 755
+            if m.isfile() and m.name.startswith('cmd/') and m.mode != 0o755:
+                m.mode = 0o755
+                changed = True
+            dst.addfile(m, io.BytesIO(data) if data is not None else None)
+
+    if changed:
+        os.replace(tmp, fpk)
+    else:
+        tmp.unlink(missing_ok=True)
+    return changed
+
+
 def main() -> int:
     if not (ROOT / 'frontend' / 'dist' / 'index.html').exists():
         print('[!] frontend/dist 不存在，先执行：cd frontend && npm run build', file=sys.stderr)
@@ -48,6 +95,10 @@ def main() -> int:
         print('[!] 缺少必需文件: ' + ', '.join(missing), file=sys.stderr)
         return 1
 
+    fixed = normalize_lf(APP)
+    if fixed:
+        print(f'[i] 统一行尾为 LF: {fixed} 个文件')
+
     if not Path(FNPACK).exists():
         print(f'[!] 找不到 fnpack: {FNPACK}', file=sys.stderr)
         return 1
@@ -69,6 +120,8 @@ def main() -> int:
     if produced[0] != target:
         shutil.move(str(produced[0]), target)
     size = target.stat().st_size / 1024 / 1024
+    if fix_manifest_lf(target):
+        print('[i] 已修正 manifest 行尾与 cmd 脚本执行位')
     print(f'\n产物: {target}\n大小: {size:.1f} MB')
     return 0
 
