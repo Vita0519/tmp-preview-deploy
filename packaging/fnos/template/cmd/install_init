@@ -1,0 +1,5 @@
+#!/bin/bash
+# 安装前：准备数据目录（保留旧数据，不覆盖）
+set -e
+mkdir -p "${TRIM_PKGVAR}/data/projects" "${TRIM_PKGVAR}/data/zips"
+exit 0

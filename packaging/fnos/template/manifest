@@ -1,0 +1,14 @@
+appname               = tmp-preview
+version               = 2.0.0
+display_name          = 临时预览站
+desc                  = 带到期时间的自托管预览 / 下载站，多 Agent 共用一套服务，各自只看自己的项目
+platform              = all
+source                = thirdparty
+maintainer            = Vita0519
+distributor           = Vita0519
+desktop_uidir         = ui
+desktop_applaunchname = tmp-preview.Application
+service_port          = 8080
+checkport             = true
+ctl_stop              = true
+os_min_version        = 1.2.0

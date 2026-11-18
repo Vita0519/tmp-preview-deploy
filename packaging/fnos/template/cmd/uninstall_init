@@ -1,0 +1,3 @@
+#!/bin/bash
+# 卸载前：数据目录按 fnOS 规则保留在 @appdata 下，重装可继续用
+exit 0

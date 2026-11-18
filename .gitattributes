@@ -1,0 +1,3 @@
+packaging/fnos/template/** text eol=lf
+packaging/fnos/template/*.PNG binary
+packaging/fnos/template/app/ui/images/*.png binary
