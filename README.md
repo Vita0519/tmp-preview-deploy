@@ -3,7 +3,7 @@
 把任意本地目录（静态站 / 单页 HTML / WebGL 作品 / 构建产物）**一键变成带到期时间的预览链接**。
 按可见性给寿命（门户 6 小时 / 持链接 12 小时 / 私有永久，可改），多成员共用一套服务，管理员看全部。
 
-自托管：**FastAPI + SQLite + 本地磁盘 + Vue 3**，一个进程一块盘，`docker compose up -d --build` 即用。
+自托管：**FastAPI + SQLite + 本地磁盘 + Vue 3**，一个进程一块盘，拉一个镜像就能跑。
 从 Cloudflare Workers + KV 迁移而来，旧实现留在 [`legacy/cloudflare/`](legacy/cloudflare/)。
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-a8332b.svg)](LICENSE)
@@ -19,18 +19,54 @@
               FastAPI (uvicorn) ── SQLite(WAL) + /data 磁盘
 ```
 
-## 快速开始
+## 截图
+
+| 控制台：项目、访问数据、分类筛选 | 项目详情：可见性、到期时间、文件清单 |
+|---|---|
+| ![控制台](docs/screenshots/console.png) | ![项目详情](docs/screenshots/project-detail.jpg) |
+
+| 成员与 API Key：一个账号绑一个 Agent | 设置：主题、站点图标、默认时长 |
+|---|---|
+| ![成员](docs/screenshots/members.png) | ![设置](docs/screenshots/settings.png) |
+
+| 访客门户：卡片墙，按分类直接挑 |
+|---|
+| ![门户](docs/screenshots/portal.png) |
+
+## 安装
+
+### 一、Docker Compose（推荐）
+
+预构建镜像：`ghcr.io/vita0519/tmp-preview:2.0.0`
 
 ```bash
-cp .env.example .env            # 至少改 ADMIN_PASSWORD；SITE_TITLE / PORT 一并看看
-docker compose up -d --build    # 首次构建 1-2 分钟
-docker compose logs -f preview  # 没指定密码时，日志里会打印初始管理员密码
+git clone https://github.com/Vita0519/tmp-preview-deploy.git
+cd tmp-preview-deploy
+cp .env.example .env            # 至少改 ADMIN_PASSWORD
+docker compose up -d            # 直接拉镜像，不构建
+docker compose logs -f preview  # 没设密码时，日志会打印初始管理员密码
 ```
 
 打开 `http://<机器IP>:8080`，用 `.env` 里的 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录。
 
+> 拉不动 ghcr：把 compose 里的 `image:` 注释掉、取消 `build:` 段，改 `docker compose up -d --build` 本地构建。
+
+### 二、飞牛 fnOS 应用包（.fpk）
+
+下载：[**tmp-preview.fpk**](https://github.com/Vita0519/tmp-preview-deploy/releases/download/v2.0.0/tmp-preview.fpk)（v2.0.0，其他版本见 [Releases](https://github.com/Vita0519/tmp-preview-deploy/releases)）
+
+1. 先在 NAS 上确认能拉到镜像：`docker pull ghcr.io/vita0519/tmp-preview:2.0.0`
+   —— 私有仓库的包默认是私有的，需要先在 GitHub Packages 把它设为 Public，或 `docker login ghcr.io`
+2. 应用中心 → 手动安装 → 选择 fpk
+3. 向导里填管理员用户名 / 密码（留空则首启自动生成，见容器日志）
+4. 启动后访问 `http://<NAS 地址>:519`（519 是特权端口，绑定失败就改 10519）
+
+应用数据在 `${TRIM_PKGVAR}/data`，卸载不删除。打包与调试细节见 [packaging/fnos/README.md](packaging/fnos/README.md)。
+
+### 三、从源码跑
+
 <details>
-<summary>没装 Docker，本地跑</summary>
+<summary>没有 Docker，或想改代码</summary>
 
 ```bash
 python -m venv .venv && .venv/Scripts/pip install -r backend/requirements.txt   # Linux/macOS: .venv/bin/pip
@@ -39,6 +75,21 @@ DATA_DIR=./data .venv/Scripts/python -m uvicorn app.main:app --app-dir backend -
 ```
 
 </details>
+
+## 公网访问
+
+推荐 **Cloudflare Tunnel**：不需要公网 IP，也不用在路由器上开端口。
+
+```bash
+cloudflared tunnel run --protocol http2 --token <TOKEN>
+```
+
+`--protocol http2` 别省。家宽对 UDP 常有 QoS，默认的 QUIC 会让上传掉到几十 KB/s，表现就是大文件一直 524。
+
+自建反向代理时：`client_max_body_size` 不小于上传上限，`proxy_read_timeout` / `proxy_send_timeout` ≥ 300s。
+
+> Cloudflare 免费版对单次请求有 100 秒响应上限。按你的上行带宽，超过约 30–50MB 的单次上传会撞 524；
+> 更大的文件建议先压成 zip，或在局域网内直连上传。
 
 ## 能力
 
@@ -145,7 +196,7 @@ curl -X POST http://127.0.0.1:8080/api/projects \
 | 事项 | 做法 |
 |---|---|
 | 看日志 | `docker compose logs -f --tail=100 preview` |
-| 升级 | `git pull && docker compose up -d --build`（数据在 `./data`，不受影响） |
+| 升级 | `git pull && docker compose pull && docker compose up -d`（数据在 `./data`，不受影响） |
 | 改端口 | `.env` 里 `PORT=9000` |
 | 反向代理 | 交给 Nginx / Caddy 终止 TLS，转发到 `127.0.0.1:8080`，并设 `COOKIE_SECURE=1` |
 | 备份 | 设置页「打包下载」（数据库走在线快照，不用停服）；兜底也可以打包 `./data`，或 `sqlite3 data/db.sqlite3 ".backup backup.db"` 单独热备 |
@@ -236,7 +287,9 @@ migrate/             Cloudflare KV → 本地
 tools/               gen_icons.py、push_api.py
 tests/               冒烟测试 / 截图脚本 / 演示数据
 legacy/cloudflare/   旧版 Worker 实现（仅存档，不再维护）
-docs/                架构、接口、可见性、迁移说明
+docs/                架构、接口、可见性、迁移说明；screenshots/ 界面截图
+packaging/fnos/      飞牛 fnOS 应用包工程（manifest / cmd / wizard / 打包脚本）
+.github/workflows/   CI：构建镜像并推送 ghcr
 ```
 
 ## 自检与测试
