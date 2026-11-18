@@ -314,6 +314,24 @@ agentctl rm landing --yes</code></pre>
         也可以直接调 HTTP API：<code>POST /api/projects</code> 带
         <code>Authorization: Bearer &lt;key&gt;</code>，multipart 传 <code>files[]</code> 或 <code>zip</code>。
       </p>
+      <h3 data-i18n="agent.h3">安装 skill</h3>
+      <ul>
+        <li data-i18n-html="agent.skill1">
+          把仓库里的 skill 目录 <code>skills/tmp-preview-agent/</code> 交给 Agent（或让它直接读
+          <a href="https://github.com/Vita0519/tmp-preview-deploy/blob/main/skills/tmp-preview-agent/SKILL.md">SKILL.md</a>）。
+          skill 里写清了命令、参数和权限边界，<code>scripts/agentctl.py</code> 是实际实现，也能单独当 CLI 用。
+        </li>
+        <li data-i18n-html="agent.skill2">
+          让管理员在「成员」页新建账号后点「复制给 Agent」，得到的就是一句话：skill 地址、
+          站点地址、API Key、上传方式都在里面，粘给任何 Agent 就能接管，不需要额外配置。
+        </li>
+      </ul>
+      <pre><code>安装 tmp-preview-deploy skill（https://&lt;你的站点&gt;/v/agent-guide）作为自己的临时预览站：
+站点 https://&lt;你的站点&gt;，API Key pv_xxx，上传用 POST /api/projects 带 Authorization: Bearer。</code></pre>
+      <p data-i18n-html="agent.skill3">
+        上面这句话由你的实例自动生成，域名和 Key 都取自当前部署；<code>/v/agent-guide</code>
+        是给 Agent 看的接入指南页，建议放一份 skill 说明。
+      </p>
     </section>
 
     <!-- 门户 -->
