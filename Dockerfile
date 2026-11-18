@@ -34,7 +34,7 @@ COPY backend/ backend/
 COPY --from=web /web/dist frontend/dist
 
 # 镜像里也留一份许可与署名声明（AGPL-3.0 要求随分发保留）
-COPY LICENSE NOTICE /app/
+COPY LICENSE NOTICE VERSION /app/
 
 RUN mkdir -p /data/projects /data/zips
 

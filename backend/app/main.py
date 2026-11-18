@@ -1,6 +1,6 @@
 """FastAPI 入口：API + 访客页 + 构建后的 SPA 同端口托管。
 
-Copyright (C) 2026 Vita0519· AGPL-3.0-only（见仓库根目录 LICENSE / NOTICE）
+Copyright (C) 2026 vita0519 · AGPL-3.0-only（见仓库根目录 LICENSE / NOTICE）
 """
 import asyncio
 import mimetypes
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
             print(f"[shutdown] flush failed: {exc}", flush=True)
 
 
-app = FastAPI(title="tmp-preview", version="2.0.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="tmp-preview", version=config.VERSION, lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(auth.router)
@@ -63,7 +63,7 @@ app.include_router(public.router)
 
 @app.get("/api/health")
 async def health():
-    return {"ok": True, "service": "tmp-preview", "version": "2.0.0"}
+    return {"ok": True, "service": "tmp-preview", "version": config.VERSION}
 
 
 @app.exception_handler(tagspec.TagError)

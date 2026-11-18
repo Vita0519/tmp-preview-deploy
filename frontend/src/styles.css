@@ -865,3 +865,13 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
     background: rgba(20, 22, 26, 0.28); backdrop-filter: blur(2px);
   }
 }
+
+/* 关于页二维码：赞赏码 / 群二维码 */
+.qrgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 172px)); gap: 18px; margin-top: 16px; }
+.qrbox { display: flex; flex-direction: column; gap: 6px; }
+.qrbox > b { font-size: 12.5px; }
+.qrimg {
+  width: 160px; height: 160px; object-fit: contain;
+  background: #fff; border-radius: 10px;
+  border: 1px solid var(--line, #e3e0d4);
+}

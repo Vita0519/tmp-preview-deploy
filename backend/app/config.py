@@ -29,6 +29,17 @@ def _bool(name: str, default: bool = False) -> bool:
 # 仓库根目录（backend/app/config.py → 上三层）
 BASE_DIR = Path(__file__).resolve().parents[2]
 
+
+def _version() -> str:
+    """版本号统一放仓库根 VERSION，改一处、跑 scripts/sync_version.py 同步其他文件。"""
+    try:
+        return (BASE_DIR / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        return "0.0.0"
+
+
+VERSION = _env("VERSION", _version())
+
 # 数据根目录：容器内挂 /data，本地默认 ./data
 DATA_DIR = Path(_env("DATA_DIR", str(BASE_DIR / "data"))).resolve()
 DB_PATH = DATA_DIR / "db.sqlite3"
@@ -42,7 +53,7 @@ SITE_SUBTITLE = _env("SITE_SUBTITLE", "到期自动回收 · 多 Agent 共享")
 # 所以这几项会在门户页脚、登录页、设置页「关于」里显示，改之前先看 NOTICE。
 PROJECT_NAME = _env("PROJECT_NAME", "tmp-preview")
 PROJECT_URL = _env("PROJECT_URL", "https://github.com/Vita0519/tmp-preview-deploy")
-PROJECT_AUTHOR = _env("PROJECT_AUTHOR", "Vita0519")
+PROJECT_AUTHOR = _env("PROJECT_AUTHOR", "vita0519")
 PROJECT_LICENSE = "AGPL-3.0-only"
 
 # 门户顶部「作者名片」的初始值。刻意用中性占位身份，不写任何真实姓名/联系方式。

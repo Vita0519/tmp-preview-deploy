@@ -224,7 +224,7 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 ```json
 {"project": {"name": "tmp-preview",
              "url": "https://github.com/Vita0519/tmp-preview-deploy",
-             "author": "Vita0519",
+             "author": "vita0519",
              "license": "AGPL-3.0-only"}}
 ```
 

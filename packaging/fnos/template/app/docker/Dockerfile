@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY backend/ backend/
 COPY frontend/dist frontend/dist
-COPY LICENSE NOTICE /app/
+COPY LICENSE NOTICE VERSION /app/
 
 RUN mkdir -p /data/projects /data/zips
 
