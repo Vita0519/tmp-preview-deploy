@@ -1,0 +1,43 @@
+name: docker-image
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 镜像标签
+        required: false
+        default: "2.0.0"
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/vita0519/tmp-preview:${{ inputs.tag || '2.0.0' }}
+            ghcr.io/vita0519/tmp-preview:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
