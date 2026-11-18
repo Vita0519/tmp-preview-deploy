@@ -224,6 +224,14 @@ function copyLoginCmd() {
   )
 }
 
+/** 一句话交接：skill 地址、站点、Key 都在里面，别的 Agent 直接能用 */
+function agentBriefText() {
+  const c = created.value
+  if (!c?.api_key) return ''
+  const origin = window.location.origin
+  return `安装 tmp-preview-deploy skill（${origin}/v/agent-guide）作为自己的临时预览站：站点 ${origin}，API Key ${c.api_key}，上传用 POST /api/projects 带 Authorization: Bearer。`
+}
+
 onMounted(load)
 </script>
 
@@ -542,8 +550,18 @@ onMounted(load)
         <dt v-if="created.api_key">API Key</dt>
         <dd v-if="created.api_key" class="mono" style="word-break: break-all">{{ created.api_key }}</dd>
       </dl>
-      <div style="display: flex; gap: 6px; margin-top: 14px">
-        <button v-if="created.api_key" class="btn sm" @click="copy(created.api_key)">复制 Key</button>
+      <div
+        v-if="created.api_key"
+        class="muted"
+        style="margin-top: 10px; font-size: 12px; line-height: 1.7; word-break: break-all"
+      >
+        {{ agentBriefText() }}
+      </div>
+      <div style="display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap">
+        <button v-if="created.api_key" class="btn primary sm" @click="copy(agentBriefText())">
+          复制给 Agent
+        </button>
+        <button v-if="created.api_key" class="btn sm" @click="copy(created.api_key)">只复制 Key</button>
         <button v-if="created.password" class="btn sm" @click="copyLoginCmd">复制登录命令</button>
       </div>
     </div>
