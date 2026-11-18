@@ -386,6 +386,6 @@ Vue 3（MIT）、Vite（MIT）；`legacy/cloudflare/` 里的旧实现同样适�
 | 交流群 | QQ `154578485` |
 | 问题反馈 | [Issues](https://github.com/Vita0519/tmp-preview-deploy/issues)，附上版本号（设置 → 关于 / 许可 可见） |
 | 最新版本 | [Releases](https://github.com/Vita0519/tmp-preview-deploy/releases) |
-| 鸣谢 | [linuxdo]((https://linux.do/) |
+| 鸣谢 | [linuxdo](https://linux.do/) |
 
 作者：**vita0519** · 许可：[AGPL-3.0-only](LICENSE)（再分发或对外服务请保留署名，见 [NOTICE](NOTICE)）
