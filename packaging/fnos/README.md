@@ -46,18 +46,24 @@ FNPACK=/path/to/fnpack python packaging/fnos/build.py
 
 ## 安装
 
-**前置：先构建镜像。** fnOS 应用中心只执行 `docker compose up -d`，不会替你 build，
-所以镜像必须先存在（或已推送到镜像仓库）。
+镜像由 GitHub Actions 构建并推送到 `ghcr.io/vita0519/tmp-preview:2.0.0`。
+
+**先确认 NAS 能拉到镜像：**
 
 ```bash
-# 在 NAS 上解包 fpk 取出源码
+docker pull ghcr.io/vita0519/tmp-preview:2.0.0
+```
+
+- 提示 `denied`：私有仓库的包默认私有，去
+  `https://github.com/users/Vita0519/packages/container/tmp-preview/settings`
+  改成 Public；或在 NAS 上 `docker login ghcr.io -u Vita0519` 后再拉
+- 提示超时：国内到 ghcr 不稳，用包内源码本地构建（产物同名，compose 直接可用）
+
+```bash
 mkdir -p ~/tmpbuild && cd ~/tmpbuild
 tar -xzf /path/to/tmp-preview.fpk
 tar -xzf app.tgz
-# 构建（首次会拉 python:3.12-slim 与依赖，几分钟）
 bash docker/build_image.sh
-# 确认
-docker image ls | grep tmp-preview
 ```
 
 然后：
