@@ -43,3 +43,6 @@ Thumbs.db
 /.ghpush/
 /.push_via_api.py
 /tests/shots/
+
+# 飞牛打包产物（fpk 与中间目录不入库）
+/packaging/fnos/out/

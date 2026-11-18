@@ -1,0 +1,46 @@
+[
+  {
+    "stepTitle": "管理员账号",
+    "items": [
+      {
+        "type": "text",
+        "field": "TP_ADMIN_USER",
+        "label": "管理员用户名",
+        "initValue": "admin",
+        "rules": [{ "required": true, "message": "请输入管理员用户名" }]
+      },
+      {
+        "type": "password",
+        "field": "TP_ADMIN_PASSWORD",
+        "label": "管理员密码（留空则首启自动生成，见容器日志）",
+        "initValue": ""
+      }
+    ]
+  },
+  {
+    "stepTitle": "站点",
+    "items": [
+      {
+        "type": "text",
+        "field": "TP_SITE_TITLE",
+        "label": "站点标题",
+        "initValue": "临时预览站"
+      },
+      {
+        "type": "text",
+        "field": "TP_PUBLIC_PORTAL",
+        "label": "门户是否公开（1 公开 / 0 需登录）",
+        "initValue": "0"
+      }
+    ]
+  },
+  {
+    "stepTitle": "安装说明",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "首次启动会构建镜像（需要几分钟，期间拉取 python:3.12-slim 与依赖）。完成后访问 http://<NAS 地址>:8080 登录。数据保存在应用数据目录，卸载不删除；如需外网访问，建议用 Cloudflare Tunnel 并加 --protocol http2。"
+      }
+    ]
+  }
+]
