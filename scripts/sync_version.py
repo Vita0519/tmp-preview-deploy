@@ -37,8 +37,15 @@ def main() -> int:
     # 根 compose 的镜像 tag
     rcomp = ROOT / 'docker-compose.yml'
     rtext = rcomp.read_text(encoding='utf-8')
-    rtext = re.sub(r'(image: ghcr\.io/vita0519/tmp-preview:)\S+', rf'\g<1>{ver}', rtext)
+    rtext = re.sub(r'(image: ghcr\.io/vita0519/tmp-preview:)\$\{IMAGE_TAG:-[\d.]+\}',
+                   rf'\g<1>${{IMAGE_TAG:-{ver}}}', rtext)
     rcomp.write_text(rtext, encoding='utf-8')
+
+    # .env.example 的默认镜像版本
+    env = ROOT / '.env.example'
+    etext = env.read_text(encoding='utf-8')
+    etext = re.sub(r'^IMAGE_TAG=.*$', f'IMAGE_TAG={ver}', etext, flags=re.M)
+    env.write_text(etext, encoding='utf-8')
 
     # CI 默认 tag
     wf = ROOT / '.github' / 'workflows' / 'docker-image.yml'

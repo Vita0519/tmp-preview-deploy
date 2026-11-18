@@ -53,7 +53,7 @@ docker compose logs -f preview  # 没设密码时，日志会打印初始管理�
 
 ### 二、飞牛 fnOS 应用包（.fpk）
 
-下载：[**tmp-preview.fpk**](https://github.com/Vita0519/tmp-preview-deploy/releases/download/v2.0.0/tmp-preview.fpk)（v2.0.0，其他版本见 [Releases](https://github.com/Vita0519/tmp-preview-deploy/releases)）
+下载：[**tmp-preview.fpk**](https://github.com/Vita0519/tmp-preview-deploy/releases/latest/download/tmp-preview.fpk)（始终指向最新版，历史版本见 [Releases](https://github.com/Vita0519/tmp-preview-deploy/releases)）
 
 1. 先在 NAS 上确认能拉到镜像：`docker pull ghcr.io/vita0519/tmp-preview:2.0.0`
    —— 私有仓库的包默认是私有的，需要先在 GitHub Packages 把它设为 Public，或 `docker login ghcr.io`
@@ -196,7 +196,7 @@ curl -X POST http://127.0.0.1:8080/api/projects \
 | 事项 | 做法 |
 |---|---|
 | 看日志 | `docker compose logs -f --tail=100 preview` |
-| 升级 | `git pull && docker compose pull && docker compose up -d`（数据在 `./data`，不受影响） |
+| 升级 | `git pull && docker compose pull && docker compose up -d`（数据在 `./data`，不受影响）；想钉住版本就改 `.env` 的 `IMAGE_TAG` |
 | 改端口 | `.env` 里 `PORT=9000` |
 | 反向代理 | 交给 Nginx / Caddy 终止 TLS，转发到 `127.0.0.1:8080`，并设 `COOKIE_SECURE=1` |
 | 备份 | 设置页「打包下载」（数据库走在线快照，不用停服）；兜底也可以打包 `./data`，或 `sqlite3 data/db.sqlite3 ".backup backup.db"` 单独热备 |
@@ -362,6 +362,12 @@ Vue 3（MIT）、Vite（MIT）；`legacy/cloudflare/` 里的旧实现同样适�
 ## 接口
 
 完整列表见 [docs/api.md](docs/api.md)，架构与取舍见 [docs/architecture.md](docs/architecture.md)。
+
+## 参与与发版
+
+- 发版规则、一键发版脚本、回滚方式见 [docs/release.md](docs/release.md)
+- 版本号只改仓库根 `VERSION`，`python scripts/sync_version.py` 会同步到各处
+- 镜像 tag 与 git tag 一一对应且不可变，`latest` 始终指向最新版本
 
 ## 赞赏与联系
 
