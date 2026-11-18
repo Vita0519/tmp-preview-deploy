@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="pvTile" x1="2" y1="0" x2="30" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#17bca9"/>
+      <stop offset=".48" stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#095651"/>
+    </linearGradient>
+    <linearGradient id="pvShine" x1="16" y1="0" x2="16" y2="19" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7.6" fill="url(#pvTile)"/>
+  <rect width="32" height="32" rx="7.6" fill="url(#pvShine)"/>
+  <path fill="#ffffff" d="M12.1 7.4H19.9C21 7.4 21.7 8 21.7 8.9V9.2L17.2 15.2V16.8L21.7 22.8V23.1C21.7 24 21 24.6 19.9 24.6H12.1C11 24.6 10.3 24 10.3 23.1V22.8L14.8 16.8V15.2L10.3 9.2V8.9C10.3 8 11 7.4 12.1 7.4Z"/>
+</svg>

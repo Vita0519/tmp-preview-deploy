@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tmp-preview · 临时预览站 — 自托管预览与下载服务</title>
+<meta name="description" content="把任意本地目录一键部署成带到期时间的预览链接，自托管、多成员、多 Agent 共用。">
+<meta property="og:title" content="tmp-preview · 临时预览站">
+<meta property="og:description" content="自托管的临时预览 / 下载站：上传即预览，到期自动回收，多成员与 API Key。">
+<meta property="og:type" content="website">
+<link rel="icon" href="assets/img/favicon.svg">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="#intro">
+    <svg viewBox="0 0 256 256" aria-hidden="true">
+      <rect width="256" height="256" rx="58" fill="#12857a"/>
+      <rect x="44" y="54" width="168" height="120" rx="14" fill="none" stroke="#fff" stroke-width="12"/>
+      <line x1="44" y1="84" x2="212" y2="84" stroke="#fff" stroke-width="10"/>
+      <circle cx="64" cy="69" r="5.5" fill="#fff"/><circle cx="84" cy="69" r="5.5" fill="#fff"/>
+      <line x1="68" y1="112" x2="150" y2="112" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+      <line x1="68" y1="136" x2="122" y2="136" stroke="#9ff3e4" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="178" cy="178" r="36" fill="#0b3b36"/>
+      <circle cx="178" cy="178" r="36" fill="none" stroke="#5eead4" stroke-width="9" stroke-linecap="round" stroke-dasharray="150 76" transform="rotate(-90 178 178)"/>
+      <line x1="178" y1="178" x2="178" y2="160" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+      <line x1="178" y1="178" x2="192" y2="186" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+    </svg>
+    <span>tmp-preview</span>
+  </a>
+  <nav class="topnav">
+    <a href="#why" data-i18n="nav.why">为什么</a>
+    <a href="#docker" data-i18n="nav.install">安装</a>
+    <a href="#agent" data-i18n="nav.agent">给 Agent 用</a>
+    <a href="#api" data-i18n="nav.api">API</a>
+    <a href="#faq" data-i18n="nav.faq">FAQ</a>
+  </nav>
+  <span class="spacer"></span>
+  <div class="lang" role="group" aria-label="Language">
+    <button data-lang="zh" class="on">中文</button>
+    <button data-lang="en">EN</button>
+  </div>
+  <a class="ghost-btn" href="https://github.com/Vita0519/tmp-preview-deploy" target="_blank" rel="noopener">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    GitHub
+  </a>
+  <button class="ghost-btn menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <h4 data-i18n="side.start">开始</h4>
+    <a href="#intro" data-i18n="side.intro">概览</a>
+    <a href="#why" data-i18n="side.why">它解决什么</a>
+    <a href="#screens" data-i18n="side.screens">界面</a>
+
+    <h4 data-i18n="side.install">安装</h4>
+    <a href="#docker" data-i18n="side.docker">Docker Compose</a>
+    <a href="#fnos" data-i18n="side.fnos">飞牛 fnOS</a>
+    <a href="#source" data-i18n="side.source">源码运行</a>
+    <a href="#public" data-i18n="side.public">公网访问</a>
+
+    <h4 data-i18n="side.usage">使用</h4>
+    <a href="#projects" data-i18n="side.projects">项目与链接</a>
+    <a href="#members" data-i18n="side.members">成员与密钥</a>
+    <a href="#agent" data-i18n="side.agent">给 Agent 用</a>
+    <a href="#portal" data-i18n="side.portal">门户与收藏夹</a>
+
+    <h4 data-i18n="side.ref">参考</h4>
+    <a href="#features" data-i18n="side.features">功能清单</a>
+    <a href="#arch" data-i18n="side.arch">架构与数据</a>
+    <a href="#api" data-i18n="side.api">API 速查</a>
+    <a href="#faq" data-i18n="side.faq">常见问题</a>
+    <a href="#release" data-i18n="side.release">版本与发版</a>
+    <a href="#license" data-i18n="side.license">许可与署名</a>
+  </aside>
+
+  <main>
+    <!-- 概览 -->
+    <section id="intro" class="hero">
+      <span class="kicker" data-i18n="hero.kicker">SELF-HOSTED · AGPL-3.0</span>
+      <h1 data-i18n="hero.title">把任何目录变成带到期时间的预览链接</h1>
+      <p class="lead" data-i18n="hero.lead">
+        上传一个文件夹或 zip，立刻得到一个可分享的预览地址；到点自动停止访问或删除，
+        不用回头清理。多成员共用一套服务，各自只能看自己的项目，管理员看全部。
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="#docker" data-i18n="hero.cta1">快速开始</a>
+        <a class="btn line" href="https://github.com/Vita0519/tmp-preview-deploy/releases/latest/download/tmp-preview.fpk" data-i18n="hero.cta2">下载飞牛安装包</a>
+        <a class="btn line" href="https://github.com/Vita0519/tmp-preview-deploy" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <table>
+        <tbody>
+          <tr>
+            <th data-i18n="hero.m1">形态</th>
+            <td data-i18n="hero.m1v">单个容器：FastAPI + SQLite + 本地磁盘 + Vue 3 控制台</td>
+          </tr>
+          <tr>
+            <th data-i18n="hero.m2">镜像</th>
+            <td><code>ghcr.io/vita0519/tmp-preview:2.0.1</code></td>
+          </tr>
+          <tr>
+            <th data-i18n="hero.m3">默认端口</th>
+            <td data-i18n="hero.m3v">Compose 8080 · 飞牛应用 519</td>
+          </tr>
+          <tr>
+            <th data-i18n="hero.m4">数据</th>
+            <td data-i18n-html="hero.m4v">全部落在本地 <code>/data</code>：SQLite + 项目文件 + zip</td>
+          </tr>
+        </tbody>
+      </table>
+      <figure class="shot">
+        <img src="assets/img/console.png" alt="控制台">
+        <figcaption data-i18n="hero.cap">控制台：项目列表、访问数据、分类与收藏夹筛选</figcaption>
+      </figure>
+    </section>
+
+    <!-- 为什么 -->
+    <section id="why">
+      <h2 data-i18n="why.title">它解决什么</h2>
+      <p data-i18n="why.p1">
+        做前端、做原型、给客户看东西，总有大量「临时」的页面要分享：交付验收的构建产物、
+        一次性的数据看板、给同事看的 demo。传网盘太重、丢对象存储又没有人管回收，
+        过几个月一堆链接还活着。
+      </p>
+      <p data-i18n="why.p2">
+        tmp-preview 把这件事收成一个动作：上传 → 拿到链接 → 到期自动处置。
+        同时它天生为「多个 Agent 共用一台机器」设计——每个 Agent 一把 API Key，
+        只能看到、改自己的项目。
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h3 data-i18n="why.c1t">上传即预览</h3>
+          <p data-i18n="why.c1d">目录或 zip 都行，入口规则自动判断，静态站、单页、PDF 都能直接打开。</p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="why.c2t">到期自动处置</h3>
+          <p data-i18n="why.c2d">按可见性给寿命，到点停止访问或删除文件；还能实时看到倒计时。</p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="why.c3t">多成员隔离</h3>
+          <p data-i18n="why.c3d">管理员 / 发布者 / 访客三类角色，一人一 Key，互相看不到对方的项目。</p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="why.c4t">数据在本地</h3>
+          <p data-i18n="why.c4d">SQLite + 本地磁盘，备份就是一个 zip，不依赖任何云服务。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 界面 -->
+    <section id="screens">
+      <h2 data-i18n="screens.title">界面</h2>
+      <div class="shots-2">
+        <figure class="shot">
+          <img src="assets/img/project-detail.jpg" alt="项目详情">
+          <figcaption data-i18n="screens.c1">项目详情：可见性、到期时间、文件清单、危险操作</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/img/settings.png" alt="设置">
+          <figcaption data-i18n="screens.c2">设置：主题系列、站点图标、默认时长、上传上限</figcaption>
+        </figure>
+      </div>
+      <figure class="shot">
+        <img src="assets/img/portal.png" alt="访客门户">
+        <figcaption data-i18n="screens.c3">访客门户：卡片墙，按分类与标签浏览</figcaption>
+      </figure>
+    </section>
+
+    <!-- Docker -->
+    <section id="docker">
+      <h2 data-i18n="docker.title">安装 · Docker Compose</h2>
+      <p data-i18n="docker.p1">推荐方式。镜像已发布在 ghcr，直接拉取即可，不需要本地构建。</p>
+      <pre><code>git clone https://github.com/Vita0519/tmp-preview-deploy.git
+cd tmp-preview-deploy
+cp .env.example .env            <span class="c"># 至少改 ADMIN_PASSWORD</span>
+docker compose up -d            <span class="c"># 拉取镜像并启动</span>
+docker compose logs -f preview  <span class="c"># 没设密码时，日志里会打印初始密码</span></code></pre>
+      <p data-i18n-html="docker.p2">打开 <code>http://&lt;机器IP&gt;:8080</code>，用 <code>.env</code> 里的管理员账号登录。</p>
+      <table>
+        <thead>
+          <tr><th data-i18n="docker.th1">变量</th><th data-i18n="docker.th2">默认</th><th data-i18n="docker.th3">说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>PORT</code></td><td>8080</td><td data-i18n="docker.v1">对外端口</td></tr>
+          <tr><td><code>ADMIN_PASSWORD</code></td><td>change-me-please</td><td data-i18n="docker.v2">初始管理员密码，已有账号则忽略</td></tr>
+          <tr><td><code>IMAGE_TAG</code></td><td>2.0.1</td><td data-i18n="docker.v3">镜像版本；想跟最新可改 latest，升级前先 pull</td></tr>
+          <tr><td><code>PUBLIC_PORTAL</code></td><td>0</td><td data-i18n="docker.v4">是否允许匿名访问门户</td></tr>
+          <tr><td><code>MAX_UPLOAD_MB</code></td><td>1024</td><td data-i18n="docker.v5">单项目大小上限</td></tr>
+        </tbody>
+      </table>
+      <div class="note" data-i18n-html="docker.note">
+        拉不动 ghcr 时：把 compose 里的 <code>image:</code> 注释掉、取消 <code>build:</code> 段，改
+        <code>docker compose up -d --build</code> 本地构建。
+      </div>
+    </section>
+
+    <!-- 飞牛 -->
+    <section id="fnos">
+      <h2 data-i18n="fnos.title">安装 · 飞牛 fnOS 应用包</h2>
+      <p data-i18n="fnos.p1">
+        提供原生 .fpk 安装包，装完在应用中心打开，数据落在应用数据目录，卸载不删除。
+      </p>
+      <ol>
+        <li data-i18n-html="fnos.s1">下载 <a href="https://github.com/Vita0519/tmp-preview-deploy/releases/latest/download/tmp-preview.fpk">tmp-preview.fpk</a>（最新版）</li>
+        <li data-i18n-html="fnos.s2">确认 NAS 能拉到镜像：<code>docker pull ghcr.io/vita0519/tmp-preview:2.0.1</code>，私有仓库需先把包设为 Public 或 <code>docker login ghcr.io</code></li>
+        <li data-i18n-html="fnos.s3">应用中心 → 手动安装 → 选择 fpk，向导里填管理员账号</li>
+        <li data-i18n-html="fnos.s4">启动后访问 <code>http://&lt;NAS 地址&gt;:519</code></li>
+      </ol>
+      <div class="warn" data-i18n="fnos.warn">
+        519 是特权端口。如果应用中心以普通用户启动容器导致绑定失败，把 fpk 里三处端口一起改成 10519 即可。
+      </div>
+    </section>
+
+    <!-- 源码 -->
+    <section id="source">
+      <h2 data-i18n="source.title">安装 · 源码运行</h2>
+      <p data-i18n="source.p1">没有 Docker，或要改代码时使用。前端构建产物会被后端直接托管。</p>
+      <pre><code>python -m venv .venv
+.venv/Scripts/pip install -r backend/requirements.txt   <span class="c"># Linux/macOS: .venv/bin/pip</span>
+cd frontend &amp;&amp; npm i &amp;&amp; npm run build &amp;&amp; cd ..
+DATA_DIR=./data .venv/Scripts/python -m uvicorn app.main:app \
+  --app-dir backend --host 0.0.0.0 --port 8080</code></pre>
+    </section>
+
+    <!-- 公网 -->
+    <section id="public">
+      <h2 data-i18n="public.title">公网访问</h2>
+      <p data-i18n="public.p1">
+        没有公网 IP 也能用 Cloudflare Tunnel 暴露服务，不用在路由器上开端口。
+      </p>
+      <pre><code>cloudflared tunnel run --protocol http2 --token &lt;TOKEN&gt;</code></pre>
+      <div class="warn" data-i18n-html="public.warn">
+        <code>--protocol http2</code> 别省。家宽对 UDP 常有 QoS，默认 QUIC 会让上传掉到几十 KB/s，
+        表现就是大文件一直 524。
+      </div>
+      <p data-i18n-html="public.p2">
+        Cloudflare 免费版对单次请求有 100 秒响应上限。按上行带宽算，超过约 30–50MB 的单次上传会撞 524；
+        更大的文件建议先压 zip，或在局域网内直连上传。自建反代时，
+        <code>client_max_body_size</code> 不小于上传上限，<code>proxy_read_timeout</code> /
+        <code>proxy_send_timeout</code> ≥ 300s。
+      </p>
+    </section>
+
+    <!-- 项目 -->
+    <section id="projects">
+      <h2 data-i18n="proj.title">项目与链接</h2>
+      <p data-i18n="proj.p1">上传后得到三种地址，各管一件事：</p>
+      <table>
+        <thead><tr><th data-i18n="proj.th1">路径</th><th data-i18n="proj.th2">用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>/v/&lt;slug&gt;</code></td><td data-i18n="proj.r1">访客外壳：标题、实时倒计时、下载按钮、复制链接</td></tr>
+          <tr><td><code>/p/&lt;slug&gt;/...</code></td><td data-i18n="proj.r2">项目原始文件，可直接嵌 iframe 或引用子资源</td></tr>
+          <tr><td><code>/download/&lt;slug&gt;</code></td><td data-i18n="proj.r3">zip 下载（项目开启下载后才有）</td></tr>
+        </tbody>
+      </table>
+      <h3 data-i18n="proj.h3">入口规则</h3>
+      <ul>
+        <li data-i18n-html="proj.l1">只有一个文件：它就是入口，<code>report.html</code>、<code>menu.pdf</code> 都能直接打开</li>
+        <li data-i18n-html="proj.l2">多个文件且有根目录 <code>index.html</code>：用它当入口</li>
+        <li data-i18n-html="proj.l3">多个文件但没有 <code>index.html</code>：拒绝上传，提示改名、拆单文件或改用 zip</li>
+      </ul>
+      <h3 data-i18n="proj.h4">可见性与寿命</h3>
+      <table>
+        <thead><tr><th data-i18n="proj.th3">可见性</th><th data-i18n="proj.th4">默认寿命</th><th data-i18n="proj.th5">谁能看到</th></tr></thead>
+        <tbody>
+          <tr><td data-i18n="proj.v1">门户</td><td>6h</td><td data-i18n="proj.v1d">出现在公开门户里，任何人可浏览</td></tr>
+          <tr><td data-i18n="proj.v2">持链接</td><td>12h</td><td data-i18n="proj.v2d">只有拿到地址的人能打开，不进门户</td></tr>
+          <tr><td data-i18n="proj.v3">私有</td><td data-i18n="proj.forever">永久</td><td data-i18n="proj.v3d">只有自己（和管理员）可见</td></tr>
+        </tbody>
+      </table>
+      <p data-i18n="proj.p2">三档默认时长都能在设置页改；到期动作可选「停止访问」或「删除文件」。</p>
+    </section>
+
+    <!-- 成员 -->
+    <section id="members">
+      <h2 data-i18n="mem.title">成员与密钥</h2>
+      <p data-i18n-html="mem.p1">
+        一个账号绑一个 Agent，一把 <code>pv_...</code> 的 API Key。成员之间互不可见，
+        管理员可以看全部项目并按成员筛选。
+      </p>
+      <table>
+        <thead><tr><th data-i18n="mem.th1">角色</th><th data-i18n="mem.th2">能做什么</th></tr></thead>
+        <tbody>
+          <tr><td data-i18n="mem.r1">管理员</td><td data-i18n="mem.r1d">看全部项目、管成员与设置、备份恢复</td></tr>
+          <tr><td data-i18n="mem.r2">发布者</td><td data-i18n="mem.r2d">只能管自己的项目；可被管理员指派负责人</td></tr>
+          <tr><td data-i18n="mem.r3">访客</td><td data-i18n="mem.r3d">只浏览门户，进不了控制台</td></tr>
+        </tbody>
+      </table>
+      <div class="note" data-i18n-html="mem.note">
+        新建成员后点「复制给 Agent」，得到的是一整句话：skill 地址、站点地址、API Key 和上传方式，
+        直接粘贴给别的 Agent 就能接管。
+      </div>
+    </section>
+
+    <!-- Agent -->
+    <section id="agent">
+      <h2 data-i18n="agent.title">给 Agent 用</h2>
+      <p data-i18n-html="agent.p1">
+        命令行工具 <code>agentctl</code> 面向 Agent：登录一次存 Key，之后一条命令部署并自动探活。
+      </p>
+      <pre><code><span class="c"># 1) 登录一次，Key 存到 ~/.config/tmp-preview/config.json（0600）</span>
+agentctl login --url https://pre.example.com --username alice --password '***'
+
+<span class="c"># 2) 部署：传完自己探活，返回可点开的地址与 HTTP 状态</span>
+agentctl deploy ./dist --ttl 24 --tags v2
+
+<span class="c"># 3) 日常</span>
+agentctl ls                 <span class="c"># 我的项目</span>
+agentctl renew landing --ttl 48
+agentctl rm landing --yes</code></pre>
+      <p data-i18n-html="agent.p2">
+        也可以直接调 HTTP API：<code>POST /api/projects</code> 带
+        <code>Authorization: Bearer &lt;key&gt;</code>，multipart 传 <code>files[]</code> 或 <code>zip</code>。
+      </p>
+    </section>
+
+    <!-- 门户 -->
+    <section id="portal">
+      <h2 data-i18n="portal.title">门户与收藏夹</h2>
+      <p data-i18n="portal.p1">
+        门户是所有「门户可见」项目的卡片墙，可以按分类、标签、类型筛选，也提供 RSS。
+        收藏夹用来做二级归类，支持子夹；管理员侧栏会按成员分组。
+      </p>
+      <ul>
+        <li data-i18n="portal.l1">标签：每个项目最多 6 个，门户顶部有标签条</li>
+        <li data-i18n="portal.l2">访问统计：每天的趋势、累计访问、下载次数</li>
+        <li data-i18n-html="portal.l3">RSS：<code>/rss.xml</code>，门户不公开且未登录时返回 404</li>
+      </ul>
+    </section>
+
+    <!-- 功能清单 -->
+    <section id="features">
+      <h2 data-i18n="feat.title">功能清单</h2>
+      <table>
+        <thead><tr><th data-i18n="feat.th1">模块</th><th data-i18n="feat.th2">能力</th></tr></thead>
+        <tbody>
+          <tr><td data-i18n="feat.m1">上传</td><td data-i18n="feat.d1">目录 / zip、入口自动判断、路径穿越校验、超大文件按需打包</td></tr>
+          <tr><td data-i18n="feat.m2">生命周期</td><td data-i18n="feat.d2">按可见性设默认时长、续期、到期停止访问或删除、倒计时</td></tr>
+          <tr><td data-i18n="feat.m3">成员</td><td data-i18n="feat.d3">三角色、API Key 轮换、负责人指派、成员搜索与筛选</td></tr>
+          <tr><td data-i18n="feat.m4">组织</td><td data-i18n="feat.d4">标签、收藏夹（含子夹）、门户、RSS、批量操作</td></tr>
+          <tr><td data-i18n="feat.m5">观感</td><td data-i18n="feat.d5">六套配色系列、站点图标、关于页二维码（赞赏 / 群）</td></tr>
+          <tr><td data-i18n="feat.m6">运维</td><td data-i18n="feat.d6">全量备份与覆盖恢复、访问统计、操作日志、孤儿目录清理</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 架构 -->
+    <section id="arch">
+      <h2 data-i18n="arch.title">架构与数据</h2>
+      <pre><code>浏览器 ──┬── /v/&lt;slug&gt;          访客预览外壳（倒计时 + 下载）
+         ├── /p/&lt;slug&gt;/...      项目本体（原始文件直出，支持 SPA 回退）
+         ├── /download/&lt;slug&gt;   zip 下载
+         └── /                  控制台（Vue 3 SPA）
+                    │
+              FastAPI (uvicorn) ── SQLite(WAL) + /data 磁盘</code></pre>
+      <table>
+        <thead><tr><th data-i18n="arch.th1">路径</th><th data-i18n="arch.th2">内容</th></tr></thead>
+        <tbody>
+          <tr><td><code>data/db.sqlite3</code></td><td data-i18n="arch.r1">项目、成员、标签、收藏夹、访问计数</td></tr>
+          <tr><td><code>data/projects/&lt;slug&gt;/</code></td><td data-i18n="arch.r2">项目文件本体</td></tr>
+          <tr><td><code>data/zips/&lt;slug&gt;.zip</code></td><td data-i18n="arch.r3">上传的 zip 或按需生成的整包</td></tr>
+          <tr><td><code>data/branding/</code></td><td data-i18n="arch.r4">站点图标与关于页二维码</td></tr>
+        </tbody>
+      </table>
+      <div class="warn" data-i18n="arch.warn">
+        保持单 worker：访问计数与到期巡检是进程内任务。要横向扩展，需要先把计数与锁换成外置方案。
+      </div>
+    </section>
+
+    <!-- API -->
+    <section id="api">
+      <h2 data-i18n="api.title">API 速查</h2>
+      <p data-i18n-html="api.p1">全部接口都在 <code>/api</code> 下，认证用 Cookie 会话或 <code>Authorization: Bearer &lt;api key&gt;</code>。</p>
+      <table>
+        <thead><tr><th data-i18n="api.th1">方法</th><th data-i18n="api.th2">路径</th><th data-i18n="api.th3">说明</th></tr></thead>
+        <tbody>
+          <tr><td>POST</td><td><code>/api/projects</code></td><td data-i18n="api.r1">上传（multipart：files[] 或 zip）</td></tr>
+          <tr><td>GET</td><td><code>/api/projects</code></td><td data-i18n="api.r2">列表，支持 q / tag / kind / status / sort</td></tr>
+          <tr><td>PATCH</td><td><code>/api/projects/&lt;slug&gt;</code></td><td data-i18n="api.r3">改标题、可见性、时长、标签、收藏夹</td></tr>
+          <tr><td>DELETE</td><td><code>/api/projects/&lt;slug&gt;</code></td><td data-i18n="api.r4">删除项目与文件</td></tr>
+          <tr><td>GET</td><td><code>/api/meta</code></td><td data-i18n="api.r5">站点信息、主题、上传限制（公开）</td></tr>
+          <tr><td>GET</td><td><code>/api/health</code></td><td data-i18n="api.r6">健康检查</td></tr>
+        </tbody>
+      </table>
+      <p data-i18n-html="api.p2">完整列表与字段说明见仓库里的 <a href="https://github.com/Vita0519/tmp-preview-deploy/blob/main/docs/api.md">docs/api.md</a>。</p>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq">
+      <h2 data-i18n="faq.title">常见问题</h2>
+      <h3 data-i18n="faq.q1">上传大文件一直 524 / 传不完？</h3>
+      <p data-i18n-html="faq.a1">
+        Cloudflare 免费版对单次请求有 100 秒响应上限，和你的上行带宽叠加后，大约 30–50MB 就会撞墙。
+        先确认 Tunnel 用了 <code>--protocol http2</code>，再压成 zip 或改内网直连上传。
+      </p>
+      <h3 data-i18n="faq.q2">能多人用吗？</h3>
+      <p data-i18n="faq.a2">
+        支持多成员、三种角色、各自独立的 API Key，成员之间互相看不到项目。
+        但它是单租户设计：一套实例对应一个团队，不适合做成对外 SaaS。
+      </p>
+      <h3 data-i18n="faq.q3">数据在哪？怎么备份？</h3>
+      <p data-i18n-html="faq.a3">
+        全在 <code>data/</code>（容器内 <code>/data</code>）。设置页「打包下载」会在线快照数据库再打包，
+        不用停服；恢复时先「看看里面有什么」再覆盖，旧数据会留在 <code>data/.backup-before-restore-*</code>。
+      </p>
+      <h3 data-i18n="faq.q4">飞牛应用装了打不开？</h3>
+      <p data-i18n-html="faq.a4">
+        先看 <code>docker logs tmp-preview</code>。最常见是镜像没拉到（把 ghcr 包设为 Public），
+        或 519 端口无权限（改成 10519）。
+      </p>
+      <h3 data-i18n="faq.q5">升级会丢数据吗？</h3>
+      <p data-i18n-html="faq.a5">
+        不会。<code>data/</code> 原样保留，新版本启动时自动补齐表结构，迁移是幂等的。
+        升级用 <code>docker compose pull &amp;&amp; docker compose up -d</code>。
+      </p>
+    </section>
+
+    <!-- 发版 -->
+    <section id="release">
+      <h2 data-i18n="rel.title">版本与发版</h2>
+      <p data-i18n-html="rel.p1">
+        版本号 SemVer，git tag 与镜像 tag 一一对应且不可变，<code>latest</code> 始终指向最新版本。
+      </p>
+      <pre><code><span class="c"># 部署侧：钉版本 / 跟最新</span>
+docker compose pull &amp;&amp; docker compose up -d
+IMAGE_TAG=2.0.1 docker compose pull &amp;&amp; docker compose up -d
+
+<span class="c"># 维护侧：一键发版</span>
+python scripts/release.py 2.0.2</code></pre>
+      <p data-i18n-html="rel.p2">发版脚本会校验工作区、同步版本号、打 tag、等 CI 出镜像、打包 fpk 并创建 Release。
+        详见 <a href="https://github.com/Vita0519/tmp-preview-deploy/blob/main/docs/release.md">docs/release.md</a>。</p>
+    </section>
+
+    <!-- 许可 -->
+    <section id="license">
+      <h2 data-i18n="lic.title">许可与署名</h2>
+      <p data-i18n="lic.p1">
+        本项目以 AGPL-3.0-only 发布。依据第 7(b) 条的附加要求：任何再分发、修改版或对外提供的服务，
+        都必须保留 LICENSE 与 NOTICE，保留「关于 / 许可」页面、登录页与门户页脚里指向本项目的署名与链接，
+        并在显著位置注明「基于 tmp-preview 修改」及修改日期；不得用原作者名义为修改版背书。
+      </p>
+      <p data-i18n="lic.p2">
+        闭源商用、白标分发需要豁免上述条款，请联系作者取得书面许可。
+      </p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="foot-wrap">
+    <div class="foot-col">
+      <h5>tmp-preview</h5>
+      <a href="#intro" data-i18n="foot.home">概览</a>
+      <a href="#docker" data-i18n="foot.install">安装</a>
+      <a href="#api" data-i18n="foot.api">API</a>
+      <a href="https://github.com/Vita0519/tmp-preview-deploy/releases" target="_blank" rel="noopener" data-i18n="foot.release">版本发布</a>
+    </div>
+    <div class="foot-col">
+      <h5 data-i18n="foot.contact">联系</h5>
+      <a href="https://github.com/Vita0519" target="_blank" rel="noopener">GitHub · Vita0519</a>
+      <a href="mailto:admin@allfather.de5.net">admin@allfather.de5.net</a>
+      <a data-i18n="foot.qq">QQ 群 154578485</a>
+      <a href="https://github.com/Vita0519/tmp-preview-deploy/issues" target="_blank" rel="noopener" data-i18n="foot.issue">问题反馈</a>
+    </div>
+    <div class="foot-col">
+      <h5 data-i18n="foot.support">赞赏</h5>
+      <div class="qr">
+        <figure>
+          <img src="assets/img/qr-wechat.png" alt="微信赞赏">
+          <figcaption data-i18n="foot.wx">微信</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/img/qr-alipay.png" alt="支付宝赞赏">
+          <figcaption data-i18n="foot.ali">支付宝</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+  <div class="legal">
+    <span data-i18n="foot.legal">© 2026 vita0519 · AGPL-3.0-only · 保留署名（见 NOTICE）</span>
+  </div>
+</footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
