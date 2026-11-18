@@ -6,6 +6,8 @@
 自托管：**FastAPI + SQLite + 本地磁盘 + Vue 3**，一个进程一块盘，拉一个镜像就能跑。
 从 Cloudflare Workers + KV 迁移而来，旧实现留在 [`legacy/cloudflare/`](legacy/cloudflare/)。
 
+在线看：[官网（中英双语）](https://pre.allfather.top/v/homepage) · 源码在 [`website/`](website/)
+
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-a8332b.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-3c5f8f.svg)](backend/requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-2f6f78.svg)](docker-compose.yml)
