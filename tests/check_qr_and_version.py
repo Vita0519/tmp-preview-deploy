@@ -38,9 +38,9 @@ code, d = c.req('GET', '/api/settings')
 check('settings 有 qr 字段', code == 200 and 'qr' in d, list(d)[:8] if code == 200 else code)
 
 body, ct = multipart({}, [('file', 'pay.png', PNG)])
-code, d = c.req('POST', '/api/settings/qr?name=pay', body, ct=ct)
+code, d = c.req('POST', '/api/settings/qr?name=wechat', body, ct=ct)
 check('上传赞赏码 200', code == 200, (code, d))
-url = ((d.get('qr') or {}).get('pay') or {}).get('url') if code == 200 else None
+url = ((d.get('qr') or {}).get('wechat') or {}).get('url') if code == 200 else None
 check('返回图片 URL', bool(url), d.get('qr'))
 
 if url:
@@ -51,11 +51,11 @@ code, _h, _d = c.fetch_bytes('/api/settings/qr/group', accept='image/*')
 check('未上传的槽返回 404', code == 404, code)
 
 body, ct = multipart({}, [('file', 'bad.txt', b'not an image')])
-code, d = c.req('POST', '/api/settings/qr?name=pay', body, ct=ct)
+code, d = c.req('POST', '/api/settings/qr?name=wechat', body, ct=ct)
 check('非法格式 400', code == 400, (code, d))
 
-code, d = c.req('DELETE', '/api/settings/qr/pay')
-check('删除 200', code == 200 and (d.get('qr') or {}).get('pay') is None, d.get('qr'))
+code, d = c.req('DELETE', '/api/settings/qr/wechat')
+check('删除 200', code == 200 and (d.get('qr') or {}).get('wechat') is None, d.get('qr'))
 
 total = len(ok) + len(bad)
 print(f'\n{len(ok)}/{total} 通过')
