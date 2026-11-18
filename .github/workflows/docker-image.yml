@@ -2,11 +2,6 @@ name: docker-image
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 镜像标签
-        required: false
-        default: "2.0.0"
   push:
     tags: ["v*"]
 
@@ -19,6 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(cat VERSION)"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "building $V"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -37,7 +43,7 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/vita0519/tmp-preview:${{ inputs.tag || '2.0.0' }}
+            ghcr.io/vita0519/tmp-preview:${{ steps.ver.outputs.version }}
             ghcr.io/vita0519/tmp-preview:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
