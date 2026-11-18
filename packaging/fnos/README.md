@@ -46,10 +46,25 @@ FNPACK=/path/to/fnpack python packaging/fnos/build.py
 
 ## 安装
 
+**前置：先构建镜像。** fnOS 应用中心只执行 `docker compose up -d`，不会替你 build，
+所以镜像必须先存在（或已推送到镜像仓库）。
+
+```bash
+# 在 NAS 上解包 fpk 取出源码
+mkdir -p ~/tmpbuild && cd ~/tmpbuild
+tar -xzf /path/to/tmp-preview.fpk
+tar -xzf app.tgz
+# 构建（首次会拉 python:3.12-slim 与依赖，几分钟）
+bash docker/build_image.sh
+# 确认
+docker image ls | grep tmp-preview
+```
+
+然后：
+
 1. 飞牛「应用中心 → 手动安装」，选择 `tmp-preview.fpk`
 2. 向导里填管理员用户名/密码（密码留空则首启自动生成，到容器日志查看）
-3. 首次启动会构建镜像（拉取 `python:3.12-slim` 与依赖，几分钟），完成后访问
-   `http://<NAS 地址>:519`
+3. 启动后访问 `http://<NAS 地址>:519`
 
 ## 运行方式
 
@@ -58,8 +73,8 @@ FNPACK=/path/to/fnpack python packaging/fnos/build.py
 - `519` 属于特权端口（<1024）：Docker 由 root 运行时正常；若应用中心以普通用户
   启动容器导致绑定失败，把三处端口一起改成 `10519` 即可
 - 数据：`${TRIM_PKGVAR}/data`（SQLite + 项目文件 + zip），卸载不删除
-- 镜像：`tmp-preview:2.0.0`，由 compose 的 `build` 从 `app/docker/src` 构建，
-  不依赖任何镜像仓库
+- 镜像：`tmp-preview:2.0.0`，compose 只引用不构建；包内 `app/docker/src`
+  是完整的构建上下文，便于在本机或 NAS 上 `docker build`
 
 ## 外网访问
 

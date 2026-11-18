@@ -1,8 +1,6 @@
 services:
   tmp-preview:
-    build:
-      context: ./src
-      dockerfile: Dockerfile
+    # 镜像需预先构建（或从镜像仓库拉取）；fnOS 应用中心不会替你 docker build
     image: tmp-preview:2.0.0
     container_name: tmp-preview
     restart: unless-stopped
