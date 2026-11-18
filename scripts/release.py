@@ -62,13 +62,13 @@ def api(method, path, payload=None, timeout=180):
         return {"raw": r.stdout[:400], "stderr": r.stderr[:200]}
 
 
-def upload_asset(release_id: int, path: Path) -> dict:
+def upload_asset(release_id: int, path: Path, name: str | None = None) -> dict:
     args = ["curl", "--noproxy", "*", "-sS", "--max-time", "300", "-X", "POST",
             "-H", f"Authorization: Bearer {token()}",
             "-H", "Accept: application/vnd.github+json",
             "-H", "Content-Type: application/octet-stream",
             "--data-binary", f"@{path}",
-            f"https://uploads.github.com/repos/{REPO}/releases/{release_id}/assets?name={path.name}"]
+            f"https://uploads.github.com/repos/{REPO}/releases/{release_id}/assets?name={name or path.name}"]
     r = subprocess.run(args, capture_output=True, text=True)
     try:
         return json.loads(r.stdout or "{}")
@@ -183,11 +183,15 @@ def main() -> int:
     for name in ("tmp-preview.fpk",):
         a = upload_asset(rid, fpk)
         print(f"  附件 {name}: {a.get('state') or a.get('message')}")
-    for name in ("docker-compose.yml", ".env.example"):
-        f = ROOT / name
-        if f.exists():
-            a = upload_asset(rid, f)
-            print(f"  附件 {name}: {a.get('state') or a.get('message')}")
+    compose = ROOT / "docker-compose.yml"
+    if compose.exists():
+        a = upload_asset(rid, compose)
+        print(f"  附件 docker-compose.yml: {a.get('state') or a.get('message')}")
+    envf = ROOT / ".env.example"
+    if envf.exists():
+        # GitHub 会把前导点改写成 default.，所以显式命名
+        a = upload_asset(rid, envf, name="env.example")
+        print(f"  附件 env.example: {a.get('state') or a.get('message')}")
 
     print(f"\n✅ {tag} 完成：{rel.get('html_url')}")
     if not run_ok:
