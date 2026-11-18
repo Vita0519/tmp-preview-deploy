@@ -1,5 +1,23 @@
 #!/bin/bash
-# 安装前：准备数据目录（保留旧数据，不覆盖）
-set -e
-mkdir -p "${TRIM_PKGVAR}/data/projects" "${TRIM_PKGVAR}/data/zips"
+# 安装前：准备数据目录，并检查镜像是否已构建。任何异常都不阻断安装。
+LOG=/tmp/tmp-preview-install.log
+{
+    echo "=== install_init $(date) ==="
+    echo "TRIM_PKGVAR=${TRIM_PKGVAR}"
+    echo "TRIM_APPDEST=${TRIM_APPDEST}"
+    echo "whoami=$(id -un 2>/dev/null)"
+} >> "$LOG" 2>/dev/null
+
+if [ -n "${TRIM_PKGVAR}" ]; then
+    mkdir -p "${TRIM_PKGVAR}/data/projects" "${TRIM_PKGVAR}/data/zips" >> "$LOG" 2>&1
+fi
+
+if command -v docker >/dev/null 2>&1; then
+    if docker image inspect tmp-preview:2.0.0 >/dev/null 2>&1; then
+        echo "[ok] 镜像 tmp-preview:2.0.0 已存在" >> "$LOG" 2>/dev/null
+    else
+        echo "[warn] 镜像 tmp-preview:2.0.0 不存在：应用启动会失败，请先执行 app.tgz 内 docker/build_image.sh 构建" >> "$LOG" 2>/dev/null
+    fi
+fi
+
 exit 0
