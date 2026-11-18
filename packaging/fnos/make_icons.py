@@ -1,13 +1,12 @@
-"""从 frontend/public/icon-512.png 生成飞牛要求的 64 / 256 图标。"""
-import base64
+"""用同目录的 icon.svg 渲染飞牛要求的 64 / 256 图标。"""
 import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-ROOT = Path(__file__).resolve().parents[2]
-TPL = Path(__file__).resolve().parent / 'template'
-SRC = ROOT / 'frontend' / 'public' / 'icon-512.png'
+HERE = Path(__file__).resolve().parent
+TPL = HERE / 'template'
+SVG_FILE = HERE / 'icon.svg'
 
 targets = [
     (64, TPL / 'ICON.PNG'),
@@ -16,10 +15,10 @@ targets = [
     (256, TPL / 'app/ui/images/icon_256.png'),
 ]
 
-if not SRC.exists():
-    sys.exit(f'源图标不存在: {SRC}')
+if not SVG_FILE.exists():
+    sys.exit(f'找不到图标源文件: {SVG_FILE}')
 
-DATA_URI = 'data:image/png;base64,' + base64.b64encode(SRC.read_bytes()).decode()
+svg = SVG_FILE.read_text(encoding='utf-8')
 
 with sync_playwright() as p:
     b = p.chromium.launch(channel='chrome')
@@ -28,12 +27,10 @@ with sync_playwright() as p:
         dest.parent.mkdir(parents=True, exist_ok=True)
         pg.set_viewport_size({'width': size, 'height': size})
         pg.set_content(
-            '<body style="margin:0;background:transparent">'
-            f'<img src="{DATA_URI}" '
-            f'style="width:{size}px;height:{size}px;display:block">'
-            '</body>'
+            '<style>html,body{margin:0;padding:0;overflow:hidden}'
+            'svg{width:100vw;height:100vh;display:block}</style>' + svg
         )
-        pg.wait_for_timeout(150)
+        pg.wait_for_timeout(120)
         pg.screenshot(path=str(dest))
         print(f'{size}px → {dest.relative_to(TPL)}')
     b.close()
