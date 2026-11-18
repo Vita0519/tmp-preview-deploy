@@ -32,11 +32,12 @@ const actionLabel = (a) => ACTION_LABEL[a] || a
 
 // 站点图标：上传即生效（不需要点保存）
 const siteIcon = ref({ custom: false, url: '', ext: '', size: 0, max_kb: 512 })
-const qr = ref({ pay: null, group: null })
+const qr = ref({ wechat: null, alipay: null, group: null })
 const qrBusy = ref('')
 const QR_SLOTS = [
-  { key: 'pay', label: '赞赏码', hint: '读者扫码支持作者，可随时更换' },
-  { key: 'group', label: '群二维码', hint: '扫码加入交流群，过期后换一张' },
+  { key: 'wechat', label: '微信赞赏', hint: '内置示例，可上传替换', fallback: '/qr-wechat.png' },
+  { key: 'alipay', label: '支付宝赞赏', hint: '内置示例，可上传替换', fallback: '/qr-alipay.png' },
+  { key: 'group', label: '群二维码', hint: '扫码加入 QQ 群 154578485', fallback: '' },
 ]
 const iconFile = ref(null)
 const iconBusy = ref(false)
@@ -217,7 +218,7 @@ async function load() {
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
     if (d.site_icon) siteIcon.value = d.site_icon
-    qr.value = d.qr || { pay: null, group: null }
+    qr.value = d.qr || { wechat: null, alipay: null, group: null }
     form.tag_max = d.tags?.max_per_project ?? 6
     form.tag_bar = d.tags?.bar_limit ?? 12
     const th = d.theme || {}
@@ -1007,10 +1008,22 @@ onUnmounted(() => {
               <dt>源码</dt>
               <dd class="mono">{{ store.project.url }}</dd>
             </dl>
+            <dl class="kv runtime" style="margin-top: 14px">
+              <dt>GitHub</dt>
+              <dd>
+                <a href="https://github.com/Vita0519" target="_blank" rel="noopener">github.com/Vita0519</a>
+              </dd>
+              <dt>反馈邮箱</dt>
+              <dd class="mono">admin@allfather.de5.net</dd>
+              <dt>交流群</dt>
+              <dd class="mono">QQ 154578485</dd>
+            </dl>
+
             <div class="qrgrid">
               <div v-for="item in QR_SLOTS" :key="item.key" class="qrbox">
                 <b>{{ item.label }}</b>
                 <img v-if="qr[item.key]" :src="qr[item.key].url" :alt="item.label" class="qrimg" />
+                <img v-else-if="item.fallback" :src="item.fallback" :alt="item.label" class="qrimg" />
                 <span v-else class="dim" style="font-size: 12px">未上传</span>
                 <div style="display: flex; gap: 6px; margin-top: 6px">
                   <label class="btn ghost sm" style="cursor: pointer">

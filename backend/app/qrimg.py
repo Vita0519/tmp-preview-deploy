@@ -16,8 +16,8 @@ ALLOWED = {
 }
 
 MAX_BYTES = 2 * 1024 * 1024
-NAMES = ("pay", "group")
-LABELS = {"pay": "赞赏码", "group": "群二维码"}
+NAMES = ("wechat", "alipay", "group")
+LABELS = {"wechat": "微信赞赏", "alipay": "支付宝赞赏", "group": "群二维码"}
 OFF_SUFFIX = ".off"
 SOFT_DELETE_ERRORS = (Exception, SystemExit)
 
