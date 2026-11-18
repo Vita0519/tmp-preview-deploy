@@ -1,7 +1,8 @@
 """系统设置（站点标题、主题色、站点图标、按可见性的默认时长、到期策略、门户可见性）。"""
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
-from .. import author, branding, config, defaults, tagspec, theme
+from .. import author, branding, config, defaults, qrimg, tagspec, theme
 from ..db import (
     all_settings,
     db,
@@ -58,6 +59,7 @@ def read_settings(user: dict = Depends(admin_user)):
         "public_portal": s.get("public_portal") == "1",
         "theme": _theme_payload(s),
         "site_icon": _icon_payload(),
+        "qr": qrimg.payload(),
         "tags": _tags_payload(),
         "author": author.load(),
         "author_types": [
@@ -140,6 +142,35 @@ def _tags_payload() -> dict:
         cap = tag_cap(conn)
         bar = tag_bar_limit(conn)
     return {**tagspec.rules(max_per_project=cap, bar_limit=bar), **usage}
+
+
+@router.get("/qr/{name}")
+def get_qr(name: str, user: dict = Depends(admin_user)):
+    info = qrimg.current(name)
+    if not info:
+        raise HTTPException(status_code=404, detail="还没有上传")
+    return FileResponse(info["path"], media_type=info["mime"])
+
+
+@router.post("/qr")
+async def upload_qr(name: str, file: UploadFile = File(...), user: dict = Depends(admin_user)):
+    if name not in qrimg.NAMES:
+        raise HTTPException(status_code=400, detail="未知的二维码类型")
+    data = await file.read()
+    try:
+        info = qrimg.save(name, file.filename or "", data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_event("settings", user["id"], None, f"更新{info.get('label', name)}")
+    return {"ok": True, "qr": qrimg.payload()}
+
+
+@router.delete("/qr/{name}")
+def delete_qr(name: str, user: dict = Depends(admin_user)):
+    if name not in qrimg.NAMES:
+        raise HTTPException(status_code=400, detail="未知的二维码类型")
+    qrimg.remove(name)
+    return {"ok": True, "qr": qrimg.payload()}
 
 
 @router.post("/tags/prune")

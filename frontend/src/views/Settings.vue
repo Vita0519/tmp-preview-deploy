@@ -32,6 +32,12 @@ const actionLabel = (a) => ACTION_LABEL[a] || a
 
 // 站点图标：上传即生效（不需要点保存）
 const siteIcon = ref({ custom: false, url: '', ext: '', size: 0, max_kb: 512 })
+const qr = ref({ pay: null, group: null })
+const qrBusy = ref('')
+const QR_SLOTS = [
+  { key: 'pay', label: '赞赏码', hint: '读者扫码支持作者，可随时更换' },
+  { key: 'group', label: '群二维码', hint: '扫码加入交流群，过期后换一张' },
+]
 const iconFile = ref(null)
 const iconBusy = ref(false)
 const iconPreview = computed(() => (siteIcon.value.custom ? siteIcon.value.url : '/favicon.svg'))
@@ -211,6 +217,7 @@ async function load() {
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
     if (d.site_icon) siteIcon.value = d.site_icon
+    qr.value = d.qr || { pay: null, group: null }
     form.tag_max = d.tags?.max_per_project ?? 6
     form.tag_bar = d.tags?.bar_limit ?? 12
     const th = d.theme || {}
@@ -278,6 +285,38 @@ async function save() {
     toast(e.message || '保存失败', 'err')
   } finally {
     busy.value = false
+  }
+}
+
+// ---------------- 关于页二维码 ----------------
+async function uploadQr(name, ev) {
+  const file = ev.target.files?.[0]
+  ev.target.value = ''
+  if (!file) return
+  qrBusy.value = name
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const d = await api.postForm(`/api/settings/qr?name=${name}`, fd)
+    qr.value = d.qr
+    toast('二维码已更新')
+  } catch (e) {
+    toast(e.message || '上传失败', 'err')
+  } finally {
+    qrBusy.value = ''
+  }
+}
+
+async function clearQr(name) {
+  qrBusy.value = name
+  try {
+    const d = await api.del(`/api/settings/qr/${name}`)
+    qr.value = d.qr
+    toast('已删除')
+  } catch (e) {
+    toast(e.message || '删除失败', 'err')
+  } finally {
+    qrBusy.value = ''
   }
 }
 
@@ -968,6 +1007,27 @@ onUnmounted(() => {
               <dt>源码</dt>
               <dd class="mono">{{ store.project.url }}</dd>
             </dl>
+            <div class="qrgrid">
+              <div v-for="item in QR_SLOTS" :key="item.key" class="qrbox">
+                <b>{{ item.label }}</b>
+                <img v-if="qr[item.key]" :src="qr[item.key].url" :alt="item.label" class="qrimg" />
+                <span v-else class="dim" style="font-size: 12px">未上传</span>
+                <div style="display: flex; gap: 6px; margin-top: 6px">
+                  <label class="btn ghost sm" style="cursor: pointer">
+                    {{ qrBusy === item.key ? '处理中…' : qr[item.key] ? '更换' : '上传' }}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style="display: none"
+                      @change="uploadQr(item.key, $event)"
+                    />
+                  </label>
+                  <button v-if="qr[item.key]" class="btn ghost sm" @click="clearQr(item.key)">删除</button>
+                </div>
+                <span class="hint">{{ item.hint }}</span>
+              </div>
+            </div>
+
             <p class="muted" style="margin: 10px 0 0; font-size: 12px; line-height: 1.7">
               本程序以 {{ store.project.license }} 发布：修改后分发、或把它作为网络服务对外提供，
               都必须按 AGPL 第 13 条向使用者提供完整源码，并保留此处的出处与署名。

@@ -490,7 +490,7 @@ def meta():
     return {
         "site_title": get_setting("site_title") or config.SITE_TITLE,
         "subtitle": config.SITE_SUBTITLE,
-        "version": "2.0.0",
+        "version": config.VERSION,
         "online": row["c"],
         "public_portal": get_setting("public_portal", "0") == "1" or config.PUBLIC_PORTAL,
         "ttl_defaults": defaults.all_defaults(),
