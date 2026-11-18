@@ -362,3 +362,21 @@ Vue 3（MIT）、Vite（MIT）；`legacy/cloudflare/` 里的旧实现同样适�
 ## 接口
 
 完整列表见 [docs/api.md](docs/api.md)，架构与取舍见 [docs/architecture.md](docs/architecture.md)。
+
+## 赞赏与联系
+
+这个项目大部分时间花在踩坑、修边角和写文档上。如果它帮你省了事，可以请作者喝杯咖啡。
+
+| 微信赞赏 | 支付宝赞赏 |
+|---|---|
+| <img src="docs/qr-wechat.png" width="220" alt="微信赞赏"> | <img src="docs/qr-alipay.png" width="220" alt="支付宝赞赏"> |
+
+| 渠道 | 地址 |
+|---|---|
+| GitHub | <https://github.com/Vita0519> |
+| 反馈邮箱 | <admin@allfather.de5.net> |
+| 交流群 | QQ `154578485` |
+| 问题反馈 | [Issues](https://github.com/Vita0519/tmp-preview-deploy/issues)，附上版本号（设置 → 关于 / 许可 可见） |
+| 最新版本 | [Releases](https://github.com/Vita0519/tmp-preview-deploy/releases) |
+
+作者：**vita0519** · 许可：[AGPL-3.0-only](LICENSE)（再分发或对外服务请保留署名，见 [NOTICE](NOTICE)）
