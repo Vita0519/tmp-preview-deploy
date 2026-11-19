@@ -45,8 +45,8 @@ with sync_playwright() as p:
         (ok if cond else bad).append(name)
         print(f"  {'✓' if cond else '✗'} {name}{(' → ' + str(extra)[:140]) if extra and not cond else ''}")
 
-    check('一句话含 skill 地址', f'{BASE}/v/agent-guide' in brief, brief)
-    check('含站点地址', f'站点 {BASE}' in brief, brief)
+    check('skill 地址固定', 'https://pre.allfather.top/v/agent-guide' in brief, brief)
+    check('站点取当前地址', f'站点 {BASE}' in brief, brief)
     check('含 API Key', 'API Key pv_' in brief, brief)
     check('含上传方式', 'POST /api/projects' in brief, brief)
 

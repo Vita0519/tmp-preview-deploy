@@ -507,5 +507,6 @@ def meta():
             "url": config.PROJECT_URL,
             "author": config.PROJECT_AUTHOR,
             "license": config.PROJECT_LICENSE,
+            "skill_guide": config.SKILL_GUIDE_URL,
         },
     }
