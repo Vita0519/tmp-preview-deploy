@@ -875,3 +875,19 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
   background: #fff; border-radius: 10px;
   border: 1px solid var(--line, #e3e0d4);
 }
+
+/* 版本检查与更新提示 */
+.verbox { margin-top: 14px; }
+.verline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; }
+.upd { margin-top: 8px; font-size: 13px; }
+.upd summary { cursor: pointer; color: var(--brand, #0f766e); }
+.upd pre {
+  max-height: 220px; overflow: auto; margin: 8px 0 0;
+  background: #f1efe6; color: inherit; padding: 10px 12px;
+  border-radius: 8px; font-size: 12px; white-space: pre-wrap;
+}
+.upd-notes {
+  max-height: 300px; overflow: auto; margin: 0;
+  background: #f1efe6; color: inherit; padding: 10px 12px;
+  border-radius: 8px; font-size: 12px; line-height: 1.6; white-space: pre-wrap;
+}

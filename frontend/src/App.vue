@@ -1,12 +1,42 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppShell from './components/AppShell.vue'
 import Icon from './components/Icon.vue'
+import { api } from './api'
 import { resolveConfirm, store } from './store'
 
 const route = useRoute()
 const bare = computed(() => route.meta.bare)
+
+// 管理员登录后自动检查一次新版本；出站失败就静默跳过，不打扰使用
+const update = ref(null)
+const SKIP_KEY = 'tp_skip_version'
+
+function skipVersion() {
+  try { localStorage.setItem(SKIP_KEY, update.value?.latest || '') } catch (e) {}
+  update.value = null
+}
+
+async function checkUpdate() {
+  try {
+    const d = await api.get('/api/settings/version')
+    if (!d?.ok || !d.has_update) return
+    let skipped = ''
+    try { skipped = localStorage.getItem(SKIP_KEY) || '' } catch (e) {}
+    if (skipped === d.latest) return
+    update.value = d
+  } catch (e) {
+    /* 检查失败不用提示 */
+  }
+}
+
+// 登录页就挂载了，等角色变成 admin 再查（登录后才会发生）
+watch(
+  () => store.user?.role,
+  (role) => { if (role === 'admin') checkUpdate() },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -21,6 +51,32 @@ const bare = computed(() => route.meta.bare)
       {{ t.message }}
     </div>
   </div>
+
+  <template v-if="update">
+    <div class="scrim" @click="update = null" />
+    <div class="modal" style="width: 470px">
+      <div class="modal-head">
+        <h2>发现新版本 {{ update.latest }}</h2>
+      </div>
+      <div class="modal-body">
+        <p class="muted" style="font-size: 12.5px; margin-bottom: 10px">
+          当前版本 {{ update.current }}，最新版本 {{ update.latest }}。
+        </p>
+        <pre v-if="update.notes" class="upd-notes">{{ update.notes }}</pre>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" @click="skipVersion">跳过此版本</button>
+        <button class="btn" @click="update = null">稍后</button>
+        <a
+          class="btn primary"
+          :href="update.url"
+          target="_blank"
+          rel="noopener"
+          @click="update = null"
+        >去更新</a>
+      </div>
+    </div>
+  </template>
 
   <template v-if="store.confirm">
     <div class="scrim" @click="resolveConfirm(false)" />

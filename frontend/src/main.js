@@ -27,6 +27,7 @@ async function boot() {
     // 自定义站点图标同样在首屏换掉，免得标签页闪一下旧图标
     applySiteIcon(meta?.site_icon || null)
     // 署名跟着仓库走：fork 了要改就改后端 config，前端不另设一份
+    store.version = meta?.version || ''
     if (meta?.project) store.project = { ...store.project, ...meta.project }
   } catch {}
   await ensureUser()
