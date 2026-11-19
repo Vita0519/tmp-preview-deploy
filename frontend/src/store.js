@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 
 export const store = reactive({
   user: null,
+  version: '',
   siteTitle: '临时预览站',
   toasts: [],
   confirm: null,

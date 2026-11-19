@@ -33,6 +33,8 @@ const actionLabel = (a) => ACTION_LABEL[a] || a
 // 站点图标：上传即生效（不需要点保存）
 const siteIcon = ref({ custom: false, url: '', ext: '', size: 0, max_kb: 512 })
 const qr = ref({ wechat: null, alipay: null, group: null })
+const ver = ref(null)
+const verBusy = ref(false)
 const qrBusy = ref('')
 const QR_SLOTS = [
   { key: 'wechat', label: '微信赞赏', hint: '内置示例，可上传替换', fallback: '/qr-wechat.png' },
@@ -318,6 +320,19 @@ async function clearQr(name) {
     toast(e.message || '删除失败', 'err')
   } finally {
     qrBusy.value = ''
+  }
+}
+
+// ---------------- 版本检查 ----------------
+async function checkVersion(force = false) {
+  if (verBusy.value) return
+  verBusy.value = true
+  try {
+    ver.value = await api.get('/api/settings/version' + (force ? '?force=1' : ''))
+  } catch (e) {
+    ver.value = { ok: false, error: e.message || '检查失败' }
+  } finally {
+    verBusy.value = false
   }
 }
 
@@ -1008,6 +1023,28 @@ onUnmounted(() => {
               <dt>源码</dt>
               <dd class="mono">{{ store.project.url }}</dd>
             </dl>
+
+            <div class="verbox">
+              <div class="verline">
+                <b>当前版本</b>
+                <span class="mono">{{ store.version || '—' }}</span>
+                <button class="btn ghost sm" :disabled="verBusy" @click="checkVersion(true)">
+                  {{ verBusy ? '检查中…' : '检查更新' }}
+                </button>
+                <span v-if="ver" class="hint" style="margin: 0">
+                  <template v-if="!ver.ok">检查失败（{{ ver.error }}）</template>
+                  <template v-else-if="ver.has_update">
+                    有新版本 <b>{{ ver.latest }}</b> ·
+                    <a :href="ver.url" target="_blank" rel="noopener">查看更新</a>
+                  </template>
+                  <template v-else>已是最新</template>
+                </span>
+              </div>
+              <details v-if="ver?.has_update && ver.notes" class="upd">
+                <summary>更新内容（{{ ver.latest }}）</summary>
+                <pre>{{ ver.notes }}</pre>
+              </details>
+            </div>
             <dl class="kv runtime" style="margin-top: 14px">
               <dt>GitHub</dt>
               <dd>

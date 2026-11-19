@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from .. import author, branding, config, defaults, qrimg, tagspec, theme
+from .. import author, branding, config, defaults, qrimg, tagspec, theme, version
 from ..db import (
     all_settings,
     db,
@@ -142,6 +142,12 @@ def _tags_payload() -> dict:
         cap = tag_cap(conn)
         bar = tag_bar_limit(conn)
     return {**tagspec.rules(max_per_project=cap, bar_limit=bar), **usage}
+
+
+@router.get("/version")
+def version_check(force: bool = False, user: dict = Depends(admin_user)):
+    """对比 GitHub 最新 Release；失败返回 ok=false，前端静默处理。"""
+    return version.check(force)
 
 
 @router.get("/qr/{name}")
