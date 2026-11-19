@@ -55,6 +55,8 @@ PROJECT_NAME = _env("PROJECT_NAME", "tmp-preview")
 PROJECT_URL = _env("PROJECT_URL", "https://github.com/Vita0519/tmp-preview-deploy")
 PROJECT_AUTHOR = _env("PROJECT_AUTHOR", "vita0519")
 PROJECT_LICENSE = "AGPL-3.0-only"
+# Agent 接入指南页：由项目方托管，不随部署域名变化；fork 后可换成自己的
+SKILL_GUIDE_URL = _env("SKILL_GUIDE_URL", "https://pre.allfather.top/v/agent-guide")
 
 # 门户顶部「作者名片」的初始值。刻意用中性占位身份，不写任何真实姓名/联系方式。
 AUTHOR_NAME = _env("AUTHOR_NAME", "vita")

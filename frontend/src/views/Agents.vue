@@ -228,8 +228,10 @@ function copyLoginCmd() {
 function agentBriefText() {
   const c = created.value
   if (!c?.api_key) return ''
+  // skill 指南由项目方托管，固定地址；站点才跟当前部署走
+  const guide = store.project?.skill_guide || 'https://pre.allfather.top/v/agent-guide'
   const origin = window.location.origin
-  return `安装 tmp-preview-deploy skill（${origin}/v/agent-guide）作为自己的临时预览站：站点 ${origin}，API Key ${c.api_key}，上传用 POST /api/projects 带 Authorization: Bearer。`
+  return `安装 tmp-preview-deploy skill（${guide}）作为自己的临时预览站：站点 ${origin}，API Key ${c.api_key}，上传用 POST /api/projects 带 Authorization: Bearer。`
 }
 
 onMounted(load)
