@@ -32,15 +32,8 @@ const actionLabel = (a) => ACTION_LABEL[a] || a
 
 // 站点图标：上传即生效（不需要点保存）
 const siteIcon = ref({ custom: false, url: '', ext: '', size: 0, max_kb: 512 })
-const qr = ref({ wechat: null, alipay: null, group: null })
 const ver = ref(null)
 const verBusy = ref(false)
-const qrBusy = ref('')
-const QR_SLOTS = [
-  { key: 'wechat', label: '微信赞赏', hint: '内置示例，可上传替换', fallback: '/qr-wechat.png' },
-  { key: 'alipay', label: '支付宝赞赏', hint: '内置示例，可上传替换', fallback: '/qr-alipay.png' },
-  { key: 'group', label: '群二维码', hint: '扫码加入 QQ 群 154578485', fallback: '' },
-]
 const iconFile = ref(null)
 const iconBusy = ref(false)
 const iconPreview = computed(() => (siteIcon.value.custom ? siteIcon.value.url : '/favicon.svg'))
@@ -220,7 +213,6 @@ async function load() {
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
     if (d.site_icon) siteIcon.value = d.site_icon
-    qr.value = d.qr || { wechat: null, alipay: null, group: null }
     form.tag_max = d.tags?.max_per_project ?? 6
     form.tag_bar = d.tags?.bar_limit ?? 12
     const th = d.theme || {}
@@ -288,51 +280,6 @@ async function save() {
     toast(e.message || '保存失败', 'err')
   } finally {
     busy.value = false
-  }
-}
-
-// ---------------- 关于页二维码 ----------------
-async function uploadQr(name, ev) {
-  const file = ev.target.files?.[0]
-  ev.target.value = ''
-  if (!file) return
-  qrBusy.value = name
-  try {
-    const fd = new FormData()
-    fd.append('file', file)
-    const d = await api.postForm(`/api/settings/qr?name=${name}`, fd)
-    qr.value = d.qr
-    toast('二维码已更新')
-  } catch (e) {
-    toast(e.message || '上传失败', 'err')
-  } finally {
-    qrBusy.value = ''
-  }
-}
-
-async function clearQr(name) {
-  qrBusy.value = name
-  try {
-    const d = await api.del(`/api/settings/qr/${name}`)
-    qr.value = d.qr
-    toast('已删除')
-  } catch (e) {
-    toast(e.message || '删除失败', 'err')
-  } finally {
-    qrBusy.value = ''
-  }
-}
-
-// ---------------- 版本检查 ----------------
-async function checkVersion(force = false) {
-  if (verBusy.value) return
-  verBusy.value = true
-  try {
-    ver.value = await api.get('/api/settings/version' + (force ? '?force=1' : ''))
-  } catch (e) {
-    ver.value = { ok: false, error: e.message || '检查失败' }
-  } finally {
-    verBusy.value = false
   }
 }
 
@@ -1057,25 +1004,16 @@ onUnmounted(() => {
             </dl>
 
             <div class="qrgrid">
-              <div v-for="item in QR_SLOTS" :key="item.key" class="qrbox">
-                <b>{{ item.label }}</b>
-                <img v-if="qr[item.key]" :src="qr[item.key].url" :alt="item.label" class="qrimg" />
-                <img v-else-if="item.fallback" :src="item.fallback" :alt="item.label" class="qrimg" />
-                <span v-else class="dim" style="font-size: 12px">未上传</span>
-                <div style="display: flex; gap: 6px; margin-top: 6px">
-                  <label class="btn ghost sm" style="cursor: pointer">
-                    {{ qrBusy === item.key ? '处理中…' : qr[item.key] ? '更换' : '上传' }}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      style="display: none"
-                      @change="uploadQr(item.key, $event)"
-                    />
-                  </label>
-                  <button v-if="qr[item.key]" class="btn ghost sm" @click="clearQr(item.key)">删除</button>
-                </div>
-                <span class="hint">{{ item.hint }}</span>
-              </div>
+              <figure class="qrbox">
+                <b>微信赞赏</b>
+                <img src="/qr-wechat.png" alt="微信赞赏码" class="qrimg" />
+                <span class="hint" style="margin: 0">扫码支持作者</span>
+              </figure>
+              <figure class="qrbox">
+                <b>支付宝赞赏</b>
+                <img src="/qr-alipay.png" alt="支付宝赞赏码" class="qrimg" />
+                <span class="hint" style="margin: 0">扫码支持作者</span>
+              </figure>
             </div>
 
             <p class="muted" style="margin: 10px 0 0; font-size: 12px; line-height: 1.7">

@@ -101,7 +101,7 @@
     'feat.m2': 'Lifecycle', 'feat.d2': 'Default lifetime per visibility, renewal, stop access or delete on expiry, countdown',
     'feat.m3': 'Members', 'feat.d3': 'Three roles, API key rotation, ownership assignment, member search and filtering',
     'feat.m4': 'Organization', 'feat.d4': 'Tags, folders (nested), portal, RSS, bulk actions',
-    'feat.m5': 'Appearance', 'feat.d5': 'Six color series, site icon, about-page QR codes (tips / group)',
+    'feat.m5': 'Appearance', 'feat.d5': 'Six color series, site icon, about-page tip QR codes (WeChat / Alipay)',
     'feat.m6': 'Operations', 'feat.d6': 'Full backup and overwrite restore, traffic stats, activity log, orphan cleanup',
 
     'arch.title': 'Architecture & data',
