@@ -19,6 +19,7 @@ import json
 import re
 import shutil
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -470,9 +471,11 @@ def _http_get(url: str, timeout: int = _HTTP_TIMEOUT) -> bytes:
 
 
 def _fetch_file(repo: str, ref: str, path: str) -> bytes:
-    """取仓库文件：自定义镜像（可选）→ raw → jsDelivr 兜底。
+    """取仓库文件，通道按序兜底：自定义镜像（可选）→ raw → jsDelivr（Fastly / Cloudflare
+    两家节点）→ GitHub contents API（base64）。
 
-    部分网络环境 raw.githubusercontent.com 不通，jsDelivr 是第二通道；
+    部分网络环境 raw.githubusercontent.com 与 jsDelivr 都会被重置连接，
+    api.github.com 往往仍可达，contents 接口（≤1MB，base64）就是最后一条通道；
     THEME_RAW_MIRROR 环境变量可指定自己的镜像（填到 {repo}/{ref}/{path} 之前那段）。
     """
     r = ref or "HEAD"
@@ -480,16 +483,29 @@ def _fetch_file(repo: str, ref: str, path: str) -> bytes:
     urls = []
     if mirror:
         urls.append(f"{mirror}/{repo}/{r}/{path}")
-    urls.append(f"{GH_RAW}/{repo}/{r}/{path}")
-    urls.append(f"{GH_JSD}/{repo}@{r}/{path}")
+    urls += [
+        f"{GH_RAW}/{repo}/{r}/{path}",
+        f"https://fastly.jsdelivr.net/gh/{repo}@{r}/{path}",
+        f"{GH_JSD}/{repo}@{r}/{path}",
+        f"https://gcore.jsdelivr.net/gh/{repo}@{r}/{path}",
+    ]
     errors = []
     for url in urls:
         try:
             return _http_get(url)
         except Exception as e:  # noqa: BLE001
             errors.append(f"{url.split('/')[2]}: {e}")
+    # 最后兜底：contents API 走 api.github.com（base64，单文件 ≤1MB，theme.json 远够）
+    try:
+        q = urllib.parse.quote(path)
+        data = json.loads(_http_get(f"{GH_API}/repos/{repo}/contents/{q}?ref={r}").decode("utf-8"))
+        if data.get("encoding") == "base64" and data.get("content"):
+            return base64.b64decode(data["content"])
+        errors.append("api.github.com: 响应不是 base64 内容")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"api.github.com: {e}")
     raise RuntimeError(
-        "；".join(errors) + "（raw 与 jsDelivr 都不可达时，可设置 THEME_RAW_MIRROR 指向自建镜像）"
+        "；".join(errors) + "（全部通道不可达时，可设置 THEME_RAW_MIRROR 指向自建镜像）"
     )
 
 

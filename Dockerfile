@@ -35,6 +35,8 @@ COPY --from=web /web/dist frontend/dist
 
 # 镜像里也留一份许可与署名声明（AGPL-3.0 要求随分发保留）
 COPY LICENSE NOTICE VERSION /app/
+# 主题商店的示例插件随镜像分发：装示例插件不依赖外网
+COPY examples /app/examples/
 
 RUN mkdir -p /data/projects /data/zips
 

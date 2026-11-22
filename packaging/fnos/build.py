@@ -111,6 +111,10 @@ def main() -> int:
     for name in ('LICENSE', 'NOTICE'):
         if (ROOT / name).exists():
             shutil.copy2(ROOT / name, src / name)
+    # 示例主题插件随包分发（设置 → 主题商店 → 装示例插件用）
+    ex = ROOT / 'examples'
+    if ex.is_dir():
+        shutil.copytree(ex, src / 'examples', dirs_exist_ok=True)
     shutil.copy2(APP / 'app' / 'docker' / 'Dockerfile', src / 'Dockerfile')
 
     required = [
