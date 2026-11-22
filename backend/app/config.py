@@ -53,7 +53,7 @@ SITE_SUBTITLE = _env("SITE_SUBTITLE", "到期自动回收 · 多 Agent 共享")
 # 所以这几项会在门户页脚、登录页、设置页「关于」里显示，改之前先看 NOTICE。
 PROJECT_NAME = _env("PROJECT_NAME", "tmp-preview")
 PROJECT_URL = _env("PROJECT_URL", "https://github.com/Vita0519/tmp-preview-deploy")
-PROJECT_AUTHOR = _env("PROJECT_AUTHOR", "vita0519")
+PROJECT_AUTHOR = _env("PROJECT_AUTHOR", "Vita0519")
 PROJECT_LICENSE = "AGPL-3.0-only"
 # Agent 接入指南页：由项目方托管，不随部署域名变化；fork 后可换成自己的
 SKILL_GUIDE_URL = _env("SKILL_GUIDE_URL", "https://pre.allfather.top/v/agent-guide")
