@@ -474,7 +474,7 @@ def webmanifest():
             "short_name": title,
             "start_url": "/",
             "display": "standalone",
-            "background_color": "#f6f7f5",
+            "background_color": "#0b0d10",
             "theme_color": theme.palette(theme.current())["accent"],
             "icons": icons,
         },
@@ -495,8 +495,8 @@ def meta():
         "public_portal": get_setting("public_portal", "0") == "1" or config.PUBLIC_PORTAL,
         "ttl_defaults": defaults.all_defaults(),
         "default_expire_action": get_setting("default_expire_action") or "block",
-        # 控制台首屏就要上色，不能等设置页接口
-        "theme": theme.palette(theme.current()),
+        # 控制台首屏就要上色，不能等设置页接口；载荷含当前主题插件的全部语义令牌
+        "theme": theme.payload(),
         "site_icon": _icon_info(),
         "tags": tagspec.rules(max_per_project=tag_cap(), bar_limit=tag_bar_limit()),
         "title_rule": namerule.rules(),

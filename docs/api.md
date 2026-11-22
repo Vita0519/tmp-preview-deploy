@@ -191,10 +191,25 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
 | GET | `/api/settings` | 🛡 | 站点配置 + `ttl_defaults` + `theme` + `site_icon` + `author` + `author_types` + 运行信息 + 最近操作 |
-| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_series, theme_accent, tag_max_per_project, tag_bar_limit, author}` |
+| PATCH | `/api/settings` | 🛡 | `{site_title, ttl_defaults:{portal,link,private}, default_expire_action, public_portal, theme_plugin, theme_accent, tag_max_per_project, tag_bar_limit, author}`；切 `theme_plugin` 时主色跟随该主题默认值（除非同请求带 `theme_accent`） |
 | POST | `/api/settings/icon` | 🛡 | `multipart/form-data` 上传站点图标，字段名 `file`；同时间只留一份 |
 | DELETE | `/api/settings/icon` | 🛡 | 删除自定义图标，回到内置沙漏图标 |
 | POST | `/api/settings/tags/prune` | 🛡 | 清理没有任何项目在用的标签，返回剩余占用 |
+
+### 主题插件与商店（仅管理员）
+
+主题 = `theme.json` **语义令牌清单**（声明式，无可执行代码），内置 `noir`（玄夜·深色，默认）与
+`ivory`（象牙·浅色）；`--brand-*` 一族由 `theme_accent` 按主题明暗实时派生，不进清单。
+格式与发布见 `examples/theme-plugin/README.md`。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/settings/themes/preview` | `{repo}`：`owner/repo`、GitHub 链接、`/tree/` 深链均可；枚举仓库里所有 `theme.json`，返回 `{ok, error, items:[{repo, ref, path, manifest\|null, error}]}` |
+| POST | `/api/settings/themes/install` | `{repo, path, ref}` 从 GitHub 安装；或 `{source:"example"}` 安装仓库自带示例。安装即校验（id 格式 / 与内置重名拒绝 / 变量名白名单 / ≤64KB） |
+| DELETE | `/api/settings/themes/{id}` | 卸载（内置 422；卸载当前主题自动回 `noir`） |
+| GET | `/api/settings/themes/{id}/preview.png` | 商店随包抓取的预览图（可选存在） |
+
+环境变量：`THEME_RAW_MIRROR`（raw 不通时的镜像前缀）、`THEME_GH_TOKEN`（GitHub API 限额）。
 
 `ttl_defaults` 是**按可见性**区分的默认存活小时数，`0` 表示永久。上传/建外链时若没传 `hours`，
 后端就按项目可见性取这里的值（门户默认 6h、链接 12h、私有永久）。`default_expire_action`

@@ -89,7 +89,7 @@ async def spa(full_path: str, request: Request):
     if not index.is_file():
         return HTMLResponse(
             "<h1 style='font-family:system-ui;padding:40px'>前端尚未构建</h1>"
-            "<p style='font-family:system-ui;padding:0 40px;color:#666'>"
+            "<p style='font-family:system-ui;padding:0 40px;color:#8b93a3'>"
             "本地开发：<code>cd frontend &amp;&amp; npm run dev</code><br>"
             "生产：<code>docker compose up -d --build</code></p>",
             status_code=503,

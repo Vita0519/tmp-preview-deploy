@@ -84,6 +84,13 @@ COOKIE_SECURE = _bool("COOKIE_SECURE", False)
 # 是否允许匿名访问 /portal 列表（默认关闭：只认直链）
 PUBLIC_PORTAL = _bool("PUBLIC_PORTAL", False)
 
+# 主题商店取文件的镜像前缀（可选）：raw.githubusercontent 不通的网络上，
+# 填一个 {repo}/{ref}/{path} 形式的自建/第三方镜像，如 https://ghfast.top/https://raw.githubusercontent.com
+THEME_RAW_MIRROR = _env("THEME_RAW_MIRROR", "")
+
+# 主题商店的 GitHub API Token（可选）：未认证限额 60 次/小时，配 Token 提到 5000
+THEME_GH_TOKEN = _env("THEME_GH_TOKEN", "")
+
 TZ_NAME = _env("TZ", "Asia/Shanghai")
 
 DIST_DIR = BASE_DIR / "frontend" / "dist"

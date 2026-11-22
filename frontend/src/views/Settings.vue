@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { api } from '../api'
 import { applyTagRules, confirmAction, store, toast } from '../store'
 import { fmtBytes, relTime } from '../format'
-import { applyPalette, applySiteIcon, neutralOf, normalize, palette, previewSeries, readable } from '../theme'
+import { applyPalette, applySiteIcon, normalize, previewAccent, readable } from '../theme'
 import Icon from '../components/Icon.vue'
 
 const data = ref(null)
@@ -75,52 +75,135 @@ async function resetIcon() {
   }
 }
 
-// 主题：整套配色系列（主色 + 中性色画布），选完即时预览，保存后才算数
+// 主题：插件清单（内置 + 商店安装）+ 当前插件 + 主色。点卡片即时预览，保存后才落库
 const accent = ref('#0f766e')
 const accentInput = ref('#0f766e')
-const seriesList = ref([])   // 后端下发的 6 套系列（含每套的完整中性色）
-const seriesKey = ref('classic')
-const custom = ref(false)    // 主色被手改过，不属于任何一套系列
-let savedBoard = null        // 进来时后端下发的整份色板，没保存就原样退回去
+const plugins = ref([])        // [{id,name,version,author,desc,mode,builtin,default_accent,preview,vars}]
+const pluginKey = ref('noir')
+const themeVars = ref({})      // 当前预览基座：正在看的这套插件的完整语义令牌
+const themeMode = ref('dark')
+const custom = ref(false)      // 主色被手改过，不等于当前主题的默认主色
+let savedBoard = null          // 进来时后端下发的整份主题载荷，没保存就原样退回去
 
-const currentSeries = computed(() => seriesList.value.find((s) => s.key === seriesKey.value) || null)
-// 卡片上的配色条：画布 → 次级容器 → 主色，正好是 60-30-10 的读法
-const stripOf = (s) => [s.neutral.bg, s.neutral['surface-2'], s.accent]
+const activePlugin = computed(() => plugins.value.find((p) => p.id === pluginKey.value) || null)
 
-function pickSeries(s) {
-  seriesKey.value = s.key
+// 主色被「可读性兜底」校正时，设置页要说清楚实际生效的是哪个色
+const dimmed = computed(() => {
+  const b = readable(accent.value, themeMode.value)
+  return b === normalize(accent.value) ? '' : b
+})
+
+function applyBoard(board) {
+  // 本地预览一套主题：{vars, accent, mode}
+  themeVars.value = board.vars || {}
+  themeMode.value = board.mode === 'light' ? 'light' : 'dark'
+  applyPalette({ vars: themeVars.value, accent: board.accent, mode: themeMode.value })
+}
+
+function pickPlugin(p) {
+  pluginKey.value = p.id
   custom.value = false
-  accent.value = normalize(s.accent)
+  accent.value = normalize(p.default_accent)
   accentInput.value = accent.value
-  previewSeries(s)
+  applyBoard({ vars: p.vars, accent: accent.value, mode: p.mode })
 }
 
 function pickAccent(v) {
   const hex = normalize(v)
   accent.value = hex
   accentInput.value = hex
-  // 改成和当前系列不一样的主色 → 记成「自定义」，中性色底保持不变
-  const hit = seriesList.value.find((s) => normalize(s.accent) === hex)
-  if (hit) {
-    seriesKey.value = hit.key
-    custom.value = false
-    previewSeries(hit)
-  } else {
-    custom.value = true
-    applyPalette({ ...palette(hex, currentSeries.value), neutral: neutralOf(currentSeries.value) })
-  }
+  // 和当前主题的默认主色不一样 → 记成「自定义」，主题令牌底保持不变
+  custom.value = !!activePlugin.value && hex !== normalize(activePlugin.value.default_accent)
+  previewAccent(hex, { vars: themeVars.value, mode: themeMode.value })
 }
 
 function resetTheme() {
-  const s = seriesList.value.find((x) => x.key === 'classic') || seriesList.value[0]
-  if (s) pickSeries(s)
+  pickAccent(activePlugin.value ? activePlugin.value.default_accent : '#0f766e')
 }
 
-// 主色被「可读性兜底」压深时，设置页要说清楚实际生效的是哪个色
-const dimmed = computed(() => {
-  const b = readable(accent.value)
-  return b === normalize(accent.value) ? '' : b
-})
+// ---------------- 主题商店 ----------------
+const shop = reactive({ open: false, repo: '', busy: false, items: [], error: '', installing: '' })
+
+async function storeFetch() {
+  if (!shop.repo.trim()) return
+  shop.busy = true
+  shop.error = ''
+  shop.items = []
+  try {
+    const d = await api.post('/api/settings/themes/preview', { repo: shop.repo.trim() })
+    shop.items = d.items || []
+    if (!d.ok) shop.error = d.error || '拉取失败'
+  } catch (e) {
+    shop.error = e.message || '拉取失败'
+  } finally {
+    shop.busy = false
+  }
+}
+
+async function storeInstall(item) {
+  shop.installing = item.path
+  try {
+    const d = await api.post('/api/settings/themes/install', {
+      repo: item.repo,
+      ref: item.ref || '',
+      path: item.path,
+    })
+    plugins.value = d.theme.plugins || []
+    toast(`已安装「${d.plugin.name}」，点卡片启用`)
+  } catch (e) {
+    toast(e.message || '安装失败', 'err')
+  } finally {
+    shop.installing = ''
+  }
+}
+
+async function installExample() {
+  shop.installing = 'example'
+  try {
+    const d = await api.post('/api/settings/themes/install', { source: 'example' })
+    plugins.value = d.theme.plugins || []
+    toast(`已安装示例主题「${d.plugin.name}」`)
+  } catch (e) {
+    toast(e.message || '安装失败', 'err')
+  } finally {
+    shop.installing = ''
+  }
+}
+
+async function uninstallTheme(p) {
+  const ok = await confirmAction({
+    title: `卸载「${p.name}」`,
+    message: '使用该主题的站点会回到默认主题，插件文件将从服务器删除。',
+    confirmText: '卸载',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    const d = await api.del(`/api/settings/themes/${p.id}`)
+    plugins.value = d.theme.plugins || []
+    if (d.theme.plugin !== pluginKey.value) {
+      // 正在预览的就是被卸的那套：退回服务端现在的状态
+      pluginKey.value = d.theme.plugin
+      accent.value = normalize(d.theme.accent)
+      accentInput.value = accent.value
+      custom.value = !!d.theme.custom
+      applyBoard({ vars: d.theme.vars, accent: accent.value, mode: d.theme.mode })
+    }
+    toast('已卸载')
+  } catch (e) {
+    toast(e.message || '卸载失败', 'err')
+  }
+}
+
+/** 商店条目的配色条：画布 → 容器 → 主色（部分覆盖的清单按明暗基底兜底） */
+function stripOf(m) {
+  const dark = m.mode === 'dark'
+  return [
+    (m.vars && m.vars['--bg']) || (dark ? '#0b0d10' : '#f6f7f5'),
+    (m.vars && m.vars['--surface']) || (dark ? '#14171d' : '#ffffff'),
+    m.default_accent,
+  ]
+}
 
 const form = reactive({
   site_title: '',
@@ -216,14 +299,15 @@ async function load() {
     form.tag_max = d.tags?.max_per_project ?? 6
     form.tag_bar = d.tags?.bar_limit ?? 12
     const th = d.theme || {}
-    seriesList.value = Array.isArray(th.series_list) ? th.series_list : []
-    seriesKey.value = th.series || 'classic'
+    plugins.value = Array.isArray(th.plugins) ? th.plugins : []
+    pluginKey.value = th.plugin || 'noir'
     custom.value = !!th.custom
-    // 记用户填的原值；palette 内部会为可读性压深，实际生效值在 th.accent
+    // 记用户填的原值；palette 内部会为可读性校正，实际生效值在 th.accent
     const hex = normalize(th.raw || th.accent || '#0f766e')
     accent.value = hex
     accentInput.value = hex
     savedBoard = th.accent ? th : null
+    applyBoard({ vars: th.vars, accent: th.accent, mode: th.mode })
     if (Array.isArray(d.author_types) && d.author_types.length) authorTypes.value = d.author_types
     const a = d.author || {}
     form.author = {
@@ -260,8 +344,8 @@ async function save() {
       },
       default_expire_action: form.default_expire_action,
       public_portal: form.public_portal,
-      // 系列决定中性色画布，主色可以在此基础上手改（custom）
-      theme_series: seriesKey.value,
+      // 主题插件定整套画布令牌，主色可以在此基础上手改（custom）
+      theme_plugin: pluginKey.value,
       theme_accent: accent.value,
       tag_max_per_project: Number(form.tag_max) || 6,
       tag_bar_limit: Number(form.tag_bar) || 0,
@@ -433,7 +517,7 @@ const state = computed(() =>
     ea: form.default_expire_action,
     pp: form.public_portal,
     ac: accent.value,
-    se: seriesKey.value,
+    tp: pluginKey.value,
     au: form.author,
     tm: form.tag_max,
     tb: form.tag_bar,
@@ -442,9 +526,9 @@ const state = computed(() =>
 const dirty = computed(() => !!snap.value && state.value !== snap.value)
 
 onMounted(load)
-// 没保存就离开：把整套色板退回去，别留下一个「只在这次会话有效」的主题
+// 没保存就离开：把整套主题退回去，别留下一个「只在这次会话有效」的主题
 onUnmounted(() => {
-  if (savedBoard) applyPalette(savedBoard)
+  if (savedBoard) applyPalette({ vars: savedBoard.vars, accent: savedBoard.accent, mode: savedBoard.mode })
 })
 </script>
 
@@ -543,42 +627,67 @@ onUnmounted(() => {
         <section id="look" class="panel">
           <div class="panel-head">
             <h2>外观</h2>
-            <span class="pdesc">控制台、门户、访客预览页共用同一套主色</span>
+            <span class="pdesc">主题插件定整套画布令牌，控制台、门户、访客页共用</span>
           </div>
           <div class="panel-body form">
             <div class="frow">
-              <label>配色系列</label>
-              <div v-if="seriesList.length" class="seriesgrid">
+              <label>主题</label>
+              <div v-if="plugins.length" class="seriesgrid">
                 <button
-                  v-for="s in seriesList"
-                  :key="s.key"
+                  v-for="p in plugins"
+                  :key="p.id"
                   type="button"
                   class="scard"
-                  :class="{ on: !custom && seriesKey === s.key }"
+                  :class="{ on: pluginKey === p.id }"
                   :style="{
-                    background: s.neutral.bg,
-                    color: s.neutral.ink,
-                    borderColor: s.neutral.line,
-                    '--chip': s.accent,
+                    background: p.preview.bg,
+                    color: p.preview.ink,
+                    borderColor: p.mode === 'dark' ? 'rgba(255,255,255,.14)' : 'rgba(20,22,26,.12)',
+                    '--chip': p.preview.accent,
+                    '--sdim': p.mode === 'dark' ? 'rgba(255,255,255,.6)' : 'rgba(20,22,26,.6)',
+                    '--sfaint': p.mode === 'dark' ? 'rgba(255,255,255,.4)' : 'rgba(20,22,26,.42)',
                   }"
-                  @click="pickSeries(s)"
+                  @click="pickPlugin(p)"
                 >
                   <span class="stop">
-                    <i :style="{ background: s.accent }">Aa</i>
-                    <b>{{ s.name }}</b>
-                    <svg v-if="!custom && seriesKey === s.key" class="sok" viewBox="0 0 16 16" aria-hidden="true">
+                    <i :style="{ background: p.preview.accent }">Aa</i>
+                    <b>{{ p.name }}</b>
+                    <span class="smode" :class="p.mode">{{ p.mode === 'dark' ? '深色' : '浅色' }}</span>
+                    <svg v-if="pluginKey === p.id" class="sok" viewBox="0 0 16 16" aria-hidden="true">
                       <path d="M3.6 8.4 6.3 11 12.4 4.8" />
                     </svg>
                   </span>
-                  <span class="sdesc" :style="{ color: s.neutral['ink-3'] }">{{ s.desc }}</span>
-                  <span class="suse" :style="{ color: s.neutral['ink-4'] }">{{ s.use }}</span>
+                  <span class="sdesc">{{ p.desc }}</span>
+                  <span class="suse">
+                    {{ p.builtin ? '内置' : '插件' }} · v{{ p.version }}<template v-if="p.author"> · {{ p.author }}</template>
+                  </span>
+                  <span
+                    v-if="!p.builtin"
+                    class="sdel"
+                    role="button"
+                    tabindex="-1"
+                    title="卸载这个主题插件"
+                    @click.stop="uninstallTheme(p)"
+                  >卸载</span>
                 </button>
               </div>
-              <span v-else class="hint">配色系列没读到，刷新一下页面</span>
+              <span v-else class="hint">主题清单没读到，刷新一下页面</span>
               <span class="hint">
-                每套 = 画布底 + 两级文字色 + 主色，按 60-30-10 分配：底与留白占 60%、卡片占 30%、主色只占 10%。
-                点一下即时预览，点「保存更改」才写进配置
+                每套主题是一份 theme.json 语义令牌清单（画布、容器、文字、描边、阴影）。
+                内置「玄夜」（深）与「象牙」（浅）；点一下即时预览，「保存更改」后才对访客生效
               </span>
+            </div>
+
+            <div class="frow">
+              <label>主题商店</label>
+              <div class="colorrow">
+                <button type="button" class="btn" @click="shop.open = true">
+                  <Icon name="external" :size="13" /> 打开主题商店
+                </button>
+                <span class="hint" style="margin-left: 2px">
+                  填一个 GitHub 仓库（owner/repo、仓库链接均可），枚举里面的 theme.json 一键安装
+                </span>
+              </div>
             </div>
 
             <div class="frow">
@@ -601,12 +710,11 @@ onUnmounted(() => {
                   @keyup.enter="pickAccent(accentInput)"
                 />
                 <span v-if="custom" class="ctag">已自定义</span>
-                <button type="button" class="btn ghost sm" @click="resetTheme()">回到经典墨绿</button>
+                <button type="button" class="btn ghost sm" @click="resetTheme()">回到主题默认</button>
               </div>
-              <span class="hint">画布底留在所选系列上，只改强调色；改回系列自带的主色会自动归位</span>
+              <span class="hint">主题画布不动，只改强调色；按钮、胶囊、圆环等仍由主色自动派生</span>
               <span v-if="dimmed" class="hint warnhint">
-                这个主色在白底上偏淡（对比度 < 3:1），实际会按 <code>{{ dimmed }}</code> 渲染，
-                免得按钮和浅底文字糊成一片
+                这个主色在当前画布上对比度不足（&lt; 3:1），实际会按 <code>{{ dimmed }}</code> 渲染
               </span>
             </div>
 
@@ -618,7 +726,7 @@ onUnmounted(() => {
                 <button type="button" class="tp-btn">主按钮</button>
                 <span class="tp-ring"><i></i></span>
               </div>
-              <span class="hint">hover、浅底、描边、渐变深色仍由主色自动派生，不用手调</span>
+              <span class="hint">hover、软底、描边、渐变深浅仍由主色按明暗模式自动派生，不用手调</span>
             </div>
           </div>
         </section>
@@ -1066,6 +1174,93 @@ onUnmounted(() => {
       </button>
     </div>
   </Teleport>
+
+  <!-- 主题商店：拉取 GitHub 仓库里的 theme.json 并安装 -->
+  <Teleport to="body">
+    <template v-if="shop.open">
+      <div class="scrim" @click="shop.open = false" />
+      <div class="modal storemodal">
+        <div class="modal-head">
+          <h2>主题商店</h2>
+          <span class="pdesc">从 GitHub 仓库安装主题插件</span>
+          <div class="grow" style="flex: 1" />
+          <button class="btn ghost icon" title="关闭" @click="shop.open = false">
+            <Icon name="close" :size="14" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="storerepo">
+            <input
+              v-model="shop.repo"
+              class="input mono"
+              placeholder="owner/repo 或 https://github.com/owner/repo"
+              spellcheck="false"
+              @keyup.enter="storeFetch"
+            />
+            <button class="btn" type="button" :disabled="shop.busy || !shop.repo.trim()" @click="storeFetch">
+              {{ shop.busy ? '拉取中…' : '拉取' }}
+            </button>
+            <button
+              class="btn ghost sm"
+              type="button"
+              :disabled="shop.installing === 'example'"
+              title="安装仓库自带的示例主题插件（examples/theme-plugin）"
+              @click="installExample"
+            >
+              {{ shop.installing === 'example' ? '安装中…' : '装示例插件' }}
+            </button>
+          </div>
+          <p class="hint" style="margin-top: 6px">
+            仓库里任意位置的 <code>theme.json</code> 都会被枚举出来；也可以直接填到文件或目录的 GitHub 链接。
+            清单格式见仓库 <code>examples/theme-plugin/README.md</code>
+          </p>
+          <div v-if="shop.error" class="storeerr">{{ shop.error }}</div>
+
+          <div v-if="shop.items.length" class="storelist">
+            <div v-for="it in shop.items" :key="it.repo + it.path" class="storeitem">
+              <template v-if="it.manifest">
+                <div class="shead">
+                  <span class="sname">{{ it.manifest.name }}</span>
+                  <span class="sver">v{{ it.manifest.version }}</span>
+                  <span class="smode" :class="it.manifest.mode">{{ it.manifest.mode === 'dark' ? '深色' : '浅色' }}</span>
+                  <div class="grow" style="flex: 1" />
+                  <button
+                    class="btn sm primary"
+                    type="button"
+                    :disabled="shop.installing === it.path"
+                    @click="storeInstall(it)"
+                  >
+                    {{ shop.installing === it.path ? '安装中…' : '安装' }}
+                  </button>
+                </div>
+                <div class="sdesc2">{{ it.manifest.desc || '（没有描述）' }}</div>
+                <div class="smeta">
+                  <span class="mono">{{ it.path }}</span>
+                  <span v-if="it.manifest.author"> · {{ it.manifest.author }}</span>
+                </div>
+                <div class="sstrip">
+                  <i
+                    v-for="(v, k) in stripOf(it.manifest)"
+                    :key="k"
+                    :style="{ background: v }"
+                  />
+                </div>
+              </template>
+              <template v-else>
+                <div class="shead">
+                  <span class="mono">{{ it.path }}</span>
+                </div>
+                <div class="storeerr" style="margin-top: 6px">{{ it.error }}</div>
+              </template>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" type="button" @click="shop.open = false">关闭</button>
+        </div>
+      </div>
+    </template>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -1128,7 +1323,7 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--warn);
   background: var(--warn-soft);
-  border: 1px solid rgba(180, 83, 9, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 /* 字段统一「左边标签 + 右边控件」，一行一个，眼睛不用来回找 */
@@ -1208,7 +1403,7 @@ onUnmounted(() => {
   min-height: 98px;
   transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease);
 }
-.scard:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -16px var(--ink); }
+.scard:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -14px rgba(0, 0, 0, 0.55); }
 .scard.on { box-shadow: 0 0 0 2px var(--chip); }
 .scard .stop { display: flex; align-items: center; gap: 7px; min-width: 0; }
 .scard .stop i {
@@ -1244,7 +1439,63 @@ onUnmounted(() => {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.scard .suse { margin-top: auto; font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em; }
+.scard .suse { margin-top: auto; font-size: 10.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--sfaint, var(--ink-4)); }
+.scard .sdesc { color: var(--sdim, var(--ink-3)); }
+/* 明暗模式徽章 + 卸载按钮（只在非内置卡片上出现） */
+.scard .smode {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  font-weight: 650;
+  padding: 1px 6px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.scard .smode.dark { background: rgba(255, 255, 255, 0.12); color: rgba(255, 255, 255, 0.75); }
+.scard .smode.light { background: rgba(20, 22, 26, 0.08); color: rgba(20, 22, 26, 0.65); }
+.scard .sdel {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--sfaint, var(--ink-4));
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.scard .sdel:hover { color: var(--danger); background: var(--danger-soft); }
+.scard { position: relative; }
+
+/* ---------------- 主题商店弹窗 ---------------- */
+.storemodal { width: 640px; }
+.storerepo { display: flex; gap: 8px; flex-wrap: wrap; }
+.storerepo .input { flex: 1 1 240px; min-width: 0; }
+.storeerr {
+  margin-top: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-line);
+  border-radius: var(--radius-xs);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+.storelist { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.storeitem {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  background: var(--surface-2);
+}
+.shead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sname { font-size: 13px; font-weight: 650; letter-spacing: -0.01em; }
+.sver { font-size: 11px; color: var(--ink-4); font-family: var(--mono); }
+.sdesc2 { margin-top: 5px; font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+.smeta { margin-top: 4px; font-size: 11px; color: var(--ink-4); word-break: break-all; }
+.sstrip { display: flex; height: 14px; border-radius: 5px; overflow: hidden; margin-top: 9px; border: 1px solid var(--line-2); }
+.sstrip i { flex: 1 1 0; }
 .ctag {
   display: inline-flex;
   align-items: center;
@@ -1346,32 +1597,32 @@ onUnmounted(() => {
 }
 .optcard b { display: block; font-size: 12.5px; font-weight: 650; color: var(--ink); }
 .optcard span { display: block; margin-top: 4px; font-size: 11px; line-height: 1.5; color: var(--ink-4); }
-.optcard:hover { border-color: var(--line-3, #d6dad7); }
+.optcard:hover { border-color: var(--line-2); }
 .optcard.on {
   border-color: var(--brand);
   background: var(--brand-soft);
-  box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.09);
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.12);
 }
 .optcard.on b { color: var(--brand); }
 .optcard.del.on {
-  border-color: #e9a23b;
-  background: #fff8ee;
-  box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.1);
+  border-color: rgba(245, 158, 11, 0.55);
+  background: var(--warn-soft);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
 }
-.optcard.del.on b { color: #b45309; }
+.optcard.del.on b { color: var(--warn); }
 
 /* ---- 标签规则 ---- */
 .rules { display: flex; flex-direction: column; gap: 7px; margin: 2px 0 0; padding: 0; list-style: none; }
 .rule { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.55; color: var(--ink-3); }
-.rule i { width: 4px; height: 4px; border-radius: 50%; background: var(--line-3, #cdd2d6); margin-top: 8px; flex: 0 0 auto; }
+.rule i { width: 4px; height: 4px; border-radius: 50%; background: var(--line-2); margin-top: 8px; flex: 0 0 auto; }
 .rule b { font-weight: 650; color: var(--ink-2); }
 .usage { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .meter {
   flex: 0 0 170px;
   height: 7px;
   border-radius: 99px;
-  background: #e6e9e7;
-  box-shadow: inset 0 0 0 1px rgba(20, 22, 26, 0.05);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 .meter i {

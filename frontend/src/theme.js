@@ -1,31 +1,28 @@
 /**
- * 主题：与 backend/app/theme.py 同一套派生公式。
+ * 主题引擎（客户端）：与 backend/app/theme.py 同一套派生公式。
  *
- * 配色按 60-30-10 拆：60% 画布（--bg 几个）、30% 容器（--surface）、10% 主色（--brand）。
- * 所以「换主题」要同时换主色和中性色画布，这里两边都算。
- * 后端会在 /api/meta、/api/settings 里直接下发整份色板，这里只在设置页实时预览时用。
+ * 主题插件 = 一整套语义令牌（theme.json 的 vars），由后端随 /api/meta、
+ * /api/settings 下发；这里负责把它逐个写进 :root。
+ * `--brand-*` 一族不进清单——它们由用户主色实时派生（本文件 palette()），
+ * 派生的对比度尺子按主题明暗模式各有一把：深底不够亮就提白，浅底不够深就压黑。
  */
 
 export const PRESETS = [
   { name: '墨绿', value: '#0f766e' },
-  { name: '靛蓝', value: '#3b5bdb' },
-  { name: '深青', value: '#0b7285' },
-  { name: '藏紫', value: '#6741d9' },
-  { name: '砖红', value: '#c2410c' },
-  { name: '玫红', value: '#be1250' },
-  { name: '赭石', value: '#a16207' },
-  { name: '石板', value: '#475569' },
-]
-
-/** 本地兜底的一套（后端不可用时设置页也不至于空白）；实际以 /api/settings 下发为准 */
-export const FALLBACK_SERIES = [
-  {
-    key: 'classic', name: '经典墨绿', desc: '暖灰画布 + 墨绿强调，克制耐看', use: '通用后台',
-    accent: '#0f766e', neutral: { bg: '#f6f7f5', ink: '#14161a', ink2: '#4a5057' },
-  },
+  { name: '翠绿', value: '#10b981' },
+  { name: '靛蓝', value: '#6366f1' },
+  { name: '深青', value: '#0ea5e9' },
+  { name: '藏紫', value: '#8b5cf6' },
+  { name: '玫红', value: '#f43f5e' },
+  { name: '砖红', value: '#f97316' },
+  { name: '石板', value: '#94a3b8' },
 ]
 
 export const DEFAULT_ACCENT = '#0f766e'
+
+/** 两种画布参照（与内置主题 noir / ivory 的 --bg 一致） */
+export const CANVAS_DARK = '#0b0d10'
+export const CANVAS_LIGHT = '#f6f7f5'
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i
 
@@ -71,105 +68,101 @@ export function contrast(a, b) {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
 }
 
-/** 主色要同时当按钮底和「浅底上的文字」，跟白底对比度不够就等比压深（色相不动） */
 export const MIN_CONTRAST = 3.0
 
-export function readable(brand) {
-  const c = normalize(brand)
-  if (contrast(c, '#ffffff') >= MIN_CONTRAST) return c
+/** 往 target 方向二分，直到 c 对 canvas 的对比度达标（色相不动） */
+function shiftToward(c, target, canvas, minimum) {
   let lo = 0
-  let hi = 0.88
+  let hi = 0.95
   for (let i = 0; i < 18; i += 1) {
     const mid = (lo + hi) / 2
-    if (contrast(mix(c, '#000000', mid), '#ffffff') >= MIN_CONTRAST) hi = mid
+    if (contrast(mix(c, target, mid), canvas) >= minimum) hi = mid
     else lo = mid
   }
-  return mix(c, '#000000', hi)
+  return mix(c, target, hi)
+}
+
+export function readable(brand, mode = 'dark') {
+  let c = normalize(brand)
+  if (contrast(c, '#ffffff') < MIN_CONTRAST) {
+    c = shiftToward(c, '#000000', '#ffffff', MIN_CONTRAST)
+  }
+  const canvas = mode === 'dark' ? CANVAS_DARK : CANVAS_LIGHT
+  if (contrast(c, canvas) < MIN_CONTRAST) {
+    c = shiftToward(c, mode === 'dark' ? '#ffffff' : '#000000', canvas, MIN_CONTRAST)
+  }
+  return c
 }
 
 /**
- * 系列 → 整套中性色。
- * 只给 bg / ink / ink2 三个锚点，其余 8 个混出来（与 theme.py 的 neutral_of 一一对应）。
+ * 主色 + 主题明暗模式 → 品牌色族。
+ * hover：深底往白提（亮起 = 可点击的暗示），浅底往黑压（classic 行为）。
  */
-export function neutralOf(s) {
-  const bg = normalize(s?.bg || s?.neutral?.bg || '#f6f7f5')
-  const ink = normalize(s?.ink || s?.neutral?.ink || '#14161a')
-  const ink2 = normalize(s?.ink2 || s?.neutral?.['ink-2'] || '#4a5057')
-  return {
-    bg,
-    'bg-2': mix('#ffffff', bg, 0.42),
-    'bg-deep': mix(bg, ink, 0.025),
-    'surface-2': mix('#ffffff', bg, 0.48),
-    'surface-3': mix(bg, ink, 0.012),
-    ink,
-    'ink-2': ink2,
-    'ink-3': mix(ink2, bg, 0.28),
-    'ink-4': mix(ink2, bg, 0.55),
-    line: mix(bg, ink, 0.065),
-    'line-2': mix(bg, ink, 0.14),
-    'ink-rgb': rgb(ink).join(','),
-    'bg-rgb': rgb(bg).join(','),
-  }
-}
-
-export function palette(accent, series) {
+export function palette(accent, mode = 'dark') {
   const raw = normalize(accent)
-  const brand = readable(raw)
+  const brand = readable(raw, mode)
   const [r, g, b] = rgb(brand)
+  const dark = mode === 'dark'
   return {
     accent: brand,
     raw,
     adjusted: brand !== raw,
-    hover: mix(brand, '#000000', 0.12),
-    soft: mix('#ffffff', brand, 0.07),
-    line: `rgba(${r},${g},${b},.22)`,
+    hover: dark ? mix(brand, '#ffffff', 0.1) : mix(brand, '#000000', 0.12),
+    soft: `rgba(${r},${g},${b},${dark ? 0.14 : 0.08})`,
+    line: `rgba(${r},${g},${b},${dark ? 0.38 : 0.22})`,
     deep: mix(brand, '#000000', 0.32),
-    light: mix(brand, '#ffffff', 0.18),
+    light: mix(brand, '#ffffff', dark ? 0.3 : 0.18),
     rgb: `${r},${g},${b}`,
-    neutral: series ? neutralOf(series) : null,
   }
 }
 
-/** 把色板写进 :root，控制台全局立刻变色（主色 + 中性色画布） */
+const BRAND_VARS = [
+  '--brand',
+  '--brand-hover',
+  '--brand-soft',
+  '--brand-line',
+  '--brand-deep',
+  '--brand-light',
+  '--brand-rgb',
+]
+
+/**
+ * 把主题写进 :root。
+ * p = { accent, mode?, vars? }：vars 是主题插件的完整语义令牌（缺省就只换主色）。
+ */
 export function applyPalette(p) {
-  const board = p && p.accent ? p : palette(p)
+  const board = p && (p.vars || p.accent) ? p : {}
   const root = document.documentElement
-  root.style.setProperty('--brand', board.accent)
-  root.style.setProperty('--brand-hover', board.hover)
-  root.style.setProperty('--brand-soft', board.soft)
-  root.style.setProperty('--brand-line', board.line)
-  root.style.setProperty('--brand-deep', board.deep)
-  root.style.setProperty('--brand-light', board.light)
-  root.style.setProperty('--brand-rgb', board.rgb)
-  const n = board.neutral
-  if (n) {
-    Object.keys(n).forEach((k) => {
-      if (k === 'ink2') return
-      root.style.setProperty(`--${k}`, n[k])
-    })
-    // 阴影也跟着正文色走，免得冷底上挂一圈暖黑影子
-    const [ir, ig, ib] = String(n['ink-rgb'] || '20,22,26').split(',')
-    root.style.setProperty('--shadow-1', `0 1px 2px rgba(${ir},${ig},${ib},0.04)`)
-    root.style.setProperty(
-      '--shadow-2',
-      `0 1px 2px rgba(${ir},${ig},${ib},0.04), 0 12px 24px -18px rgba(${ir},${ig},${ib},0.4)`
-    )
-    root.style.setProperty(
-      '--shadow-pop',
-      `0 18px 48px -24px rgba(${ir},${ig},${ib},0.45), 0 2px 6px rgba(${ir},${ig},${ib},0.06)`
-    )
-  }
+  const mode = board.mode === 'light' ? 'light' : 'dark'
+  const v = board.vars || {}
+  Object.keys(v).forEach((k) => {
+    if (!k.startsWith('--') || BRAND_VARS.includes(k)) return
+    root.style.setProperty(k, v[k])
+  })
+  const b = palette(board.accent || DEFAULT_ACCENT, mode)
+  root.style.setProperty('--brand', b.accent)
+  root.style.setProperty('--brand-hover', b.hover)
+  root.style.setProperty('--brand-soft', b.soft)
+  root.style.setProperty('--brand-line', b.line)
+  root.style.setProperty('--brand-deep', b.deep)
+  root.style.setProperty('--brand-light', b.light)
+  root.style.setProperty('--brand-rgb', b.rgb)
+  // 登录页/预览壳的防白闪：记下画布底色，index.html 的内联脚本下次直接用
+  try {
+    if (v['--bg']) localStorage.setItem('pv_bg', v['--bg'])
+    if (v['--scheme']) localStorage.setItem('pv_scheme', v['--scheme'])
+  } catch {}
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', board.accent)
+  if (meta) meta.setAttribute('content', b.accent)
 }
 
 export function applyAccent(accent) {
-  applyPalette(palette(accent))
+  applyPalette({ accent })
 }
 
-/** 设置页「点一下看效果」：主色 + 该系列的中性色一起套 */
-export function previewSeries(series) {
-  applyPalette({ ...palette(series.accent, series), neutral: neutralOf(series) })
+/** 设置页「点一下看效果」：在当前主题令牌之上换主色实时预览 */
+export function previewAccent(accent, base) {
+  applyPalette({ ...(base || {}), accent })
 }
 
 /** 站点图标：换成自定义图标，或回落到内置那套 */

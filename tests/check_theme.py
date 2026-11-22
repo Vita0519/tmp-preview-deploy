@@ -3,9 +3,9 @@
 """主题色：一个主色驱动控制台 / 门户 / 访客页，派生色与回落都要对。
 
 覆盖：
-  1. /api/meta 与 /api/settings 下发整套色板，且两者一致；预设里含默认墨绿
+  1. /api/meta 与 /api/settings 下发整套色板，且两者一致；预设里含深色墨绿
   2. PATCH theme_accent 后，门户、预览页、错误页、theme-color 全部跟着变
-  3. 派生色由主色算出（hover 更深、soft 更浅、line 带主色 rgb）
+  3. 派生色由主色算出（深色画布上 hover 提亮、soft/line 是带主色 rgb 的透明色）
   4. 非法值（非 hex / 缺 # / #abc 简写 / 空串）→ 规范化或回落到默认
   5. 跑完把主色还原成进来时的值（不覆盖管理员自己选的色）
   6. 站点图标：上传 / 校验 / /site-icon 回落 / webmanifest 跟随
@@ -53,8 +53,9 @@ def neutral_vars(body: str) -> dict:
     return out
 
 
-def contrast_ok(hex_color: str, minimum: float = 3.0) -> bool:
-    """主色跟白底的对比度是否达标（跟前端 theme.js 的 readable 同一把尺子）。"""
+def contrast_ok(hex_color: str, mode: str = "dark", minimum: float = 3.0) -> bool:
+    """主色两头都要撑住（跟 theme.py 的 readable 同一把尺子）：
+    白字压上去（主按钮）够，所在画布（按主题明暗模式）上放文字/徽标也够。"""
     if not hex_color or not re.fullmatch(r"#[0-9a-f]{6}", hex_color):
         return False
 
@@ -66,7 +67,10 @@ def contrast_ok(hex_color: str, minimum: float = 3.0) -> bool:
         r, g, b = hex2rgb(c)
         return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
 
-    return (1.05) / (lum(hex_color) + 0.05) >= minimum
+    canvas = lum("#0b0d10" if mode == "dark" else "#f6f7f5")
+    l = lum(hex_color)
+    return ((1.05) / (l + 0.05) >= minimum
+            and (max(l, canvas) + 0.05) / (min(l, canvas) + 0.05) >= minimum)
 
 
 def main() -> int:
@@ -94,12 +98,13 @@ def main() -> int:
     check("设置接口可取", code == 200, settings)
     t = settings.get("theme") or {}
     orig = str(t.get("accent") or DEFAULT)
-    # 用户填的原值（可能因为太浅被 readable 压深），还原时要还原这个
+    # 用户填的原值（可能因可读性被校正），还原时要还原这个
     orig_raw = str(t.get("raw") or orig)
+    cur_mode = str(t.get("mode") or "dark")
     check("主色是合法 hex", bool(re.fullmatch(r"#[0-9a-f]{6}", orig)), orig)
     presets = t.get("presets") or []
     check("下发 8 个预设", len(presets) == 8, len(presets))
-    check("预设里含默认墨绿", any(p.get("value") == DEFAULT for p in presets),
+    check("预设里含深色墨绿", any(p.get("value") == "#10b981" for p in presets),
           [p.get("value") for p in presets[:3]])
     code, meta = admin.req("GET", "/api/meta")
     check("/api/meta 与设置同色", (meta.get("theme") or {}).get("accent") == orig, meta.get("theme"))
@@ -107,8 +112,13 @@ def main() -> int:
     print("[2] 派生色")
     p = t or {}
     r, g, b = hex2rgb(orig)
-    check("hover 比主色深", sum(hex2rgb(p.get("hover", "#000"))) < sum(hex2rgb(orig)), p.get("hover"))
-    check("soft 比主色浅", sum(hex2rgb(p.get("soft", "#000"))) > sum(hex2rgb(orig)), p.get("soft"))
+    dark = cur_mode == "dark"
+    # 深色画布「亮起 = 可点击」：hover 往白提；浅色画布保持 classic 行为往黑压
+    if dark:
+        check("hover 比主色亮", sum(hex2rgb(p.get("hover", "#000"))) > sum(hex2rgb(orig)), p.get("hover"))
+    else:
+        check("hover 比主色深", sum(hex2rgb(p.get("hover", "#fff"))) < sum(hex2rgb(orig)), p.get("hover"))
+    check("soft 用主色 rgba", str(p.get("soft")).startswith(f"rgba({r},{g},{b},"), p.get("soft"))
     check("line 用主色 rgb", f"rgba({r},{g},{b}," in str(p.get("line")), p.get("line"))
     check("rgb 字段正确", p.get("rgb") == f"{r},{g},{b}", p.get("rgb"))
 
@@ -138,8 +148,8 @@ def main() -> int:
         th = d.get("theme") or {}
         got = th.get("raw")
         check(f"{raw!r} → {expect}", code == 200 and got == expect, f"{code} {got}")
-        # 不管填什么，落到 --brand 上的颜色都得在白底上看得见
-        check(f"{raw!r} 生效色可读", contrast_ok(th.get("accent")), th.get("accent"))
+        # 不管填什么，落到 --brand 上的颜色都得在按钮白字与当前画布上看得见
+        check(f"{raw!r} 生效色可读", contrast_ok(th.get("accent"), cur_mode), th.get("accent"))
 
     print("[5] 还原进来时的主色（不覆盖管理员的选择）")
     code, d = admin.req("PATCH", "/api/settings", {"theme_accent": orig_raw})

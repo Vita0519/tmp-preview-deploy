@@ -33,11 +33,45 @@ import shutil
 import sys
 import tempfile
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import uuid
 import zipfile
 from pathlib import Path
+
+# ---------------- 项目名宽度规则（与后端 namerule.py 同一把尺子） ----------------
+# 显示宽度：全角（中文等）算 1，半角算 0.5；上限 10 = 10 个中文字 ≈ 20 个英文字符。
+# 上传 / 建外链超长会被截短（服务端与这里同规则），改名（set --title）超长直接 422。
+TITLE_MAX_WIDTH = 10.0
+
+
+def _char_w(ch: str) -> float:
+    return 1.0 if unicodedata.east_asian_width(ch) in ("W", "F") else 0.5
+
+
+def title_width(text: str) -> float:
+    return sum(_char_w(c) for c in str(text or ""))
+
+
+def title_too_long(text: str) -> bool:
+    return title_width(text) > TITLE_MAX_WIDTH + 1e-9
+
+
+def clamp_title(text: str) -> str:
+    """截到上限内（不把一个字符劈成两半），去掉尾部空格与标点——与后端 namerule.clamp 一致。"""
+    s = str(text or "").strip()
+    if not title_too_long(s):
+        return s
+    out, used = [], 0.0
+    for ch in s:
+        w = _char_w(ch)
+        if used + w > TITLE_MAX_WIDTH + 1e-9:
+            break
+        out.append(ch)
+        used += w
+    return "".join(out).rstrip(" 　-—_·,，.。:：;；|/\\")
+
 
 VERSION = "3.0"
 SKIP_DIRS = {
@@ -413,6 +447,13 @@ def cmd_deploy(args):
 
     total = sum(p.stat().st_size for _, p in items)
     title = args.title or root.name
+    if title_too_long(title):
+        if args.title:
+            log(f"⚠️  --title 超过 10 个中文字符（约 20 个半角），已截成「{clamp_title(title)}」；下次直接起个短名")
+        else:
+            log(f"⚠️  未传 --title，退回目录名超过 10 个中文字符（约 20 个半角），"
+                f"已截成「{clamp_title(root.name)}」；部署前主动传个短名，别让机器替你截")
+        title = clamp_title(title)
     slug = args.slug or slugify(root.name)
     fields = {
         "slug": slug,
@@ -485,9 +526,16 @@ def cmd_link(args):
     if not c:
         return 2
     url, token = c
+    link_title = args.title or args.url_to
+    if title_too_long(link_title):
+        if args.title:
+            log(f"⚠️  --title 超过 10 个中文字符（约 20 个半角），已截成「{clamp_title(link_title)}」")
+        else:
+            log(f"⚠️  未传 --title，退回用 URL 当名字太长，已截成「{clamp_title(link_title)}」；建议传个 ≤10 字的短名")
+        link_title = clamp_title(link_title)
     body = {
         "link_url": args.url_to,
-        "title": args.title or args.url_to,
+        "title": link_title,
         "visibility": args.visibility,
         "description": args.desc or "",
         "tags": args.tags or "",
@@ -604,6 +652,10 @@ def cmd_set(args):
         body["hours"] = args.ttl
         body["revive"] = True
     if args.title:
+        # 改名不会被自动截短（后端 422），先在本地把话说明白
+        if title_too_long(args.title):
+            return emit(args, False, "set",
+                        error=f"项目名超过 10 个中文字符（约 20 个半角，当前 {args.title}），改名不会自动截短；缩短后再试")
         body["title"] = args.title
     if args.desc is not None:
         body["description"] = args.desc
@@ -622,7 +674,7 @@ def cmd_set(args):
     code, d = call(url, f"/api/projects/{args.slug}", token, "PATCH", body=body)
     if code != 200:
         return emit(args, False, "set", error=f"修改失败 HTTP {code}：{d.get('detail') or ''}")
-    payload = {"slug": d.get("slug"), "visibility": d.get("visibility"),
+    payload = {"slug": d.get("slug"), "title": d.get("title"), "visibility": d.get("visibility"),
                "remaining": remaining(d), "tags": d.get("tags"),
                "allow_download": d.get("allow_download"), "url": (d.get("urls") or {}).get("preview")}
     return emit(args, True, "set", payload, human=[
@@ -974,7 +1026,7 @@ def build_parser():
     p = sub.add_parser("deploy", parents=[common], help="上传目录并返回预览地址")
     p.add_argument("dir", nargs="?", default=".")
     p.add_argument("--slug")
-    p.add_argument("--title")
+    p.add_argument("--title", help="项目名：≤10 个中文字符（≈20 个半角）；不传退回目录名，超长截短")
     p.add_argument("--desc")
     p.add_argument("--tags", default="")
     p.add_argument("--ttl", type=float, help="存活小时数")
@@ -989,7 +1041,7 @@ def build_parser():
 
     p = sub.add_parser("link", parents=[common], help="登记一个外链项目")
     p.add_argument("url_to", metavar="target_url")
-    p.add_argument("--title")
+    p.add_argument("--title", help="项目名：≤10 个中文字符（≈20 个半角）；不传用 URL，超长截短")
     p.add_argument("--slug")
     p.add_argument("--desc")
     p.add_argument("--tags", default="")
@@ -1023,7 +1075,7 @@ def build_parser():
     p.add_argument("--visibility", choices=list(VISIBILITY))
     p.add_argument("--ttl", type=float)
     p.add_argument("--forever", action="store_true")
-    p.add_argument("--title")
+    p.add_argument("--title", help="改名：≤10 个中文字符（≈20 个半角），超长直接拒绝")
     p.add_argument("--desc")
     p.add_argument("--tags")
     p.add_argument("--download", action="store_true")

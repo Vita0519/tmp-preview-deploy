@@ -4,7 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#0f766e" />
+    <meta name="theme-color" content="#0b0d10" />
+    <style id="pv-first-bg">
+      /* 首帧防闪：JS 加载前先用上次会话的画布底色垫住（默认玄夜深色）。
+         改的是 style 块内容而不是内联样式——styles.css 加载后才能正常级联接管，
+         否则内联背景会一直压着主题变量，浅色主题滚动区会露出深色画布。 */
+      html { background: #0b0d10; }
+    </style>
+    <script>
+      try {
+        var b = localStorage.getItem('pv_bg')
+        if (b) document.getElementById('pv-first-bg').textContent = 'html{background:' + b + '}'
+      } catch (e) {}
+    </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

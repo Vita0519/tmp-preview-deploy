@@ -25,8 +25,8 @@ const isSelf = (id) => String(id) === selfId.value
 // 只有管理员、且不止一个人有夹时才分组——只有一堆自己的夹时多一层标题纯属噪音
 const showGroups = computed(() => (props.owners || []).length > 1)
 
-// 分组色点：按成员 id 取一个固定色，纯装饰，跟品牌色无关
-const DOTS = ['#a8332b', '#3f6f52', '#3c5f8f', '#8a6a2f', '#6b4a86', '#2f6f78', '#a05a2c']
+// 分组色点：按成员 id 取一个固定色，纯装饰，跟品牌色无关（深色画布下取亮色系）
+const DOTS = ['#e07b6f', '#5cb88a', '#6aa2e0', '#d9a45c', '#a37fd0', '#54b3bc', '#dd8a52']
 const dotColor = (id) => DOTS[Math.abs(Number(id) || 0) % DOTS.length]
 
 const ownerPick = ref(props.ownerFilter || '')

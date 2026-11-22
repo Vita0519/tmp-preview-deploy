@@ -73,7 +73,10 @@ python cli/agentctl.py selfcheck                               # 建→探活→
 
 - 版本、环境这类区分度放进名字尾部（`落地页 v3` → `落地页 v4`），别堆在开头；
 - 时间、客户名、用途这些细节写 `description` 或 `tags`，不占名字；
-- 改名超长会被 `422` 拒绝，上传/建外链超长会**自动截短**（响应里给的是真实落库的名字）；
+- **`deploy` / `link` 不传 `--title` 会退回目录名 / URL，一长就被自动截短**——
+  部署前主动起个 ≤10 字的短名，别让机器替你截（CLI 截短时会打印 ⚠️ 与截短结果）；
+- 改名超长会被 `422` 拒绝（`agentctl set --title` 会在本地先拦下来说明），上传/建外链超长会
+  **自动截短**（响应里给的是真实落库的名字）；
 - 名字与 slug 无关：改名不动链接，`/v/<slug>` 永远不变。
 
 ## 收藏夹：给项目分门别类
@@ -160,6 +163,12 @@ python cli/agentctl.py rm <slug>
 浏览器控制台还能做：按成员/标签/类型/可见性（左侧分类）/状态筛选，按访问、创建、更新、到期、体积排序，
 勾选后一键批量改可见性/续期/转永久/开放下载/删除，抽屉里看文件清单与 14 天访问趋势，
 **点抽屉标题就能改项目名**（实时显示 当前宽度/10，超了保存按钮直接禁用）。
+
+**主题插件**（设置 → 外观）：内置「玄夜」（深色，默认）与「象牙」（浅色）两套 theme.json 语义令牌清单，
+点卡片即时预览，保存后控制台 / 门户 / 预览页 / 错误页一起换；**主题商店**填一个 GitHub 仓库
+（`owner/repo` 或链接）就能枚举里面的 `theme.json` 一键安装，仓库自带示例插件
+（`examples/theme-plugin/`，商店里点「装示例插件」不依赖外网）。API 见 agent 技能包 SKILL.md 第 10 节；
+raw 不通的网络配 `THEME_RAW_MIRROR`，GitHub API 限额配 `THEME_GH_TOKEN`（见 `.env.example`）。
 
 成员页：搜索（账号 / 显示名 / 绑定 Agent 名）、角色与状态筛选、按创建时间 / 最近登录 / 访问次数等排序
 （可切升降序），一页 20 条（可切 20 / 50 / 100），筛选条件叠加后仍能清除回默认；
@@ -252,6 +261,8 @@ python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 成员搜索/�
 python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗排版与标签上限（需 chrome）
 python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 与页面署名（需 chrome）
 python tests/check_count_sync.py --url http://127.0.0.1:8000   # 删除/新建后侧栏收藏夹与分类计数当场同步（需 chrome）
+python tests/check_theme.py     --url http://127.0.0.1:8000   # 主色派生、全站跟随、站点图标
+python tests/check_themes.py    --url http://127.0.0.1:8000   # 主题插件：黑/白切换、示例安装/卸载、商店守卫
 python tests/check_compat.py    --url http://127.0.0.1:8000   # 老备份恢复+自动迁移/更老的包被拒/老书签/老字段/老 CLI（会覆盖数据，跑完自动恢复）
 ```
 

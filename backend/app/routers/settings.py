@@ -28,15 +28,19 @@ def _num(raw, fallback: float) -> float:
 
 
 def _theme_payload(s: dict | None = None) -> dict:
-    """主题：当前主色 + 派生的整套中性色 + 全部配色系列（设置页直接按真实配色渲染卡片）。"""
-    s = s if s is not None else all_settings()
-    key = theme.series_of(s.get("theme_series")).get("key")
-    accent = theme.normalize(s.get("theme_accent") or theme.BY_KEY[key]["accent"])
-    p = theme.palette(accent, key)
-    p["presets"] = [{"name": n, "value": v} for n, v in theme.PRESETS]
-    p["series_list"] = theme.series_payload()
-    # 主色被手改过（不等于任何一套系列的主色）→ 前端把「自定义」标为选中
-    p["custom"] = theme.series_by_accent(accent) is None
+    """主题：当前主色派生族 + 当前主题插件全部语义令牌 + 已装插件清单（含内置）。
+
+    设置页的插件清单带每套的完整 vars（点卡片就能本地预览整套令牌）；
+    /api/meta 那份保持精简，只有当前插件的 vars。
+    """
+    p = theme.payload()
+    p["plugins"] = [
+        {**m, "vars": (theme.get_plugin(m["id"]) or {}).get("vars", {})} for m in p["plugins"]
+    ]
+    pid = p["plugin"]
+    current = next((x for x in p["plugins"] if x["id"] == pid), None)
+    # 主色被手改过（不等于当前主题的默认主色）→ 前端把「自定义」标为选中
+    p["custom"] = bool(current) and theme.normalize(p["raw"]) != theme.normalize(current.get("default_accent"))
     return p
 
 
@@ -99,12 +103,15 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         set_setting("public_portal", "1" if payload["public_portal"] else "0")
     if "author" in payload:
         author.save(payload["author"])
-    # 换系列：主色跟着换（除非这次请求同时指定了主色，那就以主色为准——允许选完系列再微调）
-    if payload.get("theme_series"):
-        key = theme.series_of(payload["theme_series"]).get("key")
-        set_setting("theme_series", key)
+    # 换主题插件：主色跟着换（除非这次请求同时指定了主色，那就以主色为准——允许选完主题再微调）
+    if payload.get("theme_plugin"):
+        pid = str(payload["theme_plugin"]).strip().lower()
+        m = theme.get_plugin(pid)
+        if not m:
+            raise HTTPException(status_code=422, detail=theme.plugin_error(pid))
+        set_setting("theme_plugin", pid)
         if "theme_accent" not in payload:
-            set_setting("theme_accent", theme.BY_KEY[key]["accent"])
+            set_setting("theme_accent", m.get("default_accent") or theme.DEFAULT)
         theme.reset_cache()
     if "theme_accent" in payload:
         set_setting("theme_accent", theme.normalize(payload["theme_accent"]))
@@ -175,3 +182,62 @@ def delete_icon(user: dict = Depends(admin_user)):
     """删掉自定义图标，回到内置的沙漏套装。"""
     branding.remove()
     return {"ok": True, "site_icon": _icon_payload()}
+
+
+# ---------------- 主题商店 ----------------
+
+EXAMPLE_REPO = "Vita0519/tmp-preview-deploy"
+EXAMPLE_PATH = "examples/theme-plugin/theme.json"
+
+
+@router.post("/themes/preview")
+async def themes_preview(body: dict = ..., user: dict = Depends(admin_user)):
+    """主题商店预览：给一个 GitHub 仓库（owner/repo 或任意 GitHub 链接），枚举里面的 theme.json。"""
+    repo = str(body.get("repo") or "").strip()
+    if not repo:
+        raise HTTPException(status_code=422, detail="请填写仓库")
+    return theme.store_preview(repo)
+
+
+@router.post("/themes/install")
+async def themes_install(body: dict = ..., user: dict = Depends(admin_user)):
+    """安装一个主题插件：{repo, path, ref} 从 GitHub 拉，或 {source:"example"} 装仓库自带的示例。"""
+    if str(body.get("source") or "") == "example":
+        # 示例插件随仓库分发（examples/theme-plugin/），演示完整安装链路，不依赖外网
+        f = config.BASE_DIR / "examples" / "theme-plugin" / "theme.json"
+        if not f.is_file():
+            raise HTTPException(status_code=404, detail="示例插件不存在")
+        meta = theme.install_manifest(f.read_bytes(), "example")
+        return {"ok": True, "plugin": meta, "theme": _theme_payload()}
+
+    repo = str(body.get("repo") or "").strip()
+    path = str(body.get("path") or "").strip()
+    if not repo or not path:
+        raise HTTPException(status_code=422, detail="缺少仓库或文件路径")
+    ref = str(body.get("ref") or "").strip()
+    try:
+        meta = theme.store_install(repo, ref, path)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"从 GitHub 拉取失败：{e}") from e
+    return {"ok": True, "plugin": meta, "theme": _theme_payload()}
+
+
+@router.delete("/themes/{pid}")
+def themes_delete(pid: str, user: dict = Depends(admin_user)):
+    try:
+        theme.uninstall(pid)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return {"ok": True, "theme": _theme_payload()}
+
+
+@router.get("/themes/{pid}/preview.png")
+def themes_preview_image(pid: str, user: dict = Depends(admin_user)):
+    from fastapi.responses import Response
+
+    p = theme.PLUGINS_DIR / str(pid).strip().lower() / "preview.png"
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="没有预览图")
+    return Response(p.read_bytes(), media_type="image/png")

@@ -53,3 +53,8 @@ Thumbs.db
 /tests/repro_*.py
 /tests/check_prototype*.py
 /frontend/prototype-*.html
+
+# 本地验收用的运行时目录
+.preview-data/
+.shots/
+.venv/

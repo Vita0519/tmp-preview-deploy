@@ -128,8 +128,8 @@ DEFAULT_SETTINGS = {
     "default_ttl_private": "",
     "public_portal": "0",
     "default_expire_action": "block",
-    # 配色系列：classic / tech / macaron / morandi / ink / minimal
-    "theme_series": "classic",
+    # 主题插件 id（内置：noir 玄夜 / ivory 象牙，可从主题商店安装更多）
+    "theme_plugin": "noir",
 }
 
 

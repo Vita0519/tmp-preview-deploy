@@ -1,98 +1,62 @@
-"""主题：一套「主色 + 中性色画布」，控制台 / 门户 / 预览页 / 错误页共用。
+"""主题插件引擎：主题 = 一个 theme.json 语义令牌清单（声明式，无代码执行）。
 
-参考网页配色的 60-30-10 黄金比例：60% 是画布与留白（中性色），30% 是卡片与容器，
-只有 10% 是主色（按钮、圆环、进度条、选中态）。所以「换主题」不能只换一个色块，
-中性色的冷暖决定整体气质，主色只负责强调——这里把两者打包成「配色系列」。
+设计：
+- 每套主题（内置或商店安装）定义一整套 CSS 语义令牌（画布 / 容器 / 文字 / 描边 /
+  阴影 / 弹层……约 30 个 --var），覆盖在对应明暗基底的变量之上；只写部分键也可以，
+  缺省键回落到该模式的基底（noir / ivory）。
+- `--brand-*` 一族永远不进清单：它们由用户主色（theme_accent）实时派生，
+  派生公式按主题明暗模式各有一把尺（深底提亮 / 浅底压深）。
+- 商店：给定 GitHub 仓库（owner/repo、仓库 URL、/tree/ 深链均可），用 GitHub API
+  枚举仓库里的 theme.json，逐个取回（raw.githubusercontent.com，jsDelivr 兜底），
+  校验后落盘到 <DATA_DIR>/themes/<id>/theme.json。
 
-主色照旧全部派生（hover / 浅底 / 描边 / 渐变深色），中性色每套只给 4 个锚点
-（画布 bg、正文 ink、次要 ink2），其余由它们混出来，避免一格一格手调调到不可用。
-派生公式与 frontend/src/theme.js 保持一致。
+清单格式见 examples/theme-plugin/README.md。
 """
 from __future__ import annotations
 
+import base64
+import json
+import re
+import shutil
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+from . import config
+
 DEFAULT = "#0f766e"
 
-# ---------------------------------------------------------------- 配色系列
-# 每套 = 主色 + 画布底 + 两级文字色。其余中性色由这三个锚点混出来。
-SERIES = [
-    {
-        "key": "classic",
-        "name": "经典墨绿",
-        "desc": "暖灰画布 + 墨绿强调，克制耐看，内容始终是主角",
-        "use": "通用后台 / 长期使用",
-        "accent": "#0f766e",
-        "bg": "#f6f7f5",
-        "ink": "#14161a",
-        "ink2": "#4a5057",
-    },
-    {
-        "key": "tech",
-        "name": "科技感",
-        "desc": "冷灰蓝底 + 电光蓝，理性、精确、有速度感",
-        "use": "开发者工具 / 数据看板",
-        "accent": "#2563eb",
-        "bg": "#f3f5fa",
-        "ink": "#0f172a",
-        "ink2": "#475467",
-    },
-    {
-        "key": "macaron",
-        "name": "马卡龙",
-        "desc": "奶油粉底 + 玫瑰粉，明亮柔和，带一点甜",
-        "use": "作品集 / 活动页 / 面向 C 端",
-        "accent": "#d9557a",
-        "bg": "#fdf0f3",
-        "ink": "#2b2226",
-        "ink2": "#6b565d",
-    },
-    {
-        "key": "morandi",
-        "name": "莫兰迪",
-        "desc": "灰米画布 + 雾霭蓝，低饱和、有灰度，安静高级",
-        "use": "设计工作室 / 品牌展示",
-        "accent": "#5d7280",
-        "bg": "#f3f1ed",
-        "ink": "#2f3336",
-        "ink2": "#5c6367",
-    },
-    {
-        "key": "ink",
-        "name": "新中式",
-        "desc": "宣纸底 + 朱砂红，温润庄重，留白即呼吸",
-        "use": "政务公文 / 传统文化",
-        "accent": "#a8332b",
-        "bg": "#f8f4ec",
-        "ink": "#2a241f",
-        "ink2": "#5d554c",
-    },
-    {
-        "key": "minimal",
-        "name": "极简黑白",
-        "desc": "纯灰画布 + 近黑，去掉所有颜色干扰，只留结构",
-        "use": "文档站 / 摄影作品",
-        "accent": "#1f2328",
-        "bg": "#f7f7f8",
-        "ink": "#111315",
-        "ink2": "#4d5157",
-    },
-]
+# 校正主色用的两种画布参照（与内置主题 --bg 一致）
+DARK_CANVAS = "#0b0d10"
+LIGHT_CANVAS = "#f6f7f5"
 
-BY_KEY = {s["key"]: s for s in SERIES}
-DEFAULT_SERIES = "classic"
+BUILTIN_DIR = Path(__file__).resolve().parent / "builtin_themes"
+PLUGINS_DIR = Path(config.DATA_DIR) / "themes"
 
-# 兼容旧设置项 theme_accent 的「预设色板」：仍然可以只换主色（中性色跟随当前系列）
+MANIFEST_MAX = 64 * 1024
+PREVIEW_MAX = 256 * 1024
+
+ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,39}$")
+VAR_KEY_RE = re.compile(r"^--[a-z0-9-]{2,40}$")
+# 主色派生族：插件不许带，永远由 theme_accent 现算
+BRAND_KEYS = {
+    "--brand", "--brand-hover", "--brand-soft", "--brand-line",
+    "--brand-deep", "--brand-light", "--brand-rgb",
+}
+
 PRESETS = [
     ("墨绿", "#0f766e"),
-    ("靛蓝", "#3b5bdb"),
-    ("深青", "#0b7285"),
-    ("藏紫", "#6741d9"),
-    ("砖红", "#c2410c"),
-    ("玫红", "#be1250"),
-    ("赭石", "#a16207"),
-    ("石板", "#475569"),
+    ("翠绿", "#10b981"),
+    ("靛蓝", "#6366f1"),
+    ("深青", "#0ea5e9"),
+    ("藏紫", "#8b5cf6"),
+    ("玫红", "#f43f5e"),
+    ("砖红", "#f97316"),
+    ("石板", "#94a3b8"),
 ]
 
 
+# ---------------------------------------------------------------- 色值工具
 def normalize(raw: object) -> str:
     """把 #abc / #aabbcc / 带空格的输入收敛成 #aabbcc；非法就回默认。"""
     s = str(raw or "").strip().lower()
@@ -136,149 +100,218 @@ def contrast(a: str, b: str) -> float:
     return (hi + 0.05) / (lo + 0.05)
 
 
-# 主色要同时当「按钮底」和「浅底上的文字」用，跟白底的对比度低于这个值就撑不住
 MIN_CONTRAST = 3.0
 
 
-def readable(brand: str) -> str:
-    """主色在白底上必须看得见，不够就等比压深（色相不动），别让人选个淡黄就全站灰掉。"""
-    if contrast(brand, "#ffffff") >= MIN_CONTRAST:
-        return brand
-    lo, hi = 0.0, 0.88
+def _shift_toward(c: str, target: str, canvas: str, minimum: float) -> str:
+    """往 target 方向二分，直到 c 对 canvas 的对比度达标（色相不动）。"""
+    lo, hi = 0.0, 0.95
     for _ in range(18):
         mid = (lo + hi) / 2
-        if contrast(mix(brand, "#000000", mid), "#ffffff") >= MIN_CONTRAST:
+        if contrast(mix(c, target, mid), canvas) >= minimum:
             hi = mid
         else:
             lo = mid
-    return mix(brand, "#000000", hi)
+    return mix(c, target, hi)
 
 
-def series_of(key: object) -> dict:
-    """按 key 取系列；不认识就回经典墨绿。"""
-    return BY_KEY.get(str(key or "").strip(), BY_KEY[DEFAULT_SERIES])
+def readable(brand: str, mode: str = "dark") -> str:
+    """主色两头都要撑住：白字压上去（主按钮）够、所在画布上放文字/徽标也要够。
+
+    深色主题：对白不够就压黑，对深画布不够就提白（先压后提不会打架）。
+    浅色主题：两个约束都往黑压，方向一致。
+    """
+    c = normalize(brand)
+    if contrast(c, "#ffffff") < MIN_CONTRAST:
+        c = _shift_toward(c, "#000000", "#ffffff", MIN_CONTRAST)
+    canvas = DARK_CANVAS if mode == "dark" else LIGHT_CANVAS
+    if contrast(c, canvas) < MIN_CONTRAST:
+        target = "#ffffff" if mode == "dark" else "#000000"
+        c = _shift_toward(c, target, canvas, MIN_CONTRAST)
+    return c
 
 
-def series_by_accent(accent: object) -> dict | None:
-    """反查：这个主色属于哪套系列（设置页用来判断「当前是哪张卡」）。"""
-    want = normalize(accent)
-    for s in SERIES:
-        if s["accent"] == want:
-            return s
-    return None
-
-
-def neutral_of(key: object) -> dict:
-    """系列 → 整套中性色。只给 3 个锚点，剩下 8 个混出来。"""
-    s = series_of(key)
-    bg, ink, ink2 = s["bg"], s["ink"], s["ink2"]
+# ---------------------------------------------------------------- 清单读写
+def _manifest_from_raw(raw: bytes, source: str) -> dict:
+    """解析并校验一份主题清单；不合法直接抛 ValueError，消息面向插件作者。"""
+    if len(raw) > MANIFEST_MAX:
+        raise ValueError(f"theme.json 超过 {MANIFEST_MAX // 1024}KB 上限")
+    try:
+        m = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise ValueError(f"theme.json 不是合法 JSON：{e}") from e
+    if not isinstance(m, dict):
+        raise ValueError("theme.json 顶层必须是对象")
+    pid = str(m.get("id") or "").strip().lower()
+    if not ID_RE.match(pid):
+        raise ValueError("id 必须是 2-40 位小写字母/数字/连字符，且以字母或数字开头")
+    name = str(m.get("name") or "").strip()
+    if not name:
+        raise ValueError("缺少 name")
+    mode = str(m.get("mode") or "dark").strip().lower()
+    if mode not in ("dark", "light"):
+        raise ValueError("mode 只能是 dark 或 light")
+    vars_in = m.get("vars") or {}
+    if not isinstance(vars_in, dict):
+        raise ValueError("vars 必须是对象")
+    cleaned: dict[str, str] = {}
+    for k, v in vars_in.items():
+        key = str(k).strip().lower()
+        if key in BRAND_KEYS:
+            continue  # 主色派生族一律忽略：accent 永远赢
+        if not VAR_KEY_RE.match(key):
+            raise ValueError(f"非法变量名：{k!r}（应为 --xx-yy 形式）")
+        val = str(v).strip()
+        if not val or len(val) > 500:
+            raise ValueError(f"变量 {key} 的值必须是 1-500 字符")
+        cleaned[key] = val
+    accent = normalize(m.get("default_accent") or DEFAULT)
+    accents = []
+    for a in (m.get("accents") or [])[:12]:
+        na = normalize(a)
+        if na not in accents:
+            accents.append(na)
+    if accent not in accents:
+        accents.insert(0, accent)
     return {
-        # 画布：--bg 是主体 60%，--bg-2 用于从上到下的极淡渐变起手
-        "bg": bg,
-        "bg-2": mix("#ffffff", bg, 0.42),
-        "bg-deep": mix(bg, ink, 0.025),
-        # 容器：卡片固定纯白，次级容器用这两个
-        "surface-2": mix("#ffffff", bg, 0.48),
-        "surface-3": mix(bg, ink, 0.012),
-        # 文字：正文 / 次要 / 弱 / 更弱
-        "ink": ink,
-        "ink-2": ink2,
-        "ink-3": mix(ink2, bg, 0.28),
-        "ink-4": mix(ink2, bg, 0.55),
-        # 描边：两档，1px 分层靠它们
-        "line": mix(bg, ink, 0.065),
-        "line-2": mix(bg, ink, 0.14),
-        # 需要自己拼 rgba 时用
-        "ink-rgb": "%d,%d,%d" % _rgb(ink),
-        "bg-rgb": "%d,%d,%d" % _rgb(bg),
+        "id": pid,
+        "name": name[:40],
+        "version": str(m.get("version") or "1.0.0")[:20],
+        "author": str(m.get("author") or "").strip()[:60],
+        "homepage": str(m.get("homepage") or "").strip()[:200],
+        "desc": str(m.get("desc") or "").strip()[:200],
+        "mode": mode,
+        "default_accent": accent,
+        "accents": accents,
+        "vars": cleaned,
+        "source": source,
     }
 
 
-def palette(accent: str | None = None, series: str | None = None) -> dict:
-    """主色 + 中性色 → 整套色板。"""
-    raw = normalize(accent if accent else current())
-    brand = readable(raw)
-    key = series if series else current_series()
-    r, g, b = _rgb(brand)
-    s = series_of(key)
-    return {
-        "accent": brand,
-        # 用户原本填的值（可能太淡，已被 readable 压深）
-        "raw": raw,
-        "adjusted": brand != raw,
-        # hover 比主色略深，按下不发灰
-        "hover": mix(brand, "#000000", 0.12),
-        # 浅底：白底里掺一点主色，用作胶囊、选中态背景
-        "soft": mix("#ffffff", brand, 0.07),
-        # 描边：主色 22% 透明度
-        "line": f"rgba({r},{g},{b},.22)",
-        # 渐变收尾用的深色
-        "deep": mix(brand, "#000000", 0.32),
-        # 渐变起手用的亮色
-        "light": mix(brand, "#ffffff", 0.18),
-        # 需要自己拼 rgba 时用
-        "rgb": f"{r},{g},{b}",
-        # 系列
-        "series": s["key"],
-        "series_name": s["name"],
-        "neutral": neutral_of(s["key"]),
-    }
+def _load_json_file(p: Path) -> dict | None:
+    try:
+        return _manifest_from_raw(p.read_bytes(), "builtin")
+    except Exception:  # noqa: BLE001 - 单个坏清单不要拖垮整个主题系统
+        return None
 
 
-def css_vars(accent: str | None = None, series: str | None = None) -> str:
-    """注入到页面 <style> 开头的 :root 变量块（品牌色 + 中性色画布）。"""
-    p = palette(accent, series)
-    n = p["neutral"]
-    return (
-        ":root{--brand:%s;--brand-hover:%s;--brand-soft:%s;--brand-line:%s;"
-        "--brand-deep:%s;--brand-light:%s;--brand-rgb:%s;"
-        "--bg:%s;--bg-2:%s;--bg-deep:%s;--surface-2:%s;--surface-3:%s;"
-        "--ink:%s;--ink-2:%s;--ink-3:%s;--ink-4:%s;--line:%s;--line-2:%s;"
-        "--ink-rgb:%s;--bg-rgb:%s}"
-        % (
-            p["accent"], p["hover"], p["soft"], p["line"], p["deep"], p["light"], p["rgb"],
-            n["bg"], n["bg-2"], n["bg-deep"], n["surface-2"], n["surface-3"],
-            n["ink"], n["ink-2"], n["ink-3"], n["ink-4"], n["line"], n["line-2"],
-            n["ink-rgb"], n["bg-rgb"],
-        )
-    )
-
-
-def series_payload() -> list[dict]:
-    """给设置页/前端的系列清单：带上完整中性色，卡片可以直接按真实配色渲染。"""
-    out = []
-    for s in SERIES:
-        out.append(
-            {
-                "key": s["key"],
-                "name": s["name"],
-                "desc": s["desc"],
-                "use": s["use"],
-                "accent": s["accent"],
-                "neutral": neutral_of(s["key"]),
-            }
-        )
+def builtin_manifests() -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    if BUILTIN_DIR.is_dir():
+        for p in sorted(BUILTIN_DIR.glob("*.json")):
+            m = _load_json_file(p)
+            if m:
+                out[m["id"]] = m
     return out
 
 
-_cache: dict[str, object] = {"at": 0.0, "value": DEFAULT, "series": DEFAULT_SERIES}
+def installed_manifests() -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    if PLUGINS_DIR.is_dir():
+        for d in sorted(PLUGINS_DIR.iterdir()):
+            f = d / "theme.json"
+            if d.is_dir() and f.is_file():
+                m = _load_json_file(f)
+                if m:
+                    m["builtin"] = False
+                    out[m["id"]] = m
+    return out
+
+
+def all_manifests() -> dict[str, dict]:
+    """内置 + 已安装；同 id 时安装版优先（内置 id 不允许被安装覆盖，这里只是兜底）。"""
+    merged = builtin_manifests()
+    merged.update(installed_manifests())
+    return merged
+
+
+def plugin_error(pid: str) -> str:
+    if not ID_RE.match(str(pid or "")):
+        return "主题 id 不合法"
+    return "没有找到这个主题插件"
+
+
+def get_plugin(pid: str) -> dict | None:
+    """完整清单：vars 合并到对应明暗基底的完整令牌集。"""
+    m = all_manifests().get(str(pid or "").strip().lower())
+    if not m:
+        return None
+    base = builtin_manifests().get("noir" if m["mode"] == "dark" else "ivory") or {}
+    base_vars = (base.get("vars") or {}).copy()
+    base_vars.update(m.get("vars") or {})
+    out = dict(m)
+    out["vars"] = base_vars
+    return out
+
+
+def _meta(m: dict) -> dict:
+    # 预览色从「合并到基底后的完整令牌」里取：部分覆盖的清单也有完整的画布/容器色
+    full = get_plugin(m["id"]) or m
+    v = full.get("vars") or {}
+    return {
+        "id": m["id"],
+        "name": m["name"],
+        "version": m.get("version", "1.0.0"),
+        "author": m.get("author", ""),
+        "desc": m.get("desc", ""),
+        "mode": m["mode"],
+        "builtin": m.get("builtin", True),
+        "default_accent": m.get("default_accent", DEFAULT),
+        "accents": m.get("accents", []),
+        "homepage": m.get("homepage", ""),
+        # 卡片预览色：画布 → 容器 → 文字 → 主色，一眼看清气质
+        "preview": {
+            "bg": v.get("--bg", ""),
+            "surface": v.get("--surface", ""),
+            "ink": v.get("--ink", ""),
+            "accent": m.get("default_accent", DEFAULT),
+        },
+    }
+
+
+def list_plugins() -> list[dict]:
+    return [_meta(m) for m in all_manifests().values()]
+
+
+# ---------------------------------------------------------------- 当前主题
+_cache: dict[str, object] = {"at": 0.0, "value": DEFAULT, "plugin": "noir"}
 
 
 def _load() -> None:
-    value, key = DEFAULT, DEFAULT_SERIES
+    plugin, accent = "noir", DEFAULT
     try:
         from .db import get_setting
 
-        key = series_of(get_setting("theme_series")).get("key") or DEFAULT_SERIES
-        value = normalize(get_setting("theme_accent") or BY_KEY[key]["accent"])
+        plugin = str(get_setting("theme_plugin") or "").strip().lower()
+        if not plugin:
+            # 迁移：老库只有 theme_series。classic 是深色默认；其余系列是浅色画布 → 象牙。
+            legacy = str(get_setting("theme_series") or "").strip().lower()
+            plugin = "ivory" if legacy and legacy != "classic" else "noir"
+        if plugin not in all_manifests():
+            plugin = "noir"
+        m = get_plugin(plugin) or {}
+        accent = normalize(
+            get_setting("theme_accent") or m.get("default_accent") or DEFAULT
+        )
+        # 不在这里做可读性校正：raw 要保持用户填的原值，校正发生在 palette() 派生时
     except Exception:  # noqa: BLE001 - 库还没建好时不要让页面挂掉
-        value, key = DEFAULT, DEFAULT_SERIES
-    _cache["value"] = value
-    _cache["series"] = key
+        pass
+    _cache["value"] = accent
+    _cache["plugin"] = plugin
+
+
+def current_plugin() -> str:
+    import time
+
+    if time.monotonic() - float(_cache["at"] or 0) < 5:
+        return str(_cache["plugin"])
+    _load()
+    _cache["at"] = time.monotonic()
+    return str(_cache["plugin"])
 
 
 def current() -> str:
-    """当前生效的主色（设置里没写就用默认）。带 5 秒缓存，页面渲染不额外打库。"""
+    """当前生效的主色。带 5 秒缓存，页面渲染不额外打库。"""
     import time
 
     if time.monotonic() - float(_cache["at"] or 0) < 5:
@@ -288,16 +321,250 @@ def current() -> str:
     return str(_cache["value"])
 
 
-def current_series() -> str:
-    """当前生效的配色系列 key。"""
-    import time
-
-    if time.monotonic() - float(_cache["at"] or 0) < 5:
-        return str(_cache["series"])
-    _load()
-    _cache["at"] = time.monotonic()
-    return str(_cache["series"])
-
-
 def reset_cache() -> None:
     _cache["at"] = 0.0
+
+
+# ---------------------------------------------------------------- 派生
+def palette(accent: str | None = None, mode: str | None = None) -> dict:
+    """主色 + 主题明暗模式 → 品牌色族。模式缺省取当前主题。"""
+    raw = normalize(accent if accent else current())
+    mode = mode or (get_plugin(current_plugin()) or {}).get("mode", "dark")
+    brand = readable(raw, mode)
+    r, g, b = _rgb(brand)
+    dark = mode == "dark"
+    return {
+        "accent": brand,
+        "raw": raw,
+        "adjusted": brand != raw,
+        # hover：深底往白提（亮起=可点），浅底往黑压（classic 行为）
+        "hover": mix(brand, "#ffffff", 0.10) if dark else mix(brand, "#000000", 0.12),
+        # 软底：主色低透明度叠在画布上
+        "soft": f"rgba({r},{g},{b},{0.14 if dark else 0.08})",
+        "line": f"rgba({r},{g},{b},{0.38 if dark else 0.22})",
+        "deep": mix(brand, "#000000", 0.32),
+        "light": mix(brand, "#ffffff", 0.30 if dark else 0.18),
+        "rgb": f"{r},{g},{b}",
+    }
+
+
+def css_vars(accent: str | None = None) -> str:
+    """注入到页面 <style> 开头的 :root 变量块：主色派生族 + 当前主题全部语义令牌。"""
+    p = palette(accent)
+    plugin = get_plugin(current_plugin()) or {}
+    parts = [
+        f"--brand:{p['accent']}",
+        f"--brand-hover:{p['hover']}",
+        f"--brand-soft:{p['soft']}",
+        f"--brand-line:{p['line']}",
+        f"--brand-deep:{p['deep']}",
+        f"--brand-light:{p['light']}",
+        f"--brand-rgb:{p['rgb']}",
+    ]
+    for k, v in (plugin.get("vars") or {}).items():
+        if k not in BRAND_KEYS:
+            parts.append(f"{k}:{v}")
+    return ":root{" + ";".join(parts) + "}"
+
+
+def payload(accent: str | None = None) -> dict:
+    """给 /api/meta 与 /api/settings 的完整主题载荷（前端 applyPalette 直接吃）。"""
+    pid = current_plugin()
+    plugin = get_plugin(pid) or {}
+    p = palette(accent)
+    return {
+        **p,
+        "plugin": pid,
+        "plugin_name": plugin.get("name", pid),
+        "mode": plugin.get("mode", "dark"),
+        # 完整语义令牌：前端逐个写进 :root，服务端页面与 SPA 共用同一契约
+        "vars": {k: v for k, v in (plugin.get("vars") or {}).items() if k not in BRAND_KEYS},
+        "plugins": list_plugins(),
+        "presets": [{"name": n, "value": v} for n, v in PRESETS],
+    }
+
+
+# ---------------------------------------------------------------- 安装 / 卸载
+def install_manifest(raw: bytes, source: str) -> dict:
+    """校验并落盘一份主题清单；返回插件元信息。"""
+    m = _manifest_from_raw(raw, source)
+    if m["id"] in builtin_manifests():
+        raise ValueError(f"id {m['id']} 与内置主题重名，换一个 id 再发布")
+    target = PLUGINS_DIR / m["id"]
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "theme.json").write_bytes(
+        json.dumps({k: v for k, v in m.items() if k != "source"}, ensure_ascii=False, indent=2).encode("utf-8")
+    )
+    reset_cache()
+    return _meta({**m, "builtin": False})
+
+
+def save_preview(pid: str, raw: bytes) -> None:
+    """保存商店带来的预览图（可选，超限直接放弃，不影响安装）。"""
+    if not ID_RE.match(pid) or len(raw) > PREVIEW_MAX or raw[:4] != b"\x89PNG":
+        return
+    try:
+        (PLUGINS_DIR / pid / "preview.png").write_bytes(raw)
+    except Exception:  # noqa: BLE001 - 预览图失败不算安装失败
+        pass
+
+
+def uninstall(pid: str) -> None:
+    pid = str(pid or "").strip().lower()
+    if pid in builtin_manifests():
+        raise ValueError("内置主题不能卸载")
+    target = PLUGINS_DIR / pid
+    if not (target / "theme.json").is_file():
+        raise ValueError(plugin_error(pid))
+    shutil.rmtree(target, ignore_errors=True)
+    reset_cache()
+    # 当前主题被卸了就回玄夜
+    from .db import get_setting, set_setting
+
+    if str(get_setting("theme_plugin") or "").lower() == pid:
+        set_setting("theme_plugin", "noir")
+        set_setting("theme_accent", DEFAULT)
+
+
+# ---------------------------------------------------------------- GitHub 商店
+GH_API = "https://api.github.com"
+GH_RAW = "https://raw.githubusercontent.com"
+GH_JSD = "https://cdn.jsdelivr.net/gh"
+_HTTP_TIMEOUT = 15
+
+
+def _gh_headers() -> dict:
+    """GitHub API 头：UA 必须；配了 THEME_GH_TOKEN 就带上（未认证限额 60 次/小时）。"""
+    h = {"User-Agent": "tmp-preview-theme-store", "Accept": "application/vnd.github+json"}
+    token = str(getattr(config, "THEME_GH_TOKEN", "") or "").strip()
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    return h
+
+
+def parse_repo_input(raw: str) -> dict:
+    """把各种输入收敛成 {repo, ref, path}。
+
+    支持：owner/repo · owner/repo@v1 · https://github.com/owner/repo[/tree/ref[/path]]
+    · …/blob/ref/path/theme.json · https://raw.githubusercontent.com/owner/repo/ref/path
+    """
+    s = str(raw or "").strip().strip("/")
+    repo = ref = path = ""
+    m = re.match(r"^(?:https?://)?(?:raw\.githubusercontent\.com|cdn\.jsdelivr\.net/gh)/([^/\s]+)/([^/\s@]+)(?:@([^/\s]+))?/(.+)$", s)
+    if m:
+        return {"repo": f"{m.group(1)}/{m.group(2)}", "ref": m.group(3) or "", "path": m.group(4).strip("/")}
+    m = re.match(r"^(?:https?://)?github\.com/([^/\s]+)/([^/\s]+)(?:/(?:tree|blob)/([^/\s]+)(?:/(.+))?)?/?$", s)
+    if m:
+        return {"repo": f"{m.group(1)}/{m.group(2)}", "ref": m.group(3) or "", "path": (m.group(4) or "").strip("/")}
+    m = re.match(r"^([\w.-]+)/([\w.-]+)(?:@([^/\s]+))?(?:/(.+))?$", s)
+    if m:
+        return {"repo": f"{m.group(1)}/{m.group(2)}", "ref": m.group(3) or "", "path": (m.group(4) or "").strip("/")}
+    raise ValueError("仓库格式不认识：支持 owner/repo、owner/repo@分支 或 GitHub 链接")
+
+
+def _http_get(url: str, timeout: int = _HTTP_TIMEOUT) -> bytes:
+    headers = _gh_headers() if url.startswith(GH_API) else {"User-Agent": "tmp-preview-theme-store"}
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+def _fetch_file(repo: str, ref: str, path: str) -> bytes:
+    """取仓库文件：自定义镜像（可选）→ raw → jsDelivr 兜底。
+
+    部分网络环境 raw.githubusercontent.com 不通，jsDelivr 是第二通道；
+    THEME_RAW_MIRROR 环境变量可指定自己的镜像（填到 {repo}/{ref}/{path} 之前那段）。
+    """
+    r = ref or "HEAD"
+    mirror = str(getattr(config, "THEME_RAW_MIRROR", "") or "").strip().rstrip("/")
+    urls = []
+    if mirror:
+        urls.append(f"{mirror}/{repo}/{r}/{path}")
+    urls.append(f"{GH_RAW}/{repo}/{r}/{path}")
+    urls.append(f"{GH_JSD}/{repo}@{r}/{path}")
+    errors = []
+    for url in urls:
+        try:
+            return _http_get(url)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{url.split('/')[2]}: {e}")
+    raise RuntimeError(
+        "；".join(errors) + "（raw 与 jsDelivr 都不可达时，可设置 THEME_RAW_MIRROR 指向自建镜像）"
+    )
+
+
+def _default_branch(repo: str) -> str:
+    """仓库默认分支（GitHub trees API 直接吃分支名）。"""
+    data = json.loads(_http_get(f"{GH_API}/repos/{repo}").decode("utf-8"))
+    return data.get("default_branch") or "main"
+
+
+def discover_themes(repo: str, ref: str) -> list[dict]:
+    """枚举仓库里所有 theme.json（根目录与任意子目录，最多取 12 个）。"""
+    r = ref or _default_branch(repo)
+    data = json.loads(_http_get(f"{GH_API}/repos/{repo}/git/trees/{r}?recursive=1").decode("utf-8"))
+    paths = [
+        t["path"]
+        for t in data.get("tree", [])
+        if t.get("type") == "blob" and t.get("path", "").endswith("theme.json")
+    ][:12]
+    if not paths:
+        raise ValueError("仓库里没有找到 theme.json（格式见 examples/theme-plugin/README.md）")
+    out = []
+    for p in paths:
+        entry = {"repo": repo, "ref": ref, "path": p, "manifest": None, "error": ""}
+        try:
+            entry["manifest"] = _manifest_from_raw(_fetch_file(repo, ref, p), f"{repo}@{ref}:{p}")
+        except Exception as e:  # noqa: BLE001 - 单个坏主题不拖垮列表
+            entry["error"] = str(e)
+        out.append(entry)
+    return out
+
+
+def store_preview(repo_input: str) -> dict:
+    """商店预览：解析输入 → 枚举清单。失败时给出能看懂的错误。"""
+    try:
+        parsed = parse_repo_input(repo_input)
+    except ValueError as e:
+        return {"ok": False, "error": str(e), "items": []}
+    repo, ref, path = parsed["repo"], parsed["ref"], parsed["path"]
+    try:
+        if path:
+            # 明确指到某个目录/文件：只取那一个
+            p = path if path.endswith("theme.json") else path.rstrip("/") + "/theme.json"
+            raw = _fetch_file(repo, ref, p)
+            items = [{"repo": repo, "ref": ref, "path": p,
+                      "manifest": _manifest_from_raw(raw, f"{repo}@{ref}:{p}"), "error": ""}]
+        else:
+            items = discover_themes(repo, ref)
+        return {"ok": True, "error": "", "items": items}
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            try:
+                body = e.read().decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001
+                body = ""
+            if "rate limit" in body.lower():
+                hint = "GitHub API 限额（未认证 60 次/小时）。稍后再试，或在 .env 配置 THEME_GH_TOKEN 提高限额"
+            else:
+                hint = "仓库不存在或设为私有"
+        elif e.code == 404:
+            hint = "仓库不存在、已改名或设为私有"
+        else:
+            hint = f"GitHub 返回 {e.code}"
+        return {"ok": False, "error": f"{hint}（{e.code}）", "items": []}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)[:300], "items": []}
+
+
+def store_install(repo: str, ref: str, path: str) -> dict:
+    raw = _fetch_file(repo, ref or "HEAD", path)
+    meta = install_manifest(raw, f"{repo}@{ref or 'HEAD'}:{path}")
+    # 预览图有就带上，失败不影响安装
+    for name in ("preview.png", path.rsplit("/", 1)[0] + "/preview.png" if "/" in path else ""):
+        if name:
+            try:
+                save_preview(meta["id"], _fetch_file(repo, ref or "HEAD", name))
+            except Exception:  # noqa: BLE001
+                pass
+    return meta

@@ -135,8 +135,9 @@ cloudflared tunnel run --protocol http2 --token <TOKEN>
 
 | 能力 | 说明 |
 |---|---|
-| **配色系列可换** | 设置页 6 套整套方案（经典墨绿 / 科技感 / 马卡龙 / 莫兰迪 / 新中式 / 极简黑白），卡片即缩略预览，保存后控制台、门户、预览页、错误页、`theme-color` 一起换 |
-| **配色不是随手配的** | 按 60-30-10 分：画布留白 60%、卡片容器 30%、主色 10%（按钮 / 圆环 / 进度条 / 选中态）。每套只给「画布底 + 正文色 + 次级文字」三个锚点，其余中性色由它们混出；主色在白底对比度不足 3:1 时自动等比压深（色相不动），设置页写明「实际按 #xxxxxx 渲染」 |
+| **主题插件** | 主题是一份 `theme.json` 语义令牌清单（画布 / 容器 / 文字 / 描边 / 阴影，声明式、无可执行代码）。内置两套：**玄夜**（深色，默认）与**象牙**（浅色），设置页点卡片即时预览，保存后控制台、门户、预览页、错误页、`theme-color` 一起换 |
+| **主题商店** | 设置 → 外观 → 主题商店：填一个 GitHub 仓库（`owner/repo`、仓库链接、`/tree/` 深链均可），自动枚举仓库里所有 `theme.json` 一键安装，装完可卸载（内置除外）。raw 不通的网络可用 `THEME_RAW_MIRROR` 指向自建镜像，GitHub API 限额可配 `THEME_GH_TOKEN`；仓库自带示例插件（`examples/theme-plugin/`），商店里点「装示例插件」不依赖外网即可体验完整安装链路。格式文档见 [`examples/theme-plugin/README.md`](examples/theme-plugin/README.md) |
+| **主色不是随手配的** | `--brand-*` 一族永远由用户主色实时派生，且按主题明暗各有一把对比度尺子：白字压上按钮要够（不足往黑压），画布上放文字/徽标也要够（深底不足往白提、浅底不足往黑压），色相始终不动，设置页写明「实际按 #xxxxxx 渲染」 |
 | **「到期删除」看得见** | 到期动作是删文件的项目，门户卡片带琥珀色左边条 + 徽章 + 琥珀进度条，列表行、预览页顶栏、控制台表格与抽屉同样标记 |
 | **站点图标** | 出厂是枚「沙漏」（限时可用 = 临时预览），SVG + ICO + PNG 齐全，`tools/gen_icons.py` 从同一份 SVG 生成；设置页可上传替换（`png/svg/ico/jpg/webp`，≤512KB），随时恢复默认 |
 | **侧栏可折叠** | 228px → 64px 只留图标，状态记在本地，刷新后保持 |
@@ -280,6 +281,8 @@ backend/app/
   cleanup.py         到期巡检 + 计数 flush 后台任务
   serializers.py     行 → API 结构（含倒计时派生字段）
   pages.py           访客预览外壳 / 门户 / 错误页（服务端渲染）
+  theme.py           主题插件引擎（内置清单加载 / 商店拉取安装 / 派生公式）
+  builtin_themes/    内置主题包：noir（玄夜·黑）/ ivory（象牙·白）
   routers/           auth · projects · agents · settings · public
 frontend/src/        Vue 3 控制台（零 UI 框架，手写设计系统）
 frontend/public/     站点图标与 manifest（favicon.svg 是唯一矢量源）
@@ -287,6 +290,7 @@ cli/agentctl.py      成员侧命令行入口（兼容壳）
 skills/tmp-preview-agent/  Agent 技能包：scripts/agentctl.py 是真实实现 + SKILL.md 权限边界
 migrate/             Cloudflare KV → 本地
 tools/               gen_icons.py、push_api.py
+examples/theme-plugin/  主题插件格式示例（theme.json + 发布文档），商店「装示例插件」用
 tests/               冒烟测试 / 截图脚本 / 演示数据
 legacy/cloudflare/   旧版 Worker 实现（仅存档，不再维护）
 docs/                架构、接口、可见性、迁移说明；screenshots/ 界面截图
