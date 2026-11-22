@@ -19,11 +19,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SSH_URL = "ssh://git@ssh.github.com:443/Vita0519/tmp-preview-deploy.git"
+SSH_KEY = "C:/Users/15457/.ssh/id_ed25519_github"
 REPO = "Vita0519/tmp-preview-deploy"
 GH_API = "https://api.github.com"
 SSH_ENV = {
-    "GIT_SSH_COMMAND": "ssh -i C:/Users/15457/.ssh/id_ed25519_github -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+    "GIT_SSH_COMMAND": f"ssh -i {SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 }
+
+
+def push_target() -> tuple[str, dict | None]:
+    """git 推送目标：作者本机的专用 SSH key 优先，没有就回退 origin（https 凭据）。"""
+    if Path(SSH_KEY).exists():
+        return SSH_URL, SSH_ENV
+    return "origin", None
 
 
 def run(cmd, cwd=None, env=None, check=True):
@@ -101,7 +109,8 @@ def main() -> int:
     if run(["git", "tag", "-l", tag]):
         print(f"本地已有 tag {tag}，版本不可复用")
         return 1
-    remote_tags = run(["git", "ls-remote", "--tags", SSH_URL], env=SSH_ENV)
+    target, target_env = push_target()
+    remote_tags = run(["git", "ls-remote", "--tags", target], env=target_env)
     if f"refs/tags/{tag}" in remote_tags:
         print(f"远端已有 tag {tag}")
         return 1
@@ -120,8 +129,8 @@ def main() -> int:
          "packaging/fnos/template", ".github/workflows"])
     run(["git", "commit", "-m", f"chore(release): {tag}"])
     run(["git", "tag", "-a", tag, "-m", f"{tag}"])
-    run(["git", "push", SSH_URL, "main:main"], env=SSH_ENV)
-    run(["git", "push", SSH_URL, tag], env=SSH_ENV)
+    run(["git", "push", target, "main:main"], env=target_env)
+    run(["git", "push", target, tag], env=target_env)
     print(f"✅ 已推送 {tag}")
 
     # ---- 等 CI 出镜像 ----
