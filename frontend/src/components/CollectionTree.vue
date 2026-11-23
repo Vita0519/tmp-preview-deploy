@@ -6,8 +6,8 @@ import Icon from './Icon.vue'
 
 const props = defineProps({
   tree: { type: Object, default: () => ({ items: [], unassigned: 0, total: 0 }) },
-  active: { type: String, default: '' }, // '' 全部 | 'none' 未归类 | '12' 收藏夹 id
-  visibility: { type: String, default: '' }, // '' | portal | link | private；只有收藏夹为空时才归三档高亮
+  active: { type: String, default: '' }, // '' 全部 | 'none' 未归类 | '12' 分组 id
+  visibility: { type: String, default: '' }, // '' | portal | link | private；只有分组为空时才归三档高亮
   owners: { type: Array, default: () => [] }, // 管理员的归属汇总 [{id, display_name, count, total}]
   ownerFilter: { type: String, default: '' },
   loading: { type: Boolean, default: false },
@@ -22,7 +22,7 @@ const vis = computed(() => props.tree.visibility || { portal: 0, link: 0, privat
 const selfId = computed(() => String(store.user?.id ?? ''))
 // 服务端给的 id 是数字，store 里也未必同型，统一转字符串再比，别指望 === 能对上
 const isSelf = (id) => String(id) === selfId.value
-// 只有管理员、且不止一个人有夹时才分组——只有一堆自己的夹时多一层标题纯属噪音
+// 只有管理员、且不止一个人有分组时才按成员分段——只有一堆自己的分组时多一层标题纯属噪音
 const showGroups = computed(() => (props.owners || []).length > 1)
 
 // 分组色点：按成员 id 取一个固定色，纯装饰，跟品牌色无关（深色画布下取亮色系）
@@ -42,11 +42,11 @@ function emitFilter() {
 
 const groups = computed(() => {
   if (!showGroups.value) {
-    // 平铺：普通成员视角，或者站上只有一个人建过夹
+    // 平铺：普通成员视角，或者站上只有一个人建过分组
     return [{ key: '_all', id: null, flat: true, nodes: items.value }]
   }
   const list = [...(props.owners || [])]
-  // 管理员自己还没建夹时也要有一组，否则「新建收藏夹」的输入框没地方落
+  // 管理员自己还没建分组时也要有一组，否则「新建分组」的输入框没地方落
   if (store.user && !list.some((o) => String(o.id) === selfId.value)) {
     list.unshift({
       id: store.user.id,
@@ -71,11 +71,11 @@ function toggleGroup(key) {
   gopen.value = { ...gopen.value, [key]: !groupOpen(key) }
 }
 
-// 空状态要按「筛完之后还剩几个夹」判断，不能看 items.length
+// 空状态要按「筛完之后还剩几个分组」判断，不能看 items.length
 const visibleCount = computed(() => groups.value.reduce((s, g) => s + g.nodes.length, 0))
 
-// 三档可见性是「跳全站」的导航，跟收藏夹抢同一个当前选中；
-// 工具栏那个下拉是「在当前夹里快筛」，两者不是一回事，所以这里高亮要排除 active 非空的情况
+// 三档可见性是「跳全站」的导航，跟分组抢同一个当前选中；
+// 工具栏那个下拉是「在当前分组里快筛」，两者不是一回事，所以这里高亮要排除 active 非空的情况
 const VIS_ROWS = [
   { key: 'portal', label: '门户可见', icon: 'eye' },
   { key: 'link', label: '持链接', icon: 'external' },
@@ -118,7 +118,7 @@ function pick(key) {
 
 function startNew(parentId = null) {
   menu.value = ''
-  // 根级新建的输入框只挂在「我的」分组里，若当前正筛着别人的夹就先放开筛选，否则框没处落
+  // 根级新建的输入框只挂在「我的」分组里，若当前正筛着别人的分组就先放开筛选，否则框没处落
   if (!parentId && ownerPick.value && ownerPick.value !== selfId.value) {
     ownerPick.value = ''
     emitFilter()
@@ -148,7 +148,7 @@ async function submitEdit() {
   try {
     if (e.mode === 'new') {
       const d = await api.post('/api/collections', { name, parent_id: e.parentId })
-      toast(`收藏夹「${d.collection.name}」已创建`)
+      toast(`分组「${d.collection.name}」已创建`)
       emit('select', String(d.collection.id))
     } else {
       await api.patch(`/api/collections/${e.id}`, { name })
@@ -167,10 +167,10 @@ async function remove(node) {
   menu.value = ''
   const n = countOf(node)
   const ok = await confirmAction({
-    title: `删除收藏夹「${node.name}」`,
+    title: `删除分组「${node.name}」`,
     message: n
       ? `里面的 ${n} 个项目不会被删除，会退回「未归类」。`
-      : '这是一个空收藏夹，删除后不可恢复。',
+      : '这是一个空分组，删除后不可恢复。',
     confirmText: '删除',
     danger: true,
   })
@@ -194,7 +194,7 @@ function countOf(node) {
   <aside class="rail">
     <div class="railhead">
       <span>分类</span>
-      <button class="railadd" title="新建收藏夹" @click="startNew(null)">
+      <button class="railadd" title="新建分组" @click="startNew(null)">
         <Icon name="plus" :size="12" />
       </button>
     </div>
@@ -213,7 +213,7 @@ function countOf(node) {
         :class="{ on: !active && visibility === v.key }"
         role="button"
         tabindex="0"
-        :title="`跳出收藏夹，看全站${v.label}的项目`"
+        :title="`跳出分组，看全站${v.label}的项目`"
         @click="pick('vis:' + v.key)"
         @keydown.enter="pick('vis:' + v.key)"
       >
@@ -230,12 +230,12 @@ function countOf(node) {
 
       <div class="railsep" />
       <div class="raillabel">
-        <span>收藏夹</span>
+        <span>分组</span>
         <select
           v-if="showGroups"
           v-model="ownerPick"
           class="railpick"
-          title="只看某个成员名下的收藏夹"
+          title="只看某个成员名下的分组"
           @change="emitFilter"
         >
           <option value="">全部成员</option>
@@ -252,12 +252,12 @@ function countOf(node) {
           :class="{ open: groupOpen(g.key) }"
           role="button"
           tabindex="0"
-          :title="`@${g.username || ''} 名下的收藏夹`"
+          :title="`@${g.username || ''} 名下的分组`"
           @click="toggleGroup(g.key)"
           @keydown.enter="toggleGroup(g.key)"
         >
           <i class="dot" :style="{ background: dotColor(g.id) }" />
-          <span class="gn">{{ isSelf(g.id) ? '我的收藏夹' : g.display_name }}</span>
+          <span class="gn">{{ isSelf(g.id) ? '我的分组' : g.display_name }}</span>
           <span class="gc num">{{ g.count }}</span>
           <Icon name="chevron" :size="10" class="crt" />
         </div>
@@ -287,7 +287,7 @@ function countOf(node) {
           </div>
 
           <div v-if="menu === node.id" class="railmenu">
-            <button @click="startNew(node.id)">新建子收藏夹</button>
+            <button @click="startNew(node.id)">新建子分组</button>
             <button @click="startRename(node)">重命名</button>
             <button class="danger" @click="remove(node)">删除</button>
           </div>
@@ -309,7 +309,7 @@ function countOf(node) {
             <input
               :ref="bindEditor"
               class="input"
-              placeholder="子收藏夹名"
+              placeholder="子分组名"
               :value="edit.value"
               :disabled="busy"
               @input="edit.value = $event.target.value"
@@ -361,7 +361,7 @@ function countOf(node) {
             <input
               :ref="bindEditor"
               class="input"
-              placeholder="收藏夹名，回车保存"
+              placeholder="分组名，回车保存"
               :value="edit.value"
               :disabled="busy"
               @input="edit.value = $event.target.value"
@@ -374,8 +374,8 @@ function countOf(node) {
       </div>
 
       <div v-if="!visibleCount && !loading" class="railempty">
-        <template v-if="ownerPick">这个成员名下还没有收藏夹。</template>
-        <template v-else>还没有收藏夹。<br />新建一个，或从浏览器导入书签。</template>
+        <template v-if="ownerPick">这个成员名下还没有分组。</template>
+        <template v-else>还没有分组。<br />新建一个，或从浏览器导入书签。</template>
       </div>
     </div>
   </aside>

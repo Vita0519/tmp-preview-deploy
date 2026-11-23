@@ -1,10 +1,10 @@
-"""收藏夹：把项目归到「一级收藏夹 → 二级子收藏夹」。
+"""分组：把项目归到「一级分组 → 二级子分组」。
 
 设计取舍：
 * 表里只有 `parent_id`，没有写死 `level` —— 现在限制两层是交互决定，不是数据限制，
   以后要放开深度不用迁表。
 * 归属跟项目一致：管理员能看全部，其他人只看自己的。
-* 删除收藏夹默认**只删壳**：里面的项目退回「未归类」，不连坐。要连项目一起删得显式要求。
+* 删除分组默认**只删壳**：里面的项目退回「未归类」，不连坐。要连项目一起删得显式要求。
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import time
 from fastapi import HTTPException
 
 MAX_DEPTH = 2          # 目前只做两层
-MAX_NAME = 20          # 收藏夹名长度上限（字符数，不按宽度算，中文 20 个字够长了）
+MAX_NAME = 20          # 分组名长度上限（字符数，不按宽度算，中文 20 个字够长了）
 
 
 def now_ms() -> int:
@@ -23,9 +23,9 @@ def now_ms() -> int:
 def norm_name(name: str) -> str:
     s = str(name or "").strip()
     if not s:
-        raise HTTPException(status_code=422, detail="收藏夹名称不能为空")
+        raise HTTPException(status_code=422, detail="分组名称不能为空")
     if len(s) > MAX_NAME:
-        raise HTTPException(status_code=422, detail=f"收藏夹名称最多 {MAX_NAME} 个字")
+        raise HTTPException(status_code=422, detail=f"分组名称最多 {MAX_NAME} 个字")
     return s
 
 
@@ -35,25 +35,25 @@ def depth_of(conn, parent_id) -> int:
         return 0
     row = conn.execute("SELECT id, parent_id FROM collections WHERE id=?", (parent_id,)).fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="上级收藏夹不存在")
+        raise HTTPException(status_code=404, detail="上级分组不存在")
     return 2 if row["parent_id"] else 1
 
 
 def ensure_parent(conn, parent_id, owner_id: int) -> None:
-    """父级必须是本人的（或管理员指定的那个人的）一级收藏夹。"""
+    """父级必须是本人的（或管理员指定的那个人的）一级分组。"""
     if not parent_id:
         return
     row = conn.execute("SELECT * FROM collections WHERE id=?", (parent_id,)).fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="上级收藏夹不存在")
+        raise HTTPException(status_code=404, detail="上级分组不存在")
     if row["owner_id"] != owner_id:
-        raise HTTPException(status_code=409, detail="上级收藏夹属于其他成员")
+        raise HTTPException(status_code=409, detail="上级分组属于其他成员")
     if row["parent_id"]:
-        raise HTTPException(status_code=422, detail="只支持两级收藏夹，不能挂在子收藏夹下面")
+        raise HTTPException(status_code=422, detail="只支持两级分组，不能挂在子分组下面")
 
 
 def visible_rows(conn, user: dict) -> list:
-    """侧栏要用的行。带上归属成员，管理员看到的是所有人的夹混在一起，不标归属就分不清。"""
+    """侧栏要用的行。带上归属成员，管理员看到的是所有人的分组混在一起，不标归属就分不清。"""
     sql = (
         "SELECT c.*, u.username AS owner, "
         "COALESCE(NULLIF(u.display_name, ''), u.username) AS owner_display "
@@ -69,9 +69,9 @@ def visible_rows(conn, user: dict) -> list:
 def get(conn, cid: int, user: dict):
     row = conn.execute("SELECT * FROM collections WHERE id=?", (cid,)).fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="收藏夹不存在")
+        raise HTTPException(status_code=404, detail="分组不存在")
     if user["role"] != "admin" and row["owner_id"] != user["id"]:
-        raise HTTPException(status_code=403, detail="这不是你的收藏夹")
+        raise HTTPException(status_code=403, detail="这不是你的分组")
     return row
 
 
@@ -85,11 +85,11 @@ def subtree_ids(conn, cid: int) -> list[int]:
 
 
 def counts(conn, user: dict) -> dict:
-    """每个收藏夹下**直属**项目数，返回 `{cid: (自己的, 别人的)}`。
+    """每个分组下**直属**项目数，返回 `{cid: (自己的, 别人的)}`。
 
     计数口径跟项目列表一致：管理员算全站，其他成员只算自己名下的。
-    管理员的侧栏会把所有人的夹并列，所以还要把「夹里有多少是别人的」拆出来——
-    否则夹上写着 41、点进去一半是别人的项目，对不上账。
+    管理员的侧栏会把所有人的分组并列，所以还要把「分组里有多少是别人的」拆出来——
+    否则分组上写着 41、点进去一半是别人的项目，对不上账。
     """
     where = "status='active'"
     args: list = []
@@ -130,7 +130,7 @@ def counts(conn, user: dict) -> dict:
 
 
 def visibility_counts(conn, user: dict) -> dict:
-    """三档可见性各有多少项目——侧栏把它们做成常驻的「智能收藏夹」。"""
+    """三档可见性各有多少项目——侧栏把它们做成常驻的「智能分组」。"""
     where = "status='active'"
     args: list = []
     if user["role"] != "admin":
@@ -158,7 +158,7 @@ def tree(conn, user: dict) -> dict:
             "id": r["id"],
             "name": r["name"],
             "parent_id": r["parent_id"],
-            # 归属跟着节点走：管理员侧栏是所有人的夹并列，不标归属就分不清同名夹是谁的
+            # 归属跟着节点走：管理员侧栏是所有人的分组并列，不标归属就分不清同名分组是谁的
             "owner_id": r["owner_id"],
             "owner": r["owner"] or "",
             "owner_display": r["owner_display"] or "",
@@ -181,11 +181,6 @@ def tree(conn, user: dict) -> dict:
             roots.append(node)
 
     loose = cnt.get(0, (0, 0))[0]
-    # 管理员可能把别人的项目归进了自己的夹。对项目主人来说，那个夹不在他的树里，
-    # 这些项目就成了「哪个分类都点不到」的幽灵——统一算进未归类，至少点得着。
-    for cid, (n, _foreign) in cnt.items():
-        if cid and cid not in nodes:
-            loose += n
 
     # 归属汇总只给管理员（普通成员的树里本来就只有自己的）
     owners: list[dict] = []
@@ -215,7 +210,7 @@ def tree(conn, user: dict) -> dict:
         "items": roots,
         "owners": owners,
         "unassigned": loose,
-        # 「全部项目」= 各收藏夹合计 + 未归类，跟列表页的总数对得上
+        # 「全部项目」= 各分组合计 + 未归类，跟列表页的总数对得上
         "total": sum(n["total"] for n in roots) + loose,
         # 三档可见性的数量：侧栏把它们当常驻分类，所以工具栏里的可见性下拉可以省掉
         "visibility": visibility_counts(conn, user),
@@ -232,7 +227,7 @@ def create(conn, owner_id: int, name: str, parent_id=None, icon: str = "") -> in
         (owner_id, parent_id or 0, name),
     ).fetchone()
     if dup:
-        raise HTTPException(status_code=409, detail=f"已经有同名收藏夹「{name}」")
+        raise HTTPException(status_code=409, detail=f"已经有同名分组「{name}」")
     t = now_ms()
     cur = conn.execute(
         "INSERT INTO collections(name, parent_id, owner_id, icon, sort, created_at, updated_at) "
@@ -261,8 +256,9 @@ def update(conn, cid: int, user: dict, body: dict) -> None:
         if new_parent:
             ensure_parent(conn, new_parent, row["owner_id"])
             # 移动的是别人时，父级也得是同一个人的
-            if row["parent_id"] and child_ids(conn, cid):
-                raise HTTPException(status_code=422, detail="带子收藏夹的收藏夹不能再变成子级")
+            # 以前多判了 row["parent_id"]，而一级分组的 parent_id 恰好为空，这道闸从没拦住过
+            if child_ids(conn, cid):
+                raise HTTPException(status_code=422, detail="带子分组的分组不能再变成子级，先把子分组移走")
         sets.append("parent_id=?")
         args.append(new_parent)
     if not sets:
@@ -290,7 +286,7 @@ def update(conn, cid: int, user: dict, body: dict) -> None:
 
 
 def project_rows(conn, ids: list[int]) -> list:
-    """收藏夹（含子夹）里的项目，删壳时用来决定谁退回未归类、谁连文件一起删。"""
+    """分组（含子分组）里的项目，删壳时用来决定谁退回未归类、谁连文件一起删。"""
     if not ids:
         return []
     marks = ",".join("?" * len(ids))
@@ -300,7 +296,7 @@ def project_rows(conn, ids: list[int]) -> list:
 
 
 def delete(conn, cid: int, user: dict, with_projects: bool = False) -> dict:
-    """删收藏夹。默认只删壳：项目退回未归类；with_projects=True 时连项目记录一起删。
+    """删分组。默认只删壳：项目退回未归类；with_projects=True 时连项目记录一起删。
 
     项目文件不在这里删——router 会先按 slug 清盘（storage 有重试与兜底），
     这里只负责数据库，避免这个模块反向依赖 storage。

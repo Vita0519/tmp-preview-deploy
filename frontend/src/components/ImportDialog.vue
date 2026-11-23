@@ -97,7 +97,7 @@ async function doImport() {
     const d = await api.postForm('/api/import/bookmarks', payload())
     toast(
       `已导入 ${d.created} 个书签` +
-        (d.folders_created ? `、${d.folders_created} 个收藏夹` : '') +
+        (d.folders_created ? `、${d.folders_created} 个分组` : '') +
         (d.skipped_duplicate ? `，跳过 ${d.skipped_duplicate} 个重复` : ''),
     )
     emit('imported', d)
@@ -136,8 +136,8 @@ async function doImport() {
       <input ref="bm" type="file" accept=".html,.htm,text/html" style="display: none" @change="pick" />
 
       <div class="hint" style="margin: 8px 0 14px; line-height: 1.6">
-        文件夹会变成收藏夹（只取前两级，更深的折进第二级），书签变成外链项目；
-        选了「导入到」某个收藏夹时，书签的文件夹会挂在它下面，只多一层。
+        文件夹会变成分组（只取前两级，更深的折进第二级），书签变成外链项目；
+        选了「导入到」某个分组时，书签的文件夹会挂在它下面，只多一层。
         同一个网址重复导入会自动跳过。
       </div>
 
@@ -169,13 +169,13 @@ async function doImport() {
       <div v-if="preview" class="panel" style="padding: 10px 12px; margin-top: 10px; background: var(--surface-2); box-shadow: none">
         <div style="display: flex; gap: 14px; font-size: 12px; flex-wrap: wrap">
           <span>可导入 <b class="num">{{ preview.will_create }}</b> 条</span>
-          <span class="dim">收藏夹 {{ preview.folders_total }} 个</span>
+          <span class="dim">分组 {{ preview.folders_total }} 个</span>
           <span v-if="preview.skipped_duplicate" class="dim">重复 {{ preview.skipped_duplicate }}</span>
           <span v-if="preview.skipped_invalid" class="dim">无效 {{ preview.skipped_invalid }}</span>
           <span v-if="preview.truncated" class="dim">超量截断 {{ preview.truncated }}</span>
         </div>
         <div v-if="preview.folders?.length" class="dim" style="font-size: 11.5px; margin-top: 8px; line-height: 1.6">
-          收藏夹：{{ preview.folders.map((f) => (f[1] ? `${f[0]} / ${f[1]}` : f[0])).join('、') }}
+          分组：{{ preview.folders.map((f) => (f[1] ? `${f[0]} / ${f[1]}` : f[0])).join('、') }}
         </div>
         <div v-if="preview.items?.length" class="dim" style="font-size: 11.5px; margin-top: 6px; line-height: 1.7">
           <div v-for="(it, i) in preview.items.slice(0, 6)" :key="i" class="truncate">

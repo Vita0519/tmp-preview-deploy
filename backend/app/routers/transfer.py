@@ -38,7 +38,7 @@ async def import_bookmarks(
     multipart 字段：
       file        书签文件（必填其一）
       text        直接贴 HTML（做预览用）
-      parent_id   导入到哪个收藏夹下（留空 = 顶层）
+      parent_id   导入到哪个分组下（留空 = 顶层）
       visibility  portal / link / private，默认 private
       tag         可选，给这批项目打一个标签
       dry_run     1 = 只预览不落库
@@ -72,7 +72,7 @@ async def import_bookmarks(
         with db() as conn:
             crow = colls.get(conn, parent_id, user)
         if crow["owner_id"] != user["id"]:
-            raise HTTPException(status_code=409, detail="该收藏夹属于其他成员")
+            raise HTTPException(status_code=409, detail="该分组属于其他成员")
 
     result = bookmarks.import_bookmarks(
         user,
@@ -87,7 +87,7 @@ async def import_bookmarks(
             "import",
             user["id"],
             None,
-            f"导入书签 {result['created']} 条 / 收藏夹 {result['folders_created']} 个",
+            f"导入书签 {result['created']} 条 / 分组 {result['folders_created']} 个",
         )
     return {"ok": True, **result}
 

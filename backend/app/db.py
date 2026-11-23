@@ -7,7 +7,7 @@ from . import tagspec
 from .config import DB_PATH, FILES_DIR, ZIPS_DIR
 
 SCHEMA = """
--- 收藏夹（两层：parent_id 为空是一级，否则挂在某个一级下面）
+-- 分组（两层：parent_id 为空是一级，否则挂在某个一级下面）
 -- 靠 parent_id 存而不是写死两列，是为了以后放开深度不用改表
 CREATE TABLE IF NOT EXISTS collections (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,6 +183,32 @@ def init_db() -> None:
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
         _migrate_tags(conn)
         _migrate_owner(conn)
+        _repair_groups(conn)
+
+
+def _repair_groups(conn) -> None:
+    """修老版本留下的两类脏数据；没有脏数据时是空操作。
+
+    1. 项目被放进了别人的分组（旧版管理员批量归类造成）→ 退回未归类；
+    2. 第三层分组（旧版移动校验的漏洞造成）→ 提到第二层，挂到原来的祖父分组下，撞名就加后缀。
+    """
+    conn.execute(
+        "UPDATE projects SET collection_id=NULL WHERE collection_id IS NOT NULL AND "
+        "ifnull(owner_id,-1) <> (SELECT ifnull(c.owner_id,-1) FROM collections c WHERE c.id=projects.collection_id)"
+    )
+    deep = conn.execute(
+        "SELECT c.id, p.parent_id AS grand, c.name, c.owner_id FROM collections c "
+        "JOIN collections p ON p.id=c.parent_id WHERE p.parent_id IS NOT NULL"
+    ).fetchall()
+    for r in deep:
+        name, n = r["name"], 2
+        while conn.execute(
+            "SELECT 1 FROM collections WHERE owner_id IS ? AND parent_id=? "
+            "AND lower(trim(name))=lower(trim(?)) AND id<>?",
+            (r["owner_id"], r["grand"], name, r["id"]),
+        ).fetchone():
+            name, n = f"{r['name']} {n}", n + 1
+        conn.execute("UPDATE collections SET parent_id=?, name=? WHERE id=?", (r["grand"], name, r["id"]))
 
 
 def _migrate_owner(conn) -> None:
@@ -230,7 +256,7 @@ def _migrate_tags(conn) -> None:
 
 
 def _add_project_cols(conn) -> None:
-    """给老库的 projects 补上收藏夹归属（collections 表本身由 SCHEMA 建好）。"""
+    """给老库的 projects 补上分组归属（collections 表本身由 SCHEMA 建好）。"""
     have = {r["name"] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
     if "collection_id" not in have:
         try:

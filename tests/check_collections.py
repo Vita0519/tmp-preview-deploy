@@ -1,32 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""收藏夹（项目层级归类）：两级树、归类、删夹时项目去哪。
+"""分组（项目层级归类）：两级树、归类、删分组时项目去哪。
 
-以前项目是一整片平铺，没有归类。现在做成「收藏夹 → 子收藏夹」两层，
-项目挂在叶子上；删收藏夹默认只删壳，项目退回「未归类」，不连坐。
+以前项目是一整片平铺，没有归类。现在做成「分组 → 子分组」两层，
+项目挂在叶子上；删分组默认只删壳，项目退回「未归类」，不连坐。
 
 覆盖：
-  [1] 建夹
-      1. 新建一级收藏夹
+  [1] 建分组
+      1. 新建一级分组
       2. 同级重名 → 409
       3. 空名 / 超 20 字 → 422
-      4. 建子收藏夹（第二级）
-      5. 子夹下再挂子夹（第三级）→ 422
+      4. 建子分组（第二级）
+      5. 子分组下再挂子分组（第三级）→ 422
+      5b. 带子分组的一级分组挪成子级 → 422（以前能绕过去出现第三层）
   [2] 树与计数
       6. 树里根节点带 children
-      7. 父夹 total 含子夹，count 只算直属
-      8. 全部项目的数 = 各夹合计 + 未归类
+      7. 父分组 total 含子分组，count 只算直属
+      8. 全部项目的数 = 各分组合计 + 未归类
   [3] 归类
-      9. 上传时直接指定收藏夹
-     10. PATCH 把项目挪进 / 挪出收藏夹
+      9. 上传时直接指定分组
+     10. PATCH 把项目挪进 / 挪出分组
      11. 批量归类（bulk action=collection）
-     12. 按收藏夹筛选（含子夹）
+     12. 按分组筛选（含子分组）
      13. collection=none 只出未归类
   [4] 权限
-     14. 成员动不了别人的收藏夹
-     15. 成员的收藏夹里看不到别人的项目计数
-  [5] 删夹
-     16. 删空壳：子夹一起删，项目退回未归类
+     14. 成员动不了别人的分组
+     15. 成员的分组里看不到别人的项目计数
+     15b. 管理员批量把别人的项目放进自己的分组 → 跳过
+  [5] 删分组
+     16. 删空壳：子分组一起删，项目退回未归类
      17. with_projects=1：项目连记录一起删
   [7] 侧栏折叠 & 可见性分类（浏览器）
      20. 点折叠按钮：228 → 64，只留图标
@@ -80,12 +82,12 @@ def main() -> int:
     made_agents: list[str] = []
 
     try:
-        print("[1] 建夹")
+        print("[1] 建分组")
         code, d = admin.req("POST", "/api/collections", {"name": f"办公{sfx}"})
         root = d.get("collection") or {}
         made_colls.append(root.get("id"))
-        check("新建一级收藏夹", code == 200 and root.get("name") == f"办公{sfx}", f"{code} {d}")
-        check("一级夹 parent_id 为空", root.get("parent_id") is None, root.get("parent_id"))
+        check("新建一级分组", code == 200 and root.get("name") == f"办公{sfx}", f"{code} {d}")
+        check("一级分组 parent_id 为空", root.get("parent_id") is None, root.get("parent_id"))
 
         code, d = admin.req("POST", "/api/collections", {"name": f"办公{sfx}"})
         check("同级重名 → 409", code == 409, f"{code} {d}")
@@ -102,7 +104,7 @@ def main() -> int:
         code, d = admin.req("POST", "/api/collections", {"name": f"报表{sfx}", "parent_id": root["id"]})
         kid = d.get("collection") or {}
         made_colls.append(kid.get("id"))
-        check("建子收藏夹", code == 200 and kid.get("parent_id") == root["id"], f"{code} {d}")
+        check("建子分组", code == 200 and kid.get("parent_id") == root["id"], f"{code} {d}")
 
         code, d = admin.req("POST", "/api/collections", {"name": f"更深{sfx}", "parent_id": kid["id"]})
         check("第三级 → 422", code == 422, f"{code} {d}")
@@ -111,29 +113,29 @@ def main() -> int:
         slug_a = f"col{sfx}-a"
         slug_b = f"col{sfx}-b"
         slug_c = f"col{sfx}-c"
-        code, d = upload(admin, slug_a, f"根夹项目{sfx}", root["id"])
+        code, d = upload(admin, slug_a, f"根分组项目{sfx}", root["id"])
         made_slugs.append(slug_a)
-        check("上传时直接指定收藏夹", code == 200, f"{code} {d}")
-        check("项目带上了收藏夹名",
+        check("上传时直接指定分组", code == 200, f"{code} {d}")
+        check("项目带上了分组名",
               (d.get("collection") or {}).get("name") == f"办公{sfx}", d.get("collection"))
-        code, d = upload(admin, slug_b, f"子夹项目{sfx}", kid["id"])
+        code, d = upload(admin, slug_b, f"子分组项目{sfx}", kid["id"])
         made_slugs.append(slug_b)
-        check("项目可以挂在子夹上", code == 200, f"{code} {d}")
+        check("项目可以挂在子分组上", code == 200, f"{code} {d}")
         code, d = upload(admin, slug_c, f"未归类项目{sfx}")
         made_slugs.append(slug_c)
-        check("不指定收藏夹 = 未归类", code == 200 and d.get("collection") is None, d.get("collection"))
+        check("不指定分组 = 未归类", code == 200 and d.get("collection") is None, d.get("collection"))
 
         code, tree = admin.req("GET", "/api/collections")
-        check("取收藏夹树", code == 200 and isinstance(tree.get("items"), list), code)
+        check("取分组树", code == 200 and isinstance(tree.get("items"), list), code)
         node = next((n for n in tree["items"] if n["id"] == root["id"]), None)
         check("根节点在树里", node is not None, [n["id"] for n in tree["items"]])
         check("根节点带 children", any(k["id"] == kid["id"] for k in node.get("children") or []),
               node.get("children"))
-        check("父夹 total 含子夹（2）", node.get("total") == 2, node.get("total"))
-        check("父夹 count 只算直属（1）", node.get("count") == 1, node.get("count"))
+        check("父分组 total 含子分组（2）", node.get("total") == 2, node.get("total"))
+        check("父分组 count 只算直属（1）", node.get("count") == 1, node.get("count"))
         check("未归类数 ≥ 1", tree.get("unassigned", 0) >= 1, tree.get("unassigned"))
         roots_sum = sum(n["total"] for n in tree["items"])
-        check("total = 各夹合计 + 未归类",
+        check("total = 各分组合计 + 未归类",
               tree.get("total") == roots_sum + tree.get("unassigned", 0),
               f"{tree.get('total')} vs {roots_sum}+{tree.get('unassigned')}")
         check("total 与项目列表总数一致", tree.get("total") == totals(admin),
@@ -141,12 +143,12 @@ def main() -> int:
 
         print("[3] 归类")
         code, d = admin.req("PATCH", f"/api/projects/{slug_c}", {"collection_id": kid["id"]})
-        check("PATCH 把项目挪进子夹",
+        check("PATCH 把项目挪进子分组",
               code == 200 and (d.get("collection") or {}).get("id") == kid["id"], f"{code} {d.get('collection')}")
         code, d = admin.req("PATCH", f"/api/projects/{slug_c}", {"collection_id": None})
         check("PATCH 挪回未归类", code == 200 and d.get("collection") is None, f"{code} {d.get('collection')}")
         code, d = admin.req("PATCH", f"/api/projects/{slug_c}", {"collection_id": 999999})
-        check("挂到不存在的收藏夹 → 404", code == 404, f"{code} {d}")
+        check("挂到不存在的分组 → 404", code == 404, f"{code} {d}")
 
         code, d = admin.req("POST", "/api/projects/bulk",
                             {"action": "collection", "slugs": [slug_c], "collection_id": kid["id"]})
@@ -156,11 +158,11 @@ def main() -> int:
 
         code, d = admin.req("GET", f"/api/projects?collection={root['id']}")
         got = {p["slug"] for p in d.get("items", [])}
-        check("按根夹筛选含子夹", got == {slug_a, slug_b, slug_c}, got)
+        check("按根分组筛选含子分组", got == {slug_a, slug_b, slug_c}, got)
 
         code, d = admin.req("GET", f"/api/projects?collection={kid['id']}")
         got = {p["slug"] for p in d.get("items", [])}
-        check("按子夹筛选只出子夹里的", got == {slug_b, slug_c}, got)
+        check("按子分组筛选只出子分组里的", got == {slug_b, slug_c}, got)
 
         code, d = admin.req("GET", "/api/projects?collection=none")
         got = {p["slug"] for p in d.get("items", [])}
@@ -170,25 +172,50 @@ def main() -> int:
 
         print("[4] 权限")
         agent_name = f"cb{suffix_short()}"
-        code, d = admin.req("POST", "/api/agents", {"username": agent_name, "display_name": "收藏夹测试"})
+        code, d = admin.req("POST", "/api/agents", {"username": agent_name, "display_name": "分组测试"})
         made_agents.append(agent_name)
         check("建一个成员账号", code == 200, f"{code} {d}")
         agent = Client(args.url)
         agent.token = (d or {}).get("api_key") or ""
 
         code, d = agent.req("PATCH", f"/api/collections/{root['id']}", {"name": f"抢{sfx}"})
-        check("成员改不了别人的收藏夹", code in (403, 404), f"{code} {d}")
+        check("成员改不了别人的分组", code in (403, 404), f"{code} {d}")
         code, d = agent.req("DELETE", f"/api/collections/{root['id']}")
-        check("成员删不了别人的收藏夹", code in (403, 404), f"{code} {d}")
+        check("成员删不了别人的分组", code in (403, 404), f"{code} {d}")
 
         code, d = agent.req("POST", "/api/collections", {"name": f"我的{sfx}"})
         mine = d.get("collection") or {}
         made_colls.append(mine.get("id"))
-        check("成员能建自己的收藏夹", code == 200, f"{code} {d}")
+        check("成员能建自己的分组", code == 200, f"{code} {d}")
         code, tree2 = agent.req("GET", "/api/collections")
         ids = {n["id"] for n in tree2.get("items", [])}
-        check("成员只看到自己的收藏夹", root["id"] not in ids and mine.get("id") in ids, sorted(ids))
+        check("成员只看到自己的分组", root["id"] not in ids and mine.get("id") in ids, sorted(ids))
         check("成员的未归类数不含别人的项目", tree2.get("unassigned", 0) == 0, tree2.get("unassigned"))
+
+        print("[4.5] 归属一致（回归）")
+        # 管理员把成员的项目批量放进自己的分组 → 必须被跳过，不能产生「主人找不到的分组」
+        slug_m = f"cm-{sfx}"
+        body, ct = multipart({"slug": slug_m, "title": f"成员项目{sfx}", "hours": "2"},
+                             [("files", "index.html", HTML)])
+        agent.req("POST", "/api/projects", body, ct=ct, raw=True)
+        code, d = admin.req("POST", "/api/projects/bulk",
+                            {"slugs": [slug_m], "action": "collection", "collection_id": root["id"]})
+        check("管理员批量放别人的项目进自己分组 → 跳过",
+              code == 200 and d.get("skipped") == 1 and d.get("done") == 0, f"{code} {d}")
+        code, d = agent.req("GET", "/api/projects?collection=none")
+        check("该项目仍在成员自己的未归类里",
+              slug_m in {p["slug"] for p in d.get("items", [])}, [p["slug"] for p in d.get("items", [])][:5])
+        admin.req("DELETE", f"/api/projects/{slug_m}")
+
+        # 带子分组的一级分组不能挪成别人的子级（否则出现第三层）
+        code, other = admin.req("POST", "/api/collections", {"name": f"另一个{sfx}"})
+        oid = (other.get("collection") or {}).get("id")
+        made_colls.append(oid)
+        code, d = admin.req("PATCH", f"/api/collections/{root['id']}", {"parent_id": oid})
+        check("带子分组的分组挪成子级 → 422", code == 422, f"{code} {d}")
+        code, tree3 = admin.req("GET", "/api/collections")
+        depth_ok = all(not g.get("children") for n in tree3.get("items", []) for g in n.get("children", []))
+        check("树里仍然最多两层", depth_ok)
 
         print("[5.5] 可见性分类")
         code, tree = admin.req("GET", "/api/collections")
@@ -201,9 +228,9 @@ def main() -> int:
             check(f"{label}计数与筛选结果一致", vis.get(k) == d.get("total"),
                   f"{vis.get(k)} vs {d.get('total')}")
 
-        print("[5] 删夹")
+        print("[5] 删分组")
         code, d = admin.req("DELETE", f"/api/collections/{kid['id']}")
-        check("删子夹只删壳", code == 200 and d.get("removed") == 1, f"{code} {d}")
+        check("删子分组只删壳", code == 200 and d.get("removed") == 1, f"{code} {d}")
         check("里面的项目退回未归类", d.get("moved_to_unassigned") == 2, d.get("moved_to_unassigned"))
         code, d = admin.req("GET", f"/api/projects/{slug_b}")
         check("项目本身还在", code == 200 and d.get("collection") is None, f"{code} {d.get('collection')}")
@@ -213,7 +240,7 @@ def main() -> int:
         code, _ = admin.req("GET", f"/api/projects/{slug_a}")
         check("项目记录真的没了", code == 404, code)
         code, _ = admin.req("GET", f"/api/projects/{slug_b}")
-        check("没在夹里的项目不受影响", code == 200, code)
+        check("没在分组里的项目不受影响", code == 200, code)
 
         print("[6] 浏览器")
         browser_suite(args.url.rstrip("/"), args.user, args.password, args.headed, sfx)

@@ -39,7 +39,7 @@ const openSlug = ref('')
 const uploadOpen = ref(false)
 const importOpen = ref(false)
 const colTree = ref({ items: [], unassigned: 0, total: 0, owners: [] })
-// 侧栏「只看某个成员的收藏夹」——纯前端视图筛选，不参与 /api/projects 的查询参数
+// 侧栏「只看某个成员的分组」——纯前端视图筛选，不参与 /api/projects 的查询参数
 const ownerFilter = ref('')
 const colLoading = ref(false)
 const now = ref(Date.now())
@@ -55,11 +55,11 @@ const maxTagCount = computed(() =>
 )
 const tagsForBar = computed(() => (data.facets.tags || []).slice(0, 10))
 
-// 窄屏侧栏收起后，收藏夹（含「未归类」）只能靠工具栏这个下拉筛
+// 窄屏侧栏收起后，分组（含「未归类」）只能靠工具栏这个下拉筛
 const multiOwner = computed(() => (colTree.value.owners || []).length > 1)
 const collectionOptions = computed(() => {
   const out = []
-  // 管理员视角下不同成员的夹可能同名，带上归属才分得清
+  // 管理员视角下不同成员的分组可能同名，带上归属才分得清
   const tag = (n) => (multiOwner.value && n.owner_display ? ` · ${n.owner_display}` : '')
   for (const n of colTree.value.items || []) {
     out.push({ id: n.id, label: n.name + tag(n) })
@@ -79,7 +79,7 @@ if (saved.status) filters.status = saved.status
 if (saved.sort) filters.sort = saved.sort
 if (saved.order) filters.order = saved.order
 if (saved.size) size.value = saved.size
-// 收藏夹是范围、可见性是范围内的过滤，两者正交：都恢复（老版本只存过一个，也不会串）
+// 分组是范围、可见性是范围内的过滤，两者正交：都恢复（老版本只存过一个，也不会串）
 if (saved.collection) filters.collection = String(saved.collection)
 if (saved.visibility) filters.visibility = saved.visibility
 
@@ -140,7 +140,7 @@ async function loadCollections(silent = false) {
   try {
     colTree.value = await api.get('/api/collections')
   } catch {
-    /* 收藏夹接口挂了不该拦着项目列表 */
+    /* 分组接口挂了不该拦着项目列表 */
   } finally {
     if (!silent) colLoading.value = false
   }
@@ -166,11 +166,11 @@ function onCollectionPicked(key) {
     return
   }
   if (k.startsWith('vis:')) {
-    // 侧栏这三档是「跳出收藏夹」的权限维度：点它就脱离当前收藏夹，看全站这一档。
-    // 注意跟工具栏那个下拉不是一回事——那个是「在当前收藏夹里按可见性快筛」，不换范围。
+    // 侧栏这三档是「跳出分组」的权限维度：点它就脱离当前分组，看全站这一档。
+    // 注意跟工具栏那个下拉不是一回事——那个是「在当前分组里按可见性快筛」，不换范围。
     const v = k.slice(4)
     if (filters.collection) {
-      // 从夹里往外跳：哪怕夹内筛的正好也是这一档，也应该切到全站这一档，而不是取消
+      // 从分组里往外跳：哪怕组内筛的正好也是这一档，也应该切到全站这一档，而不是取消
       filters.collection = ''
       filters.visibility = v
       return
@@ -178,7 +178,7 @@ function onCollectionPicked(key) {
     filters.visibility = filters.visibility === v ? '' : v
     return
   }
-  // 选收藏夹就离开可见性维度，回到「这个夹里的全部项目」
+  // 选分组就离开可见性维度，回到「这个分组里的全部项目」
   filters.collection = k
   filters.visibility = ''
 }
@@ -286,14 +286,19 @@ async function bulk(action, extra = {}, label = '') {
     const d = await api.post('/api/projects/bulk', { slugs: selected.value, action, ...extra })
     const extraBits = []
     if (d.expired) extraBits.push(`${d.expired} 个已到期（需先续期才会出现在门户）`)
-    if (d.skipped) extraBits.push(`${d.skipped} 个无权操作已跳过`)
+    if (d.skipped) {
+      extraBits.push(action === 'collection'
+        ? `${d.skipped} 个不属于这个分组的主人，已跳过（分组只能放主人自己的项目）`
+        : `${d.skipped} 个无权操作已跳过`)
+    }
     toast(
       (label ? `${label} · ` : '') +
         `已处理 ${d.done} 个项目` +
         (extraBits.length ? `，${extraBits.join('，')}` : ''),
     )
-    selected.value = []
-    // 批量删除/续期/改可见性都会动到侧栏的数字，一起刷
+    // 不手动清空选中：refreshAll → load 的 alive 过滤只清掉「已不在结果里」的项
+    // （删除的会消失，改可见性/续期/设为永久/开放下载/归入分组的会保留），
+    // 让用户能连续多步操作，工具条不会点一下就没了
     refreshAll()
   } catch (e) {
     toast(e.message || '操作失败', 'err')
@@ -304,11 +309,11 @@ const VIS_LABEL = { portal: '门户可见', link: '持链接可见', private: '�
 
 async function bulkMove(cid) {
   if (!selected.value.length) return
-  // bulk() 里已经带 refreshAll，别在这里再补一次收藏夹请求
+  // bulk() 里已经带 refreshAll，别在这里再补一次分组请求
   await bulk(
     'collection',
     { collection_id: cid || null },
-    cid ? '已归入收藏夹' : '已移出收藏夹',
+    cid ? '已归入分组' : '已移出分组',
   )
 }
 
@@ -430,29 +435,29 @@ onBeforeUnmount(() => {
         <button :class="{ on: filters.kind === 'link' }" @click="filters.kind = 'link'">外链</button>
       </div>
 
-      <!-- 可见性快筛：只在当前范围内过滤，不换收藏夹。跳全站那三档在左侧分类里 -->
+      <!-- 可见性快筛：只在当前范围内过滤，不换分组。跳全站那三档在左侧分类里 -->
       <select
         v-model="filters.visibility"
         class="field"
         style="min-width: 122px"
         :title="
           filters.collection
-            ? '在当前收藏夹里按可见性筛选，不改变收藏夹'
+            ? '在当前分组里按可见性筛选，不改变分组'
             : '按可见性筛选全部项目（要按分类跳转，用左侧的分类型）'
         "
       >
-        <option value="">{{ filters.collection ? '本夹全部可见性' : '全部可见性' }}</option>
+        <option value="">{{ filters.collection ? '本组全部可见性' : '全部可见性' }}</option>
         <option value="portal">门户可见</option>
         <option value="link">持链接可见</option>
         <option value="private">仅自己可见</option>
       </select>
 
-      <!-- 归类筛选：宽屏走左侧收藏夹栏，窄屏只剩这里，「未归类」得能一键筛出来 -->
+      <!-- 归类筛选：宽屏走左侧分组栏，窄屏只剩这里，「未归类」得能一键筛出来 -->
       <select
         v-model="filters.collection"
         class="field colfallback"
         style="min-width: 118px"
-        title="按收藏夹筛选"
+        title="按分组筛选"
         @change="filters.visibility = ''"
       >
         <option value="">全部归类</option>
@@ -561,12 +566,12 @@ onBeforeUnmount(() => {
     <select
       class="field sm"
       style="min-width: 118px; height: 26px"
-      title="批量归入收藏夹"
+      title="批量归入分组"
       @change="bulkMove($event.target.value); $event.target.value = ''"
     >
-      <option value="">移到收藏夹…</option>
-      <option value="none">移出收藏夹</option>
-      <!-- 平铺而不是 optgroup：optgroup 的组名会和夹名重复显示一次，看着像同一个夹出现了两层 -->
+      <option value="">移到分组…</option>
+      <option value="none">移出分组</option>
+      <!-- 平铺而不是 optgroup：optgroup 的组名会和分组名重复显示一次，看着像同一个分组出现了两层 -->
       <template v-for="node in colTree.items" :key="node.id">
         <option :value="node.id">{{ node.name }}</option>
         <option v-for="kid in node.children || []" :key="kid.id" :value="kid.id">

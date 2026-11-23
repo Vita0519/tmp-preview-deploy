@@ -20,7 +20,7 @@ const ACTION_LABEL = {
   import: '导入书签',
   backup: '下载备份',
   restore: '恢复备份',
-  collection: '收藏夹',
+  collection: '分组',
   agent_create: '创建成员',
   agent_patch: '修改成员',
   agent_delete: '删除成员',
@@ -1019,7 +1019,7 @@ onUnmounted(() => {
                   账号 <b class="num">{{ backupInfo.manifest.counts.users }}</b>
                 </span>
                 <span v-if="backupInfo.manifest?.counts">
-                  收藏夹 <b class="num">{{ backupInfo.manifest.counts.collections }}</b>
+                  分组 <b class="num">{{ backupInfo.manifest.counts.collections }}</b>
                 </span>
                 <span class="dim">文件 {{ backupInfo.files }} 个</span>
                 <span v-if="backupInfo.manifest?.created_at" class="dim">

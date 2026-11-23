@@ -149,7 +149,7 @@ def list_projects(
         where.append("p.visibility = ?")
         args.append(visibility)
 
-    # 收藏夹：空 = 全部；none = 未归类；数字 = 这个夹（含子夹）
+    # 分组：空 = 全部；none = 未归类；数字 = 这个分组（含子分组）
     if collection:
         if collection in ("none", "0", "unassigned"):
             where.append("p.collection_id IS NULL")
@@ -388,7 +388,7 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
     if existing:
         owner_id = existing["owner_id"] or owner_id
 
-    # 收藏夹：没传就沿用原来的；"none" 表示移出收藏夹
+    # 分组：没传就沿用原来的；"none" 表示移出分组
     collection_id = None
     if collection_in and collection_in not in ("none", "0", "unassigned"):
         try:
@@ -398,7 +398,7 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
         with db() as conn:
             crow = colls.get(conn, collection_id, user)
         if crow["owner_id"] != owner_id:
-            raise HTTPException(status_code=409, detail="该收藏夹属于其他成员")
+            raise HTTPException(status_code=409, detail="该分组属于其他成员")
 
     # 同一成员名下不允许重名；覆盖更新自己这个 slug 时不算冲突
     with db() as conn:
@@ -477,7 +477,7 @@ async def upload_project(request: Request, user: dict = Depends(current_user)):
                 ),
             )
             pid = cur.lastrowid
-        # 收藏夹单独写：没传就不动，传 "none" 就挪出去
+        # 分组单独写：没传就不动，传 "none" 就挪出去
         if collection_id:
             conn.execute("UPDATE projects SET collection_id=? WHERE id=?", (collection_id, pid))
         elif collection_in in ("none", "0", "unassigned"):
@@ -526,7 +526,7 @@ async def create_link(request: Request, user: dict = Depends(current_user)):
         if collection_id:
             crow = colls.get(conn, collection_id, user)  # 存在 + 有权限
             if crow["owner_id"] != user["id"]:
-                raise HTTPException(status_code=409, detail="该收藏夹属于其他成员")
+                raise HTTPException(status_code=409, detail="该分组属于其他成员")
         dup = title_conflict(conn, user["id"], title)
         if dup:
             _raise_title_conflict(dup, title)
@@ -592,7 +592,7 @@ async def patch_project(slug: str, request: Request, user: dict = Depends(curren
             with db() as conn:
                 crow = colls.get(conn, cid, user)  # 存在 + 有权限
             if crow["owner_id"] != row["owner_id"]:
-                raise HTTPException(status_code=409, detail="该收藏夹属于其他成员")
+                raise HTTPException(status_code=409, detail="该分组属于其他成员")
             sets.append("collection_id=?")
             args.append(cid)
 
@@ -715,7 +715,7 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
             if row["status"] == "expired" or (row["expires_at"] and row["expires_at"] <= now):
                 expired += 1
         elif action == "collection":
-            # 批量归入收藏夹；collection_id 为空表示移出收藏夹
+            # 批量归入分组；collection_id 为空表示移出分组
             cid = body.get("collection_id")
             if cid in (None, "", 0, "0", "none", "unassigned"):
                 with db() as conn:
@@ -728,9 +728,9 @@ async def bulk_action(request: Request, user: dict = Depends(current_user)):
                     raise HTTPException(status_code=400, detail="collection_id 不合法") from None
                 with db() as conn:
                     crow = colls.get(conn, cid, user)
-                # 「收藏夹归属跟项目归属一致」只约束普通成员（他没权限把别人的项目挪走）。
-                # 管理员在「全部项目」里勾的常常就是别人的项目，一律跳过等于功能不可用。
-                if user["role"] != "admin" and crow["owner_id"] != row["owner_id"]:
+                # 分组归属必须跟项目归属一致，管理员也一样。以前管理员能把别人的项目
+                # 塞进自己的分组，项目主人在自己的树里找不到那个分组。现在跳过并计入 skipped。
+                if crow["owner_id"] != row["owner_id"]:
                     skipped += 1
                     continue
                 with db() as conn:

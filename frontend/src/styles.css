@@ -75,7 +75,7 @@
 
 html, body, #app { height: 100%; }
 
-/* 竖向滚动条一直占位：切换收藏夹时列表长短变化，否则滚动条一出现/消失
+/* 竖向滚动条一直占位：切换分组时列表长短变化，否则滚动条一出现/消失
    内容区宽度就跳 15px，整页看着抖一下 */
 /* html 画布跟着主题 --bg 走：body 只有第一屏高，滚动后的区域露出的是画布，
    颜色必须始终与 --bg 一致（深浅主题切换时也同步），否则浅色主题会「半白半黑」 */
@@ -231,7 +231,7 @@ p { margin: 0; }
 
 .content { padding: 22px 26px 64px; max-width: 1560px; width: 100%; }
 
-/* ---------------- 收藏夹侧栏 ---------------- */
+/* ---------------- 分组侧栏 ---------------- */
 .withrail { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 18px; align-items: start; }
 .maincol { min-width: 0; }
 
@@ -306,7 +306,7 @@ p { margin: 0; }
 }
 .railpick:hover { color: var(--brand); }
 
-/* 收藏夹按成员分组 */
+/* 分组按成员分组 */
 .railgw { display: flex; flex-direction: column; }
 .railgroup {
   display: flex; align-items: center; gap: 6px;
@@ -321,7 +321,7 @@ p { margin: 0; }
 .railgroup .crt { flex: 0 0 auto; color: var(--ink-4); transform: rotate(-90deg); transition: transform 0.16s var(--ease); }
 .railgroup.open .crt { transform: rotate(0deg); }
 
-/* 夹里混了别人的项目时补一个 +N */
+/* 分组里混了别人的项目时补一个 +N */
 .railrow .n .xf { font-style: normal; font-size: 9.5px; margin-left: 1px; opacity: 0.85; }
 
 .railmenu {
@@ -347,18 +347,18 @@ p { margin: 0; }
 .railedit .input { height: 26px; font-size: 12px; }
 .railempty { font-size: 11.5px; color: var(--ink-4); line-height: 1.6; padding: 10px 8px; }
 
-/* 每个收藏夹节点：自身不撑高，只有展开/编辑时才长出内容 */
+/* 每个分组节点：自身不撑高，只有展开/编辑时才长出内容 */
 .railnode { display: block; }
 .railkids { display: flex; flex-direction: column; gap: 1px; }
 .railmenu.kidmenu { margin-left: 20px; }
 
-/* 归类下拉：宽屏用左侧收藏夹栏就够了，窄屏（侧栏隐藏）才需要它兜底 */
+/* 归类下拉：宽屏用左侧分组栏就够了，窄屏（侧栏隐藏）才需要它兜底 */
 .colfallback { display: none; }
 
 @media (max-width: 1120px) {
   .withrail { grid-template-columns: minmax(0, 1fr); }
   .rail { display: none; }
-  /* 侧栏收起后，收藏夹 / 未归类的筛选改由工具栏下拉接管 */
+  /* 侧栏收起后，分组 / 未归类的筛选改由工具栏下拉接管 */
   .colfallback { display: inline-flex; }
 }
 

@@ -46,7 +46,7 @@ python cli/agentctl.py whoami                                  # 我是谁、什
 python cli/agentctl.py deploy ./dist --title "落地页 v3" --tags "前端,v3" --ttl 24
 python cli/agentctl.py deploy ./dist --forever --download      # 永久 + 开放下载
 python cli/agentctl.py deploy ./build.zip --zip                # 只做下载包
-python cli/agentctl.py deploy ./dist --collection 办公          # 顺手归到收藏夹（也可写 id）
+python cli/agentctl.py deploy ./dist --collection 办公          # 顺手归到分组（也可写 id）
 python cli/agentctl.py selfcheck                               # 建→探活→改私有→改回→续期→删除
 ```
 
@@ -79,57 +79,57 @@ python cli/agentctl.py selfcheck                               # 建→探活→
   **自动截短**（响应里给的是真实落库的名字）；
 - 名字与 slug 无关：改名不动链接，`/v/<slug>` 永远不变。
 
-## 收藏夹：给项目分门别类
+## 分组：给项目分门别类
 
-左侧那一栏是**分类导航 + 收藏夹**二合一，点一下就筛；`⋯` 里能新建子夹 / 改名 / 删除，
-勾选多个项目后底部能一键「移到收藏夹…」。
+左侧那一栏是**分类导航 + 分组**二合一，点一下就筛；`⋯` 里能新建子分组 / 改名 / 删除，
+勾选多个项目后底部能一键「移到分组…」。
 
 - 常驻分类：**全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类**——按可见性和是否归类自动算，
   不用手动维护；数量跟列表页的总数同源（三档之和 = 全部项目）
-- 再往下才是自己建的收藏夹（两级：**收藏夹 → 子收藏夹**）
-- **侧栏三档 = 跳全站，工具栏下拉 = 夹内快筛**：点侧栏三档会跳出当前收藏夹看全站这一档；
-  工具栏那个「可见性」下拉不换范围，是在当前夹里再筛（选中夹时文案变「本夹全部可见性」）。
+- 再往下才是自己建的分组（两级：**分组 → 子分组**）
+- **侧栏三档 = 跳全站，工具栏下拉 = 组内快筛**：点侧栏三档会跳出当前分组看全站这一档；
+  工具栏那个「可见性」下拉不换范围，是在当前分组里再筛（选中分组时文案变「本组全部可见性」）。
   窗口窄于 1120px 侧栏收起时，工具栏另外补一个**归类下拉**兜底
-- 管理员视角下侧栏**按成员分组**：自己的组排最前（组头有色点、夹数、折叠箭头），
-  右上角成员下拉可只看某个人（只收侧栏、不改项目列表范围）；夹里混了别人的项目时数字后补 `+N`
+- 管理员视角下侧栏**按成员分组**：自己的组排最前（组头有色点、分组数、折叠箭头），
+  右上角成员下拉可只看某个人（只收侧栏、不改项目列表范围）；分组里混了别人的项目时数字后补 `+N`
 
 控制台左侧导航栏右上角有一个折叠按钮（`‹` / `›`）：收起后只留图标，宽度 228px → 64px，
 内容区跟着往左扩 164px；选择记在 localStorage，刷新后保持。
 
 ```bash
-python cli/agentctl.py collections                       # 树 + 每个夹的直属/合计数量
-python cli/agentctl.py collections add --name 办公        # 建一级夹
-python cli/agentctl.py collections add --name 报表 --parent 办公   # 建子夹
-python cli/agentctl.py ls --collection 办公               # 只看这个夹（含子夹）
+python cli/agentctl.py collections                       # 树 + 每个分组的直属/合计数量
+python cli/agentctl.py collections add --name 办公        # 建一级分组
+python cli/agentctl.py collections add --name 报表 --parent 办公   # 建子分组
+python cli/agentctl.py ls --collection 办公               # 只看这个分组（含子分组）
 python cli/agentctl.py set <slug> --collection 办公/报表  # 把项目挪进去
 python cli/agentctl.py set <slug> --no-collection        # 移出来（回到未归类）
 python cli/agentctl.py collections rm 办公 --with-projects  # 连项目一起删（默认只删壳）
 ```
 
 - **只做两层**：再往下的层级建不出来（422）。数据结构没写死深度，以后要放开不用迁表。
-- **删夹默认只删壳**：里面的项目退回「未归类」，不会跟着消失；要连项目一起删得显式说。
-- **同名拦截**：同一层不允许两个同名夹（忽略大小写/首尾空格），撞上返回 409。
-- **计数口径**：`count` 是直属项目数，`total` 含子夹；侧栏「全部项目」= 各夹合计 + 未归类，
+- **删分组默认只删壳**：里面的项目退回「未归类」，不会跟着消失；要连项目一起删得显式说。
+- **同名拦截**：同一层不允许两个同名分组（忽略大小写/首尾空格），撞上返回 409。
+- **计数口径**：`count` 是直属项目数，`total` 含子分组；侧栏「全部项目」= 各分组合计 + 未归类，
   跟列表总数一致。非管理员只统计自己名下，看不到别人的项目数。
   管理员额外拿到 `count_own / count_foreign / total_foreign`（相对**看的人**：我名下 vs 别人名下），
-  夹上那个 `+N` 就是 `total_foreign`。
+  分组上那个 `+N` 就是 `total_foreign`。
 
 ## 导入 / 导出浏览器书签
 
 Chrome / Edge / Firefox / Safari 导出的书签都是同一种 Netscape HTML，一个解析器全吃。
 
-- 控制台项目页右上角「导入书签」：选文件 → **先预览**（可导入几条、几个收藏夹、跳过几个重复）→ 确认导入；
-- 文件夹 → 收藏夹（一级 → 一级，二级 → 子夹，更深的折进第二级），书签 → **外链项目**；
+- 控制台项目页右上角「导入书签」：选文件 → **先预览**（可导入几条、几个分组、跳过几个重复）→ 确认导入；
+- 文件夹 → 分组（一级 → 一级，二级 → 子分组，更深的折进第二级），书签 → **外链项目**；
 - 默认 `visibility=private`（仅自己可见），导入时也能选持链接 / 门户，并可一批打同一个标签；
 - 同一个网址重复导入**自动跳过**，反复导同一个文件不会造重复；
-- 「导出」把当前收藏夹（含子集）导回成书签 HTML，能直接再导入浏览器。
+- 「导出」把当前分组（含子集）导回成书签 HTML，能直接再导入浏览器。
 
 ```bash
 curl -b cookiejar -F "file=@bookmarks.html" -F "dry_run=1" http://<host>:8080/api/import/bookmarks
 curl -b cookiejar -OJ "http://<host>:8080/api/export/bookmarks?collection=3"
 ```
 
-指定了「导入到某个收藏夹」时，只能再往下放一层：书签的一级文件夹变成它的子夹，更深的折进去，
+指定了「导入到某个分组」时，只能再往下放一层：书签的一级文件夹变成它的子分组，更深的折进去，
 免得做出第三层把项目藏到筛选管不到的地方。
 
 ## 备份与恢复
@@ -251,16 +251,16 @@ python tests/check_concurrency.py --url http://127.0.0.1:8000  # 6 agent 并发 
 python tests/check_copy.py       --url http://127.0.0.1:8000   # 复制按钮（需 chrome）
 python tests/check_title.py      --url http://127.0.0.1:8000   # 同一成员重名拦截
 python tests/check_rename.py     --url http://127.0.0.1:8000   # 改名链路 + 项目名长度规则
-python tests/check_collections.py --url http://127.0.0.1:8000  # 收藏夹树 / 归类 / 筛选 / 删夹去向 / 侧栏折叠
+python tests/check_collections.py --url http://127.0.0.1:8000  # 分组树 / 归类 / 筛选 / 删分组去向 / 侧栏折叠
 python tests/check_bookmarks.py --url http://127.0.0.1:8000   # 书签导入预览/判重/导出回灌（需 chrome）
 python tests/check_backup.py    --url http://127.0.0.1:8000   # 打包/预览/恢复/保留策略（会真恢复一次）
 python tests/check_icon.py       --url http://127.0.0.1:8000   # 站点图标上传/恢复（含 .off 残骸回归，需 chrome）
-python tests/check_owner_rail.py --url http://127.0.0.1:8000   # 收藏夹归属/侧栏分组与筛选/+N（需 chrome）
-python tests/check_visfilter.py  --url http://127.0.0.1:8000   # 三档跳全站 vs 工具栏夹内快筛（需 chrome）
+python tests/check_owner_rail.py --url http://127.0.0.1:8000   # 分组归属/侧栏分组与筛选/+N（需 chrome）
+python tests/check_visfilter.py  --url http://127.0.0.1:8000   # 三档跳全站 vs 工具栏组内快筛（需 chrome）
 python tests/check_agents_filter.py --url http://127.0.0.1:8000 # 成员搜索/角色/状态/排序（需 chrome）
 python tests/check_upload.py     --url http://127.0.0.1:8000   # 新建项目弹窗排版与标签上限（需 chrome）
 python tests/check_license.py    --url http://127.0.0.1:8000   # LICENSE/NOTICE 与页面署名（需 chrome）
-python tests/check_count_sync.py --url http://127.0.0.1:8000   # 删除/新建后侧栏收藏夹与分类计数当场同步（需 chrome）
+python tests/check_count_sync.py --url http://127.0.0.1:8000   # 删除/新建后侧栏分组与分类计数当场同步（需 chrome）
 python tests/check_theme.py     --url http://127.0.0.1:8000   # 主色派生、全站跟随、站点图标
 python tests/check_themes.py    --url http://127.0.0.1:8000   # 主题插件：黑/白切换、示例安装/卸载、商店守卫
 python tests/check_compat.py    --url http://127.0.0.1:8000   # 老备份恢复+自动迁移/更老的包被拒/老书签/老字段/老 CLI（会覆盖数据，跑完自动恢复）

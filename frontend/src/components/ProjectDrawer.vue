@@ -133,7 +133,7 @@ async function setVisibility(v) {
 }
 
 async function setCollection(value) {
-  await patch({ collection_id: value || null }, value ? '已归入收藏夹' : '已移出收藏夹')
+  await patch({ collection_id: value || null }, value ? '已归入分组' : '已移出分组')
 }
 
 function fileDownloadUrl(path) {
@@ -218,7 +218,7 @@ onMounted(async () => {
   try {
     collections.value = await api.get('/api/collections')
   } catch {
-    /* 拿不到就当没有收藏夹，不影响抽屉其它功能 */
+    /* 拿不到就当没有分组，不影响抽屉其它功能 */
   }
 })
 </script>
@@ -371,7 +371,7 @@ onMounted(async () => {
           <dl class="kv">
             <dt>归属</dt>
             <dd>{{ detail.owner?.display_name || '—' }}</dd>
-            <dt>收藏夹</dt>
+            <dt>分组</dt>
             <dd>
               <select
                 class="field"

@@ -336,12 +336,12 @@ async function submitLink() {
         </div>
 
         <div class="frow">
-          <label>收藏夹</label>
+          <label>分组</label>
           <select v-model="form.collection" class="field">
             <option value="">未归类</option>
             <option v-for="o in folderOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
           </select>
-          <span class="hint">项目多了按收藏夹分组更好找；也可以先空着，回头批量挪</span>
+          <span class="hint">项目多了按分组归类更好找；也可以先空着，回头批量挪</span>
         </div>
 
         <div class="frow">

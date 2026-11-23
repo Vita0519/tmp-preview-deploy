@@ -405,9 +405,9 @@ def cmd_health(args):
 # 命令：部署 / 外链
 # --------------------------------------------------------------------------- #
 def resolve_collection(url, token, value):
-    """把 `--collection` 的值换成收藏夹 id。
+    """把 `--collection` 的值换成分组 id。
 
-    能吃三种：数字 id、`none`（移出收藏夹）、收藏夹名字（子夹写成 `办公/报表`）。
+    能吃三种：数字 id、`none`（移出分组）、分组名字（子分组写成 `办公/报表`）。
     名字找不到就返回 None（= 未归类），让命令继续跑，不因为归类失败中断部署。
     """
     v = str(value or "").strip()
@@ -583,7 +583,7 @@ def cmd_ls(args):
         else:
             cid = resolve_collection(url, token, raw)
             if cid is None:
-                return emit(args, False, "ls", error=f"找不到收藏夹：{raw}")
+                return emit(args, False, "ls", error=f"找不到分组：{raw}")
             qs.append(f"collection={cid}")
     for t in args.tag or []:
         qs.append("tag=" + urllib.request.quote(t))
@@ -763,7 +763,7 @@ def cmd_stats(args):
 
 
 # --------------------------------------------------------------------------- #
-# 命令：收藏夹
+# 命令：分组
 # --------------------------------------------------------------------------- #
 def cmd_collections(args):
     c = conn(args)
@@ -800,23 +800,23 @@ def cmd_collections(args):
         if args.parent:
             body["parent_id"] = resolve_collection(url, token, args.parent)
             if body["parent_id"] is None:
-                return emit(args, False, "collections.add", error=f"找不到上级收藏夹：{args.parent}")
+                return emit(args, False, "collections.add", error=f"找不到上级分组：{args.parent}")
         code, d = call(url, "/api/collections", token, "POST", body=body)
         if code != 200:
             return emit(args, False, "collections.add", error=f"新建失败 HTTP {code}：{d.get('detail') or ''}")
         col = d.get("collection") or {}
-        return emit(args, True, "collections.add", col, human=[f"✅ 收藏夹 {col.get('id')}：{col.get('name')}"])
+        return emit(args, True, "collections.add", col, human=[f"✅ 分组 {col.get('id')}：{col.get('name')}"])
 
     if act in ("rm", "delete"):
         cid = resolve_collection(url, token, args.target)
         if cid is None:
-            return emit(args, False, "collections.rm", error=f"找不到收藏夹：{args.target}")
+            return emit(args, False, "collections.rm", error=f"找不到分组：{args.target}")
         qs = "?with_projects=1" if args.with_projects else ""
         code, d = call(url, f"/api/collections/{cid}{qs}", token, "DELETE")
         if code != 200:
             return emit(args, False, "collections.rm", error=f"删除失败 HTTP {code}：{d.get('detail') or ''}")
         return emit(args, True, "collections.rm", d, human=[
-            f"✅ 已删除收藏夹「{d.get('name')}」："
+            f"✅ 已删除分组「{d.get('name')}」："
             + (f"连 {d.get('deleted_projects')} 个项目一起删" if args.with_projects
                else f"{d.get('moved_to_unassigned')} 个项目退回未归类")
         ])
@@ -1036,7 +1036,7 @@ def build_parser():
     p.add_argument("--visibility", default="link", choices=list(VISIBILITY))
     p.add_argument("--expire-action", default="block", choices=["block", "delete"])
     p.add_argument("--no-verify", action="store_true", help="跳过部署后的地址探活")
-    p.add_argument("--collection", help="归到哪个收藏夹：id 或名字（子夹写 办公/报表）")
+    p.add_argument("--collection", help="归到哪个分组：id 或名字（子分组写 办公/报表）")
     p.set_defaults(func=cmd_deploy)
 
     p = sub.add_parser("link", parents=[common], help="登记一个外链项目")
@@ -1048,7 +1048,7 @@ def build_parser():
     p.add_argument("--ttl", type=float)
     p.add_argument("--forever", action="store_true")
     p.add_argument("--visibility", default="link", choices=list(VISIBILITY))
-    p.add_argument("--collection", help="归到哪个收藏夹：id 或名字")
+    p.add_argument("--collection", help="归到哪个分组：id 或名字")
     p.set_defaults(func=cmd_link)
 
     p = sub.add_parser("ls", parents=[common], help="列出项目")
@@ -1063,7 +1063,7 @@ def build_parser():
                             "downloads", "size_bytes", "title"])
     p.add_argument("--order", default="desc", choices=["asc", "desc"])
     p.add_argument("--limit", type=int, default=50)
-    p.add_argument("--collection", help="只看某个收藏夹：id / 名字 / none（未归类）")
+    p.add_argument("--collection", help="只看某个分组：id / 名字 / none（未归类）")
     p.set_defaults(func=cmd_ls)
 
     p = sub.add_parser("show", parents=[common], help="项目详情")
@@ -1080,8 +1080,8 @@ def build_parser():
     p.add_argument("--tags")
     p.add_argument("--download", action="store_true")
     p.add_argument("--no-download", action="store_true")
-    p.add_argument("--collection", help="挪到某个收藏夹：id 或名字")
-    p.add_argument("--no-collection", action="store_true", help="移出收藏夹（回到未归类）")
+    p.add_argument("--collection", help="挪到某个分组：id 或名字")
+    p.add_argument("--no-collection", action="store_true", help="移出分组（回到未归类）")
     p.set_defaults(func=cmd_set)
 
     p = sub.add_parser("extend", parents=[common], help="延长存活时间")
@@ -1123,10 +1123,10 @@ def build_parser():
     p.add_argument("--rotate-key", action="store_true")
     p.set_defaults(func=cmd_members)
 
-    p = sub.add_parser("collections", parents=[common], help="收藏夹：列表 / 新建 / 删除")
+    p = sub.add_parser("collections", parents=[common], help="分组：列表 / 新建 / 删除")
     p.add_argument("action", nargs="?", default="ls", choices=["ls", "add", "rm", "delete"])
-    p.add_argument("target", nargs="?", help="要删的收藏夹（id 或名字）")
-    p.add_argument("--name", help="add 时用：收藏夹名字")
+    p.add_argument("target", nargs="?", help="要删的分组（id 或名字）")
+    p.add_argument("--name", help="add 时用：分组名字")
     p.add_argument("--parent", help="add 时用：挂在哪一级下面（id 或名字）")
     p.add_argument("--with-projects", action="store_true", help="删除时连项目一起删")
     p.set_defaults(func=cmd_collections)

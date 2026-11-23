@@ -42,13 +42,13 @@ python scripts/agentctl.py selfcheck     # 用当前身份真跑一遍：建→�
 | `link` | 只登记外链，不发文件 | `--url` `--title` `--ttl` `--collection` |
 | `ls` | 列项目（默认只看自己的） | `--status` `--visibility` `--collection` `--tag` `--q` `--sort` `--limit` |
 | `show` | 单个项目详情：文件清单、14 天访问、事件流水 | `<slug>` |
-| `set` | 改可见性 / 到期 / 标题 / 标签 / 下载 / 归属收藏夹 | `--visibility` `--ttl` `--forever` `--tags` `--collection` `--no-collection` |
+| `set` | 改可见性 / 到期 / 标题 / 标签 / 下载 / 归属分组 | `--visibility` `--ttl` `--forever` `--tags` `--collection` `--no-collection` |
 | `extend` | 只续期 | `<slug> <小时>` 或 `--forever` |
 | `rm` | 删项目（文件 + zip + 访问记录） | `<slug>` `--yes` |
 | `bulk` | 批量改可见性 / 续期 / 删 | `--action` `--slugs` `--yes` |
 | `stats` | 访问趋势 | `--days` |
 | `members` | 成员管理（**需 admin**） | `list/create/set/rm/key`、`--role` `--label` `--rotate-key` |
-| `collections` | 收藏夹：列表 / 新建 / 删除 | `ls`(默认) `add --name [--parent]` `rm <id或名字> [--with-projects]` |
+| `collections` | 分组：列表 / 新建 / 删除 | `ls`(默认) `add --name [--parent]` `rm <id或名字> [--with-projects]` |
 | `selfcheck` | 自检，别信文档，信这个 | — |
 
 **输出契约（给上游程序读）**
@@ -246,26 +246,26 @@ DELETE /api/projects/{slug}     # 文件、zip、访问记录一起清
 
 删除是不可恢复的，批量删之前先用 `GET /api/projects?status=expired` 确认清单。
 
-### 6. 收藏夹：把项目分门别类
+### 6. 分组：把项目分门别类
 
-两级（收藏夹 → 子收藏夹）。**归类是幂等的**，重复放同一个夹不会出错。
+两级（分组 → 子分组）。**归类是幂等的**，重复放同一个分组不会出错。
 
 ```bash
 # CLI
 agentctl collections                        # 树：id / 直属数 / 合计 / 名字
-agentctl collections add --name 办公         # 建一级夹
+agentctl collections add --name 办公         # 建一级分组
 agentctl collections add --name 报表 --parent 办公
 agentctl deploy ./dist --collection 办公     # 部署顺手归类（也可写 id）
 agentctl set <slug> --collection 办公/报表   # 挪进去
 agentctl set <slug> --no-collection         # 移出来
-agentctl ls --collection 办公                # 只看这个夹（含子夹）
+agentctl ls --collection 办公                # 只看这个分组（含子分组）
 
 # 原始 API
 GET    /api/collections                     # {items:[...], unassigned, total, visibility:{portal,link,private}}
 POST   /api/collections                     # {"name":"办公","parent_id":null}
 PATCH  /api/collections/{id}                # {"name":"...","parent_id":...}
 DELETE /api/collections/{id}?with_projects=0
-GET    /api/projects?collection=12          # 12 及其子夹；collection=none = 未归类
+GET    /api/projects?collection=12          # 12 及其子分组；collection=none = 未归类
 PATCH  /api/projects/{slug}                 # {"collection_id": 12} / {"collection_id": null}
 ```
 
@@ -275,37 +275,37 @@ PATCH  /api/projects/{slug}                 # {"collection_id": 12} / {"collecti
 
 返回里的 `visibility` 是三档可见性的数量（三者之和 = `total`）。控制台侧栏把
 「全部项目 / 门户可见 / 持链接 / 仅自己 / 未归类」做成了常驻分类，用的就是这几个数，
-再往下才是收藏夹；**API 侧没变**，筛可见性仍然走 `GET /api/projects?visibility=portal|link|private`
-（工具条那个下拉只是夹内快筛，同样走这个参数，不换收藏夹范围）。
+再往下才是分组；**API 侧没变**，筛可见性仍然走 `GET /api/projects?visibility=portal|link|private`
+（工具条那个下拉只是组内快筛，同样走这个参数，不换分组范围）。
 
 **归属字段**（服务端已就位，Agent 读树时能直接用）：
 
 | 字段 | 含义 |
 |---|---|
-| `owner_id` / `owner` / `owner_display` | 夹的创建者：id、账号、显示名 |
+| `owner_id` / `owner` / `owner_display` | 分组的创建者：id、账号、显示名 |
 | `count` / `count_own` / `count_foreign` | **直挂本层**的项目数：合计 / 我名下的 / 别人名下的 |
-| `total` / `total_foreign` | **含子夹**的合计 / 其中别人的 |
+| `total` / `total_foreign` | **含子分组**的合计 / 其中别人的 |
 | `owners`（仅管理员） | `[{id, username, display_name, count, total, total_foreign}]`，自己的组排第一 |
 
-`own / foreign` 是相对**发起请求的人**算的：publisher 看自己的夹全是 `own`，
-管理员看别人的夹全是 `foreign`（侧栏那个 `+N` 就是它）。普通成员的 `owners` 是 `[]`——
-他本来就只看得见自己的夹。成员筛选是纯前端行为，没有对应的查询参数。
+`own / foreign` 是相对**发起请求的人**算的：publisher 看自己的分组全是 `own`，
+管理员看别人的分组全是 `foreign`（侧栏那个 `+N` 就是它）。普通成员的 `owners` 是 `[]`——
+他本来就只看得见自己的分组。成员筛选是纯前端行为，没有对应的查询参数。
 
 ### 7. 导入 / 导出浏览器书签
 
-Chrome / Edge / Firefox / Safari 导出的 HTML 都能直接吃，**文件夹变收藏夹、书签变外链项目**。
+Chrome / Edge / Firefox / Safari 导出的 HTML 都能直接吃，**文件夹变分组、书签变外链项目**。
 
 ```bash
 # 先预览（不落库），确认条数与层级再真导
 curl -H "Authorization: Bearer $KEY" -F "file=@bookmarks.html" -F "dry_run=1" \
      $BASE/api/import/bookmarks
 
-# 真导：默认仅自己可见，可选 link / portal，可统一打标签，可指定落到哪个收藏夹
+# 真导：默认仅自己可见，可选 link / portal，可统一打标签，可指定落到哪个分组
 curl -H "Authorization: Bearer $KEY" -F "file=@bookmarks.html" \
      -F "visibility=private" -F "tag=书签" -F "parent_id=12" \
      $BASE/api/import/bookmarks
 
-# 导回成书签（浏览器能直接导入）：?collection=12 只导这个夹
+# 导回成书签（浏览器能直接导入）：?collection=12 只导这个分组
 curl -H "Authorization: Bearer $KEY" -OJ "$BASE/api/export/bookmarks?collection=12"
 ```
 
@@ -401,7 +401,7 @@ DELETE /api/settings/themes/{id}                    # 卸载（内置不可卸�
 ## 六、相关文档
 
 - `docs/visibility.md`：三档可见性的完整判定表（谁能看、私有链接怎么打开）
-- `docs/api.md`：接口一览（含收藏夹、书签导入导出、备份恢复）
+- `docs/api.md`：接口一览（含分组、书签导入导出、备份恢复）
 - `SKILL.md`：把这套服务部署起来（运维侧）
 
 ## 七、许可与署名（用这套服务 / 复制这个脚本前先看）

@@ -12,8 +12,8 @@ HTML，所以只要按它解析，就能一次吃下所有主流浏览器：
       </DL><p>
     </DL><p>
 
-映射规则（跟产品约定一致：两级收藏夹）：
-* 路径第一段 → 一级收藏夹；第二段 → 子收藏夹；更深的层级压到第二段里，不丢书签；
+映射规则（跟产品约定一致：两级分组）：
+* 路径第一段 → 一级分组；第二段 → 子分组；更深的层级压到第二段里，不丢书签；
 * 书签 → 外链项目（kind=link），默认**私有**、永久有效 —— 导入是私事，公开与否自己挑；
 * 同一个 URL 在自己名下已存在就跳过（重复导入同一个文件是幂等的）；
 * 标题撞车时加 `(2)`、`(3)`，并且始终服从项目名 10 个中文字符的上限。
@@ -71,7 +71,7 @@ class _Parser(HTMLParser):
                     self._href = (v or "").strip()
                     break
         elif tag == "dt" and self.pending is not None:
-            # <H3> 后面没跟 <DL>（空文件夹），别让文件夹名污染下一个 DL
+            # <H3> 后面没跟 <DL>（空文件夹），别让文件分组名污染下一个 DL
             self.pending = None
 
     def handle_endtag(self, tag):
@@ -199,8 +199,8 @@ def import_bookmarks(
         root, sub = _map_path(f)
         if not root:
             continue
-        # 已经指定了目标收藏夹时，目标自己就是一级，只能再往下放一层：
-        # 书签里的一级文件夹变子夹，更深的层折进去（不然会做出第三层，筛选时又漏掉）。
+        # 已经指定了目标分组时，目标自己就是一级，只能再往下放一层：
+        # 书签里的一级文件夹变子分组，更深的层折进去（不然会做出第三层，筛选时又漏掉）。
         keys = [(root, "")] if parent_id else [(root, ""), (root, sub)]
         for key in keys:
             if key[1] == "" and key in seen_folders:
@@ -253,7 +253,7 @@ def import_bookmarks(
     t = now_ms()
 
     with tx() as conn:
-        # 1) 收藏夹：先一级，再二级
+        # 1) 分组：先一级，再二级
         for root, sub in plan_folders:
             if (root, "") not in folder_ids:
                 folder_ids[(root, "")] = _ensure_folder(conn, owner_id, root, parent_id)
@@ -292,7 +292,7 @@ def import_bookmarks(
 
 
 def _ensure_folder(conn, owner_id: int, name: str, parent_id) -> int:
-    """按名字找收藏夹，没有就建。重复导入同一个文件时不会长出一堆同名夹。"""
+    """按名字找分组，没有就建。重复导入同一个文件时不会长出一堆同名分组。"""
     row = conn.execute(
         "SELECT id FROM collections WHERE owner_id=? AND ifnull(parent_id,0)=? "
         "AND lower(trim(name))=lower(?)",
@@ -316,7 +316,7 @@ def _esc(s: str) -> str:
 
 
 def export_html(user: dict, origin: str = "", collection_id=None) -> tuple[str, int]:
-    """按收藏夹层级导出成 Netscape 书签 HTML，浏览器可直接导入。返回 (html, 条数)。"""
+    """按分组层级导出成 Netscape 书签 HTML，浏览器可直接导入。返回 (html, 条数)。"""
     with db() as conn:
         if user["role"] == "admin":
             where, args = "p.status='active'", []

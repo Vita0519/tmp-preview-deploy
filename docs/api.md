@@ -23,11 +23,11 @@
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
-| GET | `/api/projects` | ✍ | 列表。参数：`q`、`agent`、`tag`(可重复)、`kind`、`status`(online/expired/permanent/all)、`visibility`、`collection`(收藏夹 id / `none`)、`expiring_hours`、`sort`、`order`、`limit`、`offset`。返回 `items`、`total`、`stats`、`facets`、`server_now` |
+| GET | `/api/projects` | ✍ | 列表。参数：`q`、`agent`、`tag`(可重复)、`kind`、`status`(online/expired/permanent/all)、`visibility`、`collection`(分组 id / `none`)、`expiring_hours`、`sort`、`order`、`limit`、`offset`。返回 `items`、`total`、`stats`、`facets`、`server_now` |
 | GET | `/api/projects/{slug}` | ✍ | 详情：含 `files[]`、`daily_views[]`、`events[]` |
-| POST | `/api/projects` | ✍ | 上传（multipart）：`slug,title,description,tags,hours,forever,expire_action,allow_download,visibility,collection,files[],zip,owner(管理员)`。`hours` 省略时按可见性取默认时长；`allow_download` **默认为开**，传 `0` 才关；`collection` 是收藏夹 id 或 `none` |
+| POST | `/api/projects` | ✍ | 上传（multipart）：`slug,title,description,tags,hours,forever,expire_action,allow_download,visibility,collection,files[],zip,owner(管理员)`。`hours` 省略时按可见性取默认时长；`allow_download` **默认为开**，传 `0` 才关；`collection` 是分组 id 或 `none` |
 | POST | `/api/projects/link` | ✍ | 登记外链：`{link_url,title,slug,description,tags,hours,forever,visibility,collection_id}` |
-| PATCH | `/api/projects/{slug}` | ✍ | 改属性：`title,description,tags[],visibility,allow_download,expire_action,hours,permanent,expires_at,slug(改名),revive,collection_id`（`null` / `"none"` = 移出收藏夹） |
+| PATCH | `/api/projects/{slug}` | ✍ | 改属性：`title,description,tags[],visibility,allow_download,expire_action,hours,permanent,expires_at,slug(改名),revive,collection_id`（`null` / `"none"` = 移出分组） |
 | DELETE | `/api/projects/{slug}` | ✍ | 删除项目与文件 |
 | POST | `/api/projects/bulk` | ✍ | `{slugs[], action}`，action ∈ `delete, expire, permanent, extend, allow_download, deny_download, visibility, tag_add, collection`（后者带 `collection_id`，`null` = 移出） |
 | POST | `/api/projects/{slug}/reset-views` | ✍ | 访问计数清零 |
@@ -65,19 +65,19 @@
 
 截断不会劈坏字符，也会去掉尾部的空格与标点；不传 `title` 时从文件名 / URL 推导，同样按这条规则截。
 
-## 收藏夹（项目层级归类）
+## 分组（项目层级归类）
 
-两级：**收藏夹 → 子收藏夹**，项目挂在任意一层（挂在父夹上的不会自动算进子夹）。
+两级：**分组 → 子分组**，项目挂在任意一层（挂在父分组上的不会自动算进子分组）。
 表里只有 `parent_id`，没有写死 `level`，以后要放开深度不用迁表。
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
 | GET | `/api/collections` | ✍ | 树：`{items:[{id,name,parent_id,owner_id,owner,owner_display,icon,sort,count,count_own,count_foreign,total,total_foreign,children}], owners, unassigned, total, visibility:{portal,link,private}, max_depth}` |
-| POST | `/api/collections` | ✍ | 新建：`{name, parent_id?, icon?}`。同名（同层）→ 409；挂到子夹下（第三层）→ 422 |
+| POST | `/api/collections` | ✍ | 新建：`{name, parent_id?, icon?}`。同名（同层）→ 409；挂到子分组下（第三层）→ 422 |
 | PATCH | `/api/collections/{id}` | ✍ | 改名 / 换图标 / 调顺序 / 移动：`{name?,icon?,sort?,parent_id?}` |
-| DELETE | `/api/collections/{id}` | ✍ | 删夹。默认**只删壳**，里面的项目退回「未归类」；`?with_projects=1` 才连项目与文件一起删 |
+| DELETE | `/api/collections/{id}` | ✍ | 删分组。默认**只删壳**，里面的项目退回「未归类」；`?with_projects=1` 才连项目与文件一起删 |
 
-返回字段里 `count` 是直属项目数，`total` 是含子夹的合计；`total`（顶层）已经包含「未归类」，
+返回字段里 `count` 是直属项目数，`total` 是含子分组的合计；`total`（顶层）已经包含「未归类」，
 所以侧栏的「全部项目」跟项目列表的 `total` 永远对得上。非管理员只统计**自己名下**的项目。
 `visibility` 是三档可见性的数量（`portal/link/private`，三者之和 = `total`），
 控制台侧栏把它们当成常驻分类，所以工具栏里的可见性下拉只在窄屏兜底时才出现。
@@ -86,7 +86,7 @@
 
 每个节点带上创建者：`owner_id` / `owner`（账号）/ `owner_display`（显示名）。
 计数按**看的人**拆成两半：`count_own` / `count_foreign` 是直属的「我的 / 别人的」，
-`total_foreign` 是含子夹滚上来的别人的项目数；侧栏在数字后面补一个 `+N` 就表示这个。
+`total_foreign` 是含子分组滚上来的别人的项目数；侧栏在数字后面补一个 `+N` 就表示这个。
 
 管理员额外拿到一份 `owners` 汇总，按「自己排第一 → 项目多的靠前」排序：
 
@@ -95,39 +95,39 @@
             {"id": 7, "username": "alice", "display_name": "Alice", "count": 1, "total": 2, "total_foreign": 0}]}
 ```
 
-`count` 是根夹个数、`total` 是这些夹里的项目数（含子夹）。普通成员这个字段是 `[]`——
-他本来就只看得见自己的夹，再分组纯属噪音。
+`count` 是根分组个数、`total` 是这些分组里的项目数（含子分组）。普通成员这个字段是 `[]`——
+他本来就只看得见自己的分组，再分组纯属噪音。
 
 侧栏据此按成员分组、并给一个成员筛选下拉；**筛掉一个人不会改变 `/api/projects` 的查询范围**，
-它只是把侧栏这几根枝收起来（工具栏那个「可见性」是夹内快筛，两者都不换范围）。
+它只是把侧栏这几根枝收起来（工具栏那个「可见性」是组内快筛，两者都不换范围）。
 
-删夹的返回：
+删分组的返回：
 
 ```json
 {"ok": true, "removed": 2, "moved_to_unassigned": 1, "deleted_projects": 0, "name": "办公"}
 ```
 
-`removed` 是删掉的收藏夹个数（含子夹），两个数字只会有一个非零。
+`removed` 是删掉的分组个数（含子分组），两个数字只会有一个非零。
 
-**筛选**：`GET /api/projects?collection=12` 取 12 及其子夹的项目；`collection=none` 只取未归类的；
+**筛选**：`GET /api/projects?collection=12` 取 12 及其子分组的项目；`collection=none` 只取未归类的；
 非数字且不是 `none` → `400`（以前会静默当成「全部」，看着像筛了其实没筛）。
 
 ## 导入 / 导出（浏览器书签）
 
 Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，一个解析器全吃。
-**文件夹 → 收藏夹，书签 → 外链项目**（默认 `visibility=private`，仅自己可见）。
+**文件夹 → 分组，书签 → 外链项目**（默认 `visibility=private`，仅自己可见）。
 
 | 方法 | 路径 | 权限 | 说明 |
 |---|---|---|---|
 | POST | `/api/import/bookmarks` | ✍ | multipart：`file`（或 `text` 直接贴 HTML）、`parent_id`、`visibility`、`tag`、`dry_run` |
-| GET | `/api/export/bookmarks` | ✍ | Netscape HTML 附件；`?collection=<id>` 只导这个夹（含子夹） |
+| GET | `/api/export/bookmarks` | ✍ | Netscape HTML 附件；`?collection=<id>` 只导这个分组（含子分组） |
 
 导入的层级映射：
 
 | 场景 | 结果 |
 |---|---|
-| 不指定 `parent_id` | 书签一级文件夹 → 一级收藏夹；二级 → 子收藏夹；**更深的层折进第二级** |
-| 指定 `parent_id` | 目标夹已经是一级，只能再往下放一层：书签一级文件夹 → 它的子夹，更深折进去 |
+| 不指定 `parent_id` | 书签一级文件夹 → 一级分组；二级 → 子分组；**更深的层折进第二级** |
+| 指定 `parent_id` | 目标分组已经是一级，只能再往下放一层：书签一级文件夹 → 它的子分组，更深折进去 |
 
 其它规则：
 
