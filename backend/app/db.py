@@ -446,6 +446,36 @@ def tag_bar_limit(conn: sqlite3.Connection | None = None) -> int:
         return 12
 
 
+PORTAL_MAX_DEFAULT = 500
+PORTAL_MAX_MIN = 50
+PORTAL_MAX_CAP = 5000
+
+
+def clamp_portal_max(raw: object) -> int:
+    """门户 / RSS 一次最多列多少个项目：PORTAL_MAX_MIN–PORTAL_MAX_CAP。
+
+    门户是整页渲染、前端筛选，没有服务端分页；不设上限会被大量项目撑爆首页。
+    """
+    try:
+        n = int(float(str(raw).strip()))
+    except (TypeError, ValueError):
+        return PORTAL_MAX_DEFAULT
+    return max(PORTAL_MAX_MIN, min(PORTAL_MAX_CAP, n))
+
+
+def portal_max(conn: sqlite3.Connection | None = None) -> int:
+    sql = "SELECT value FROM settings WHERE key='portal_max'"
+    try:
+        if conn is not None:
+            row = conn.execute(sql).fetchone()
+        else:
+            with db() as c:
+                row = c.execute(sql).fetchone()
+        return clamp_portal_max(row["value"]) if row else PORTAL_MAX_DEFAULT
+    except sqlite3.Error:
+        return PORTAL_MAX_DEFAULT
+
+
 def set_tags(conn: sqlite3.Connection, project_id: int, names: list[str]) -> None:
     """写项目的标签。规则在 tagspec 里（数量/长度/字符/归一化），这里只落库。
 

@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from .. import author, branding, config, defaults, namerule, pages, storage, tagspec, theme, views
-from ..db import db, get_setting, tag_bar_limit, tag_cap
+from ..db import db, get_setting, portal_max, tag_bar_limit, tag_cap
 from ..security import now_ms, resolve_user
 
 router = APIRouter(tags=["public"])
@@ -21,7 +21,6 @@ PORTAL_HOME = "/portal?gone=1"
 
 # 门户一次最多取多少个（前端在其上做筛选/排序/分页）。
 # 公开门户可能被大量项目灌满，必须有个天花板；超出部分由页面明确提示，不静默截断。
-PORTAL_MAX = 500
 
 
 def _wants_html(request: Request) -> bool:
@@ -319,7 +318,7 @@ def portal(request: Request):
             "FROM projects p LEFT JOIN users u ON u.id=p.owner_id "
             "WHERE p.visibility='portal' AND p.status='active' "
             "AND (p.expires_at IS NULL OR p.expires_at>?) ORDER BY p.created_at DESC LIMIT ?",
-            (now, PORTAL_MAX),
+            (now, portal_max()),
         ).fetchall()
         total_public = conn.execute(
             "SELECT COUNT(*) c FROM projects WHERE visibility='portal' AND status='active' "
@@ -359,8 +358,8 @@ def rss(request: Request):
     with db() as conn:
         rows = conn.execute(
             "SELECT * FROM projects WHERE visibility='portal' AND status='active' "
-            "AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 50",
-            (now,),
+            "AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT ?",
+            (now, portal_max()),  # 与门户同一上限（设置页可调）
         ).fetchall()
 
     base = _base_url(request)

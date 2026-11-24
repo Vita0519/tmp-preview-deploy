@@ -213,6 +213,7 @@ const form = reactive({
   author: { name: '', bio: '', links: [] },
   tag_max: 6,
   tag_bar: 12,
+  portal_max: 500,
 })
 
 const authorTypes = ref([
@@ -295,6 +296,7 @@ async function load() {
     form.ttl = { ...form.ttl, ...(d.ttl_defaults || {}) }
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
+    form.portal_max = d.portal_max ?? 500
     if (d.site_icon) siteIcon.value = d.site_icon
     form.tag_max = d.tags?.max_per_project ?? 6
     form.tag_bar = d.tags?.bar_limit ?? 12
@@ -344,6 +346,7 @@ async function save() {
       },
       default_expire_action: form.default_expire_action,
       public_portal: form.public_portal,
+      portal_max: Number(form.portal_max) || 500,
       // 主题插件定整套画布令牌，主色可以在此基础上手改（custom）
       theme_plugin: pluginKey.value,
       theme_accent: accent.value,
@@ -516,6 +519,7 @@ const state = computed(() =>
     ttl: form.ttl,
     ea: form.default_expire_action,
     pp: form.public_portal,
+    pm: form.portal_max,
     ac: accent.value,
     tp: pluginKey.value,
     au: form.author,
@@ -619,6 +623,28 @@ onUnmounted(() => {
                 </a>
               </div>
               <span class="hint">关闭后 /portal 需要登录；已发出去的直链预览不受影响</span>
+            </div>
+            <div class="frow">
+              <label>门户上限</label>
+              <div class="inlinerow">
+                <label style="display: flex; align-items: center; gap: 7px; font-size: 13px">
+                  门户与 RSS 最多列出
+                  <input
+                    v-model.number="form.portal_max"
+                    type="number"
+                    class="field"
+                    style="width: 96px"
+                    min="50"
+                    max="5000"
+                    step="50"
+                  />
+                  个项目
+                </label>
+              </div>
+              <span class="hint">
+                按创建时间取最新的 N 个，超出的不在门户和 RSS 里显示，但直链照常可用。
+                门户整页渲染，每个项目约 1–2 KB，数值越大首页越重（范围 50–5000，默认 500）
+              </span>
             </div>
           </div>
         </section>
