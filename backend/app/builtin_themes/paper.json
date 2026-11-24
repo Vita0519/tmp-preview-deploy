@@ -24,11 +24,12 @@
     "--bg-rgb": "244,241,234",
     "--line": "#e6e0d3",
     "--line-2": "#d8d0bf",
-    "--track-h": "2px",
-    "--track-seg": "2px",
+    "--track-h": "3px",
+    "--track-seg": "3px",
     "--track-gap": "2px",
     "--track-radius": "0",
     "--card-radius": "6px",
-    "--font-num": "ui-monospace, Consolas, monospace"
+    "--font-num": "ui-monospace, Consolas, monospace",
+    "--track-bg": "rgba(20,22,26,.08)"
   }
 }

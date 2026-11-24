@@ -58,3 +58,4 @@ Thumbs.db
 .preview-data/
 .shots/
 .venv/
+tmp_shots/
