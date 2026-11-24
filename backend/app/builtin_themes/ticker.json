@@ -1,0 +1,43 @@
+{
+  "id": "ticker",
+  "name": "刻度",
+  "version": "1.0.0",
+  "author": "tmp-preview",
+  "desc": "深墨画布 + 细分段刻度倒计时条，等宽数字，临期末段呼吸提醒。",
+  "mode": "dark",
+  "default_accent": "#2dd4bf",
+  "accents": [
+    "#2dd4bf",
+    "#22d3ee",
+    "#a3e635",
+    "#f472b6",
+    "#818cf8",
+    "#fb923c"
+  ],
+  "vars": {
+    "--bg": "#0c0e11",
+    "--bg-2": "#101317",
+    "--bg-deep": "#08090b",
+    "--surface": "#13161a",
+    "--surface-2": "#181c21",
+    "--surface-3": "#1d2228",
+    "--ink": "#e8eaed",
+    "--ink-2": "#a9aeb5",
+    "--ink-3": "#737982",
+    "--ink-4": "#4d535a",
+    "--ink-rgb": "232,234,237",
+    "--bg-rgb": "12,14,17",
+    "--line": "#1f242a",
+    "--line-2": "#2a3037",
+    "--warn": "#f59e0b",
+    "--danger": "#f43f5e",
+    "--track-h": "4px",
+    "--track-seg": "5px",
+    "--track-gap": "2px",
+    "--track-radius": "1px",
+    "--track-bg": "rgba(232,234,237,.07)",
+    "--track-glow": "0 0 8px rgba(45,212,191,.45)",
+    "--card-radius": "10px",
+    "--font-num": "ui-monospace, Consolas, monospace"
+  }
+}

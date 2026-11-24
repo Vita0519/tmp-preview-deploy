@@ -46,6 +46,23 @@ your-repo/
 | `--shadow-1` `--shadow-2` `--shadow-pop` `--shadow-panel` `--shadow-drawer` `--edge` | 阴影分档（`--edge` 是卡片顶部的受光高光） |
 | `--select-arrow` | select 下拉箭头（data-uri，无法用 currentColor） |
 
+### 可选布局令牌（v2.4+）
+
+不写就保持默认外观；只收安全取值，写错会安装失败并提示。
+
+| 令牌 | 作用 | 默认 | 取值限制 |
+|---|---|---|---|
+| `--track-h` | 门户倒计时条高度 | `3px` | 1–12px |
+| `--track-seg` | 分段长度，非 0 即启用细分段样式 | `0`（连续线） | 0–99px |
+| `--track-gap` | 段间空隙 | `2px` | 0–99px |
+| `--track-radius` | 倒计时条圆角 | `99px` | px |
+| `--track-bg` | 倒计时条底槽色 | 正文色 10% | 颜色值 |
+| `--track-glow` | 进度发光（box-shadow） | `none` | 阴影值 |
+| `--card-radius` | 门户卡片圆角 | `12px` | px |
+| `--font-num` | 倒计时数字字体 | 继承 | 字体族 |
+
+内置示例：`ticker`（刻度，深色）、`paper`（纸感，浅色）。剩余 <2 小时的倒计时条会缓慢呼吸（尊重"减少动态效果"）。
+
 > `--brand` `--brand-hover` `--brand-soft` `--brand-line` `--brand-deep` `--brand-light` `--brand-rgb`
 > **不进清单**：它们由用户主色（`default_accent` 或用户微调值）按 `mode` 实时派生，
 > 清单里写了也会被忽略。深浅两把尺子保证主色在按钮（白字）和画布（文字/徽标）上都 ≥3:1。

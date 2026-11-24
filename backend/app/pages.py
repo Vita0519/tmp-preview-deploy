@@ -372,7 +372,7 @@ padding-top:14px;margin-bottom:18px}
 .grid[hidden]{display:none}
 .wrap[data-cols] .grid{grid-template-columns:repeat(auto-fill,minmax(max(260px,calc((100% - (var(--pcols) - 1) * 12px) / var(--pcols))),1fr))}
 .card{position:relative;display:flex;flex-direction:column;background:var(--surface,#14171d);border:1px solid rgba(var(--ink-rgb),.1);
-border-radius:12px;padding:14px 15px 12px;
+border-radius:var(--card-radius,12px);padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
 .card[hidden]{display:none}
 .card:hover{transform:translateY(-2px);box-shadow:var(--shadow-2);border-color:rgba(var(--brand-rgb),.42)}
@@ -396,14 +396,17 @@ border:1px solid rgba(var(--ink-rgb),.09);white-space:nowrap;max-width:100%;over
 .foot{margin-top:auto;padding-top:10px}
 .cdrow{display:flex;align-items:baseline;gap:5px;margin-bottom:6px}
 .cdlab{font-size:10.5px;color:var(--ink-4,#4d5357)}
-.cd{font-size:12.5px;font-weight:650;color:var(--brand);font-variant-numeric:tabular-nums;
+.cd{font-size:12.5px;font-weight:650;color:var(--brand);font-variant-numeric:tabular-nums;font-family:var(--font-num,inherit);
 letter-spacing:-.01em;white-space:nowrap}
 .cd.perm{color:var(--ink-2,#a1a5aa)}
 .cd.warn{color:var(--warn)}
 .cd.dead{color:var(--danger)}
 .cdend{margin-left:auto;font-size:10.5px;color:var(--ink-4,#4d5357);font-variant-numeric:tabular-nums;white-space:nowrap}
-.track{height:3px;border-radius:99px;background:rgba(var(--ink-rgb),.1);overflow:hidden}
-.track > i{display:block;height:100%;border-radius:99px;background:var(--brand);transition:width .5s ease}
+.track{height:var(--track-h,3px);border-radius:var(--track-radius,99px);background:var(--track-bg,rgba(var(--ink-rgb),.1));overflow:hidden}
+.track > i{display:block;height:100%;border-radius:var(--track-radius,99px);background:var(--brand);box-shadow:var(--track-glow,none);transition:width .5s ease}
+.track.warn > i{animation:trackBreath 1.6s ease-in-out infinite}
+@keyframes trackBreath{50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.track > i{animation:none!important;transition:none}}
 .track.warn > i{background:var(--warn)}
 .track.dead > i{background:var(--danger)}
 /* ---------- 到期删除：不是「停访」而是连文件一起清掉，得一眼看出来 ---------- */

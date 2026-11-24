@@ -1,0 +1,34 @@
+{
+  "id": "paper",
+  "name": "纸感",
+  "version": "1.0.0",
+  "author": "tmp-preview",
+  "desc": "米白纸面 + 极细密分段倒计时条，直角卡片，安静的阅读感。",
+  "mode": "light",
+  "default_accent": "#9a3412",
+  "accents": [
+    "#9a3412",
+    "#1e3a8a",
+    "#14532d",
+    "#7c2d12",
+    "#581c87",
+    "#334155"
+  ],
+  "vars": {
+    "--bg": "#f4f1ea",
+    "--bg-2": "#f8f6f0",
+    "--bg-deep": "#ece8de",
+    "--surface": "#fffdf8",
+    "--surface-2": "#faf7f0",
+    "--surface-3": "#f3efe6",
+    "--bg-rgb": "244,241,234",
+    "--line": "#e6e0d3",
+    "--line-2": "#d8d0bf",
+    "--track-h": "2px",
+    "--track-seg": "2px",
+    "--track-gap": "2px",
+    "--track-radius": "0",
+    "--card-radius": "6px",
+    "--font-num": "ui-monospace, Consolas, monospace"
+  }
+}

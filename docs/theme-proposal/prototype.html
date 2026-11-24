@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>主题原型 · 刻度 Ticker</title>
+<style>
+/* ---------- 基底：沿用 ivory / noir 语义令牌 ---------- */
+:root{--bg:#f6f7f5;--surface:#fff;--ink:#14161a;--ink-2:#4a5057;--ink-3:#7b8189;--ink-4:#a8adb4;--ink-rgb:20,22,26;
+--line:#e7e9e6;--warn:#b45309;--danger:#b42318;--brand:#0f766e;--shadow-2:0 1px 2px rgba(20,22,26,.04),0 12px 24px -18px rgba(20,22,26,.4);
+/* 新增：倒计时条令牌（默认值 = 现在的连续细线，老主题零变化） */
+--track-h:3px;--track-radius:99px;--track-bg:rgba(var(--ink-rgb),.1);
+--track-seg:0px;--track-gap:0px;            /* seg=0 表示不分段 */
+--track-glow:none;--card-radius:14px;--font-num:ui-monospace,Consolas,monospace}
+/* 主题「刻度 Ticker」：深墨底 + 细分段刻度条 + 等宽数字 */
+[data-theme=ticker]{--bg:#0c0e11;--surface:#13161a;--ink:#e8eaed;--ink-2:#a9aeb5;--ink-3:#737982;--ink-4:#4d535a;--ink-rgb:232,234,237;
+--line:#1f242a;--warn:#f59e0b;--danger:#f43f5e;--brand:#2dd4bf;--shadow-2:0 18px 40px -28px rgba(0,0,0,.9);
+--track-h:4px;--track-radius:1px;--track-bg:rgba(var(--ink-rgb),.07);--track-seg:5px;--track-gap:2px;
+--track-glow:0 0 8px rgba(45,212,191,.45);--card-radius:10px}
+/* 主题「纸感 Paper」：浅色，分段更密更细 */
+[data-theme=paper]{--bg:#f4f1ea;--surface:#fffdf8;--line:#e6e0d3;--brand:#9a3412;
+--track-h:2px;--track-radius:0;--track-seg:2px;--track-gap:2px;--card-radius:6px}
+
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"PingFang SC","Microsoft YaHei";transition:background .3s}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+h1{font-size:18px;margin:0}.sub{color:var(--ink-3);font-size:12.5px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--surface)}
+.seg button{border:0;background:none;color:var(--ink-2);padding:6px 12px;border-radius:7px;cursor:pointer;font:inherit}
+.seg button.on{background:var(--brand);color:#fff}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--card-radius);padding:15px;box-shadow:var(--shadow-2)}
+.card b{display:block;font-size:14.5px;margin-bottom:2px}.card p{margin:0 0 14px;color:var(--ink-3);font-size:12.5px}
+.cdrow{display:flex;align-items:baseline;gap:5px;margin-bottom:7px}
+.cdlab{font-size:10.5px;color:var(--ink-4)}
+.cd{font:650 12.5px var(--font-num);color:var(--brand)}.cd.warn{color:var(--warn)}.cd.dead{color:var(--danger)}
+.cdend{margin-left:auto;font-size:10.5px;color:var(--ink-4)}
+/* ---------- 核心：分段条只靠变量 + mask，宽度动画逻辑完全不动 ---------- */
+.track{height:var(--track-h);border-radius:var(--track-radius);background:var(--track-bg);overflow:hidden;position:relative}
+.track>i{display:block;height:100%;border-radius:var(--track-radius);background:var(--brand);box-shadow:var(--track-glow);transition:width .5s ease}
+.track.warn>i{background:var(--warn)}.track.dead>i{background:var(--danger)}
+.segmented .track,.segmented .track>i{border-radius:var(--track-radius)}
+.segmented .track{
+  -webkit-mask:repeating-linear-gradient(90deg,#000 0 var(--track-seg),transparent var(--track-seg) calc(var(--track-seg) + var(--track-gap)));
+          mask:repeating-linear-gradient(90deg,#000 0 var(--track-seg),transparent var(--track-seg) calc(var(--track-seg) + var(--track-gap)))}
+/* 末段呼吸：剩余 <2h 时最后一格闪烁 */
+.track.warn>i{animation:breath 1.6s ease-in-out infinite}
+@keyframes breath{50%{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.track>i{animation:none!important;transition:none}}
+.note{margin-top:28px;padding:14px 16px;border:1px dashed var(--line);border-radius:10px;color:var(--ink-2);font-size:12.5px}
+code{font-family:var(--font-num);font-size:12px}
+</style></head>
+<body data-theme="ticker" class="segmented"><div class="wrap">
+<header><div><h1>临时预览站 · 门户原型</h1><div class="sub">切换主题看倒计时条；数字每秒刷新</div></div>
+<div class="seg" id="sw"><button data-t="default">现有（连续线）</button><button data-t="ticker" class="on">刻度 Ticker</button><button data-t="paper">纸感 Paper</button></div></header>
+<div class="grid" id="g"></div>
+<div class="note">实现方式：主题清单新增 <code>--track-h / --track-seg / --track-gap / --track-radius / --track-bg / --track-glow / --card-radius / --font-num</code> 八个可选令牌；
+<code>--track-seg</code> 为 0 时不加 mask，老主题外观完全不变。门户 JS 只改 <code>width</code>，分段由 CSS mask 切出来，所以不需要改倒计时逻辑。</div>
+</div>
+<script>
+var H=3600e3,now=Date.now(),data=[["沙丘设定集","静态站 · 12.4MB",.92,24*H],["季度汇报","PDF · 3.1MB",.55,72*H],["活动落地页","外链",.23,48*H],["设计稿评审","HTML · 860KB",.04,30*H],["测试包","ZIP · 41MB",.6,6*H],["临时分享","已到期",0,10*H]];
+var g=document.getElementById('g');
+data.forEach(function(d){var c=document.createElement('div');c.className='card';c.dataset.exp=now+d[2]*d[3];c.dataset.total=d[3];
+c.innerHTML='<b>'+d[0]+'</b><p>'+d[1]+'</p><div class="cdrow"><span class="cdlab">剩余</span><span class="cd"></span><span class="cdend">到期 11-2'+(5+g.children.length%4)+'</span></div><div class="track"><i></i></div>';g.appendChild(c)});
+function pad(n){return n<10?'0'+n:n}
+function fmt(l){var s=Math.floor(l/1e3),d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d>0?d+'天'+h+'h':h+':'+pad(m)+':'+pad(s%60)}
+function tick(){var t=Date.now();[].forEach.call(g.children,function(c){var l=c.dataset.exp-t,w=l>0&&l<2*H,dd=l<=0,cd=c.querySelector('.cd'),b=c.querySelector('.track');
+cd.textContent=dd?'已到期':fmt(l);cd.className='cd'+(w?' warn':dd?' dead':'');b.className='track'+(w?' warn':dd?' dead':'');
+b.firstChild.style.width=(dd?0:Math.max(1.5,Math.min(100,l/c.dataset.total*100)))+'%'})}
+tick();setInterval(tick,1000);
+document.getElementById('sw').onclick=function(e){var t=e.target.dataset.t;if(!t)return;
+[].forEach.call(this.children,function(b){b.classList.toggle('on',b===e.target)});
+document.body.dataset.theme=t;document.body.classList.toggle('segmented',t!=='default')};
+</script></body></html>

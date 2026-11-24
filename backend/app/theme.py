@@ -45,6 +45,20 @@ BRAND_KEYS = {
     "--brand-deep", "--brand-light", "--brand-rgb",
 }
 
+# 可选布局令牌（v2.4）：倒计时条 / 卡片圆角 / 数字字体。缺省值写在页面 CSS 的 var() 回退里，
+# 老主题不写就和以前完全一样。长度类只收 0-40px 的 px 值，防止把页面撑坏。
+_PX = re.compile(r"^(0|\d{1,2}(\.\d)?px)$")
+LAYOUT_KEYS = {
+    "--track-h": re.compile(r"^([1-9]|1[0-2])(\.\d)?px$"),
+    "--track-seg": _PX,
+    "--track-gap": _PX,
+    "--track-radius": _PX,
+    "--card-radius": _PX,
+    "--track-bg": re.compile(r"^[#a-z0-9(),.%\s-]{1,80}$", re.I),
+    "--track-glow": re.compile(r"^(none|[#a-z0-9(),.%\s-]{1,120})$", re.I),
+    "--font-num": re.compile(r"^[a-z0-9\s,\"'-]{1,160}$", re.I),
+}
+
 PRESETS = [
     ("墨绿", "#0f766e"),
     ("翠绿", "#10b981"),
@@ -165,6 +179,11 @@ def _manifest_from_raw(raw: bytes, source: str) -> dict:
         val = str(v).strip()
         if not val or len(val) > 500:
             raise ValueError(f"变量 {key} 的值必须是 1-500 字符")
+        if any(ch in val for ch in "{};<>"):
+            raise ValueError(f"变量 {key} 的值不能包含 {{ }} ; < >")
+        rule = LAYOUT_KEYS.get(key)
+        if rule and not rule.match(val):
+            raise ValueError(f"变量 {key} 的值不合法：{val!r}")
         cleaned[key] = val
     accent = normalize(m.get("default_accent") or DEFAULT)
     accents = []
@@ -365,7 +384,14 @@ def css_vars(accent: str | None = None) -> str:
     for k, v in (plugin.get("vars") or {}).items():
         if k not in BRAND_KEYS:
             parts.append(f"{k}:{v}")
-    return ":root{" + ";".join(parts) + "}"
+    out = ":root{" + ";".join(parts) + "}"
+    v = plugin.get("vars") or {}
+    if str(v.get("--track-seg", "0")).strip() not in ("0", "0px", ""):
+        # 分段倒计时条：只在主题声明了 --track-seg 时才加遮罩，老主题零变化
+        m = ("repeating-linear-gradient(90deg,#000 0 var(--track-seg),transparent var(--track-seg) "
+             "calc(var(--track-seg) + var(--track-gap,2px)))")
+        out += ".track{-webkit-mask:" + m + ";mask:" + m + "}"
+    return out
 
 
 def payload(accent: str | None = None) -> dict:
