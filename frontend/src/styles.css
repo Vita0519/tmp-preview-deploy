@@ -349,8 +349,24 @@ p { margin: 0; }
 
 /* 每个分组节点：自身不撑高，只有展开/编辑时才长出内容 */
 .railnode { display: block; }
-.railkids { display: flex; flex-direction: column; gap: 1px; }
+/* 子级：左侧引导线 + 展开时轻微下滑淡入，层级一眼能分 */
+.railkids {
+  display: flex; flex-direction: column; gap: 1px;
+  margin: 1px 0 3px 13px; padding-left: 4px;
+  border-left: 1px solid var(--rail-guide, var(--line-2));
+  animation: railIn 0.18s var(--ease);
+}
+.railkids .railrow.kid { padding-left: 10px; }
+.railkids .railrow.kid.on { box-shadow: inset 2px 0 0 var(--brand); }
+.railgbody { display: flex; flex-direction: column; gap: 1px; animation: railIn 0.18s var(--ease); }
+@keyframes railIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .railkids, .railgbody { animation: none; } }
 .railmenu.kidmenu { margin-left: 20px; }
+/* 折叠箭头：点击热区放大到 20px，悬停有底色，和整行的选中区分开 */
+.railrow .caret { width: 18px; height: 18px; flex-basis: 18px; margin-left: -3px; border-radius: 4px; }
+.railrow .caret:not(.leaf):hover { background: rgba(var(--ink-rgb), 0.08); color: var(--ink-2); }
+.railrow .caret svg { transition: transform 0.16s var(--ease); }
+.railgroup .crt { order: -1; }
 
 /* 归类下拉：宽屏用左侧分组栏就够了，窄屏（侧栏隐藏）才需要它兜底 */
 .colfallback { display: none; }

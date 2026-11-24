@@ -65,10 +65,18 @@ const groups = computed(() => {
   }))
 })
 
-const gopen = ref({})
+// 折叠状态记在 localStorage，刷新后保持
+const loadFold = (k) => {
+  try { return JSON.parse(localStorage.getItem(k) || '{}') || {} } catch { return {} }
+}
+const saveFold = (k, v) => {
+  try { localStorage.setItem(k, JSON.stringify(v)) } catch {}
+}
+const gopen = ref(loadFold('pv_rail_groups'))
 const groupOpen = (key) => gopen.value[key] !== false // 默认展开
 function toggleGroup(key) {
   gopen.value = { ...gopen.value, [key]: !groupOpen(key) }
+  saveFold('pv_rail_groups', gopen.value)
 }
 
 // 空状态要按「筛完之后还剩几个分组」判断，不能看 items.length
@@ -82,7 +90,7 @@ const VIS_ROWS = [
   { key: 'private', label: '仅自己', icon: 'key' },
 ]
 
-const open = ref({})
+const open = ref(loadFold('pv_rail_nodes'))
 const menu = ref('')
 // {mode:'new'|'rename', id, parentId, value}
 const edit = ref(null)
@@ -109,6 +117,7 @@ const editKey = computed(() => {
 
 function toggle(id) {
   open.value = { ...open.value, [id]: !open.value[id] }
+  saveFold('pv_rail_nodes', open.value)
 }
 
 function pick(key) {
@@ -262,7 +271,7 @@ function countOf(node) {
           <Icon name="chevron" :size="10" class="crt" />
         </div>
 
-        <template v-if="g.flat || groupOpen(g.key)">
+        <div v-if="g.flat || groupOpen(g.key)" class="railgbody">
         <div v-for="node in g.nodes" :key="node.id" class="railnode">
           <div
             class="railrow"
@@ -370,7 +379,7 @@ function countOf(node) {
               @blur="submitEdit"
             />
           </div>
-        </template>
+        </div>
       </div>
 
       <div v-if="!visibleCount && !loading" class="railempty">

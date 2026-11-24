@@ -476,6 +476,31 @@ def portal_max(conn: sqlite3.Connection | None = None) -> int:
         return PORTAL_MAX_DEFAULT
 
 
+# 门户每行最多卡片数：0=自动（按宽度填满），3/4/5=上限；卡片最小宽度始终 260px，不会出现半张
+PORTAL_COLS_CHOICES = (0, 3, 4, 5)
+
+
+def clamp_portal_cols(raw: object) -> int:
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return 0
+    return n if n in PORTAL_COLS_CHOICES else 0
+
+
+def portal_cols(conn: sqlite3.Connection | None = None) -> int:
+    sql = "SELECT value FROM settings WHERE key='portal_cols'"
+    try:
+        if conn is not None:
+            row = conn.execute(sql).fetchone()
+        else:
+            with db() as c:
+                row = c.execute(sql).fetchone()
+        return clamp_portal_cols(row["value"]) if row else 0
+    except sqlite3.Error:
+        return 0
+
+
 def set_tags(conn: sqlite3.Connection, project_id: int, names: list[str]) -> None:
     """写项目的标签。规则在 tagspec 里（数量/长度/字符/归一化），这里只落库。
 

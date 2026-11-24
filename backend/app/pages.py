@@ -283,7 +283,7 @@ def _human(n: int) -> str:
 
 PORTAL_CSS = """
 body{background:linear-gradient(180deg,var(--bg-2,#10131a),var(--bg-deep,#0a0c10) 60%,var(--bg-deep,#07090c));min-height:100vh}
-.wrap{max-width:1080px;margin:0 auto;padding:0 20px 28px;
+.wrap{max-width:1600px;margin:0 auto;padding:0 20px 28px;
 display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box}
 /* 标签以上整体吸附：标题 + 作者名片 + 筛选条 + 标签 */
 .dock{position:sticky;top:0;z-index:20;margin:0 -20px;padding:18px 20px 0;
@@ -367,9 +367,10 @@ cursor:pointer;transition:.16s;white-space:nowrap}
 .tagsbar button.tmore{background:transparent;border:1px dashed rgba(var(--ink-rgb),.24);
 color:var(--ink-3,#757a7e);cursor:help}
 .tagsbar button.tmore:hover{background:transparent;color:var(--ink-3,#757a7e)}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));align-items:stretch;
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));align-items:stretch;
 padding-top:14px;margin-bottom:18px}
 .grid[hidden]{display:none}
+.wrap[data-cols] .grid{grid-template-columns:repeat(auto-fill,minmax(max(260px,calc((100% - (var(--pcols) - 1) * 12px) / var(--pcols))),1fr))}
 .card{position:relative;display:flex;flex-direction:column;background:var(--surface,#14171d);border:1px solid rgba(var(--ink-rgb),.1);
 border-radius:12px;padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
@@ -981,8 +982,10 @@ def portal_page(
     accent: str | None = None,
     truncated: int = 0,
     tag_limit: int = 12,
+    cols: int = 0,
 ) -> str:
     accent = accent or theme.current()
+    cols_attr = f' data-cols="{cols}" style="--pcols:{cols}"' if cols in (3, 4, 5) else ''
     max_views = max([(p.get("views") or 0) for p in items] or [0]) or 1
     # 成员列表：门户按成员筛选，选项从当前可见项目里现算，不额外查库
     owners: dict[int, list] = {}
@@ -1133,7 +1136,7 @@ def portal_page(
 {theme.css_vars(accent)}
 {BASE_CSS}
 {PORTAL_CSS}
-</style></head><body><div class="wrap">
+</style></head><body><div class="wrap"{cols_attr}>
 <div class="gonebar" id="gonebar" hidden>
 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8" r="6.4"/><path d="M8 4.6v3.9M8 11.3v.2"/></svg>
 <span>你打开的那个预览链接已经失效（可能已到期或被移除），这里是站点门户。</span>

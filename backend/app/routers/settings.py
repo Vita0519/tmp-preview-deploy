@@ -6,9 +6,11 @@ from .. import author, branding, config, defaults, tagspec, theme, version
 from ..db import (
     all_settings,
     db,
+    clamp_portal_cols,
     clamp_portal_max,
     get_setting,
     log_event,
+    portal_cols,
     portal_max,
     set_setting,
     tag_bar_limit,
@@ -64,6 +66,7 @@ def read_settings(user: dict = Depends(admin_user)):
         "default_expire_action": s.get("default_expire_action") or "block",
         "public_portal": s.get("public_portal") == "1",
         "portal_max": portal_max(),
+        "portal_cols": portal_cols(),
         "theme": _theme_payload(s),
         "site_icon": _icon_payload(),
         "tags": _tags_payload(),
@@ -106,6 +109,8 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         set_setting("public_portal", "1" if payload["public_portal"] else "0")
     if "portal_max" in payload:
         set_setting("portal_max", str(clamp_portal_max(payload["portal_max"])))
+    if "portal_cols" in payload:
+        set_setting("portal_cols", str(clamp_portal_cols(payload["portal_cols"])))
     if "author" in payload:
         author.save(payload["author"])
     # 换主题插件：主色跟着换（除非这次请求同时指定了主色，那就以主色为准——允许选完主题再微调）
@@ -136,6 +141,7 @@ async def update_settings(payload: dict, user: dict = Depends(admin_user)):
         "default_expire_action": get_setting("default_expire_action") or "block",
         "public_portal": get_setting("public_portal", "0") == "1",
         "portal_max": portal_max(),
+        "portal_cols": portal_cols(),
         "theme": _theme_payload(),
         "site_icon": _icon_payload(),
         "tags": _tags_payload(),

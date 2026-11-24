@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from .. import author, branding, config, defaults, namerule, pages, storage, tagspec, theme, views
-from ..db import db, get_setting, portal_max, tag_bar_limit, tag_cap
+from ..db import db, get_setting, portal_cols, portal_max, tag_bar_limit, tag_cap
 from ..security import now_ms, resolve_user
 
 router = APIRouter(tags=["public"])
@@ -338,6 +338,7 @@ def portal(request: Request):
             theme.current(),
             truncated=max(0, total_public - len(items)),
             tag_limit=tag_bar_limit(),
+            cols=portal_cols(),
         ),
         headers=NOINDEX,
     )

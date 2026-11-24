@@ -214,6 +214,7 @@ const form = reactive({
   tag_max: 6,
   tag_bar: 12,
   portal_max: 500,
+  portal_cols: 0,
 })
 
 const authorTypes = ref([
@@ -297,6 +298,7 @@ async function load() {
     form.default_expire_action = d.default_expire_action || 'block'
     form.public_portal = d.public_portal
     form.portal_max = d.portal_max ?? 500
+    form.portal_cols = d.portal_cols ?? 0
     if (d.site_icon) siteIcon.value = d.site_icon
     form.tag_max = d.tags?.max_per_project ?? 6
     form.tag_bar = d.tags?.bar_limit ?? 12
@@ -333,6 +335,29 @@ function addLink() {
 function removeLink(i) {
   form.author.links.splice(i, 1)
 }
+// 链接排序：拖拽 + 上下按钮
+const dragFrom = ref(-1)
+const dragOver = ref(-1)
+function dragStart(i, e) {
+  dragFrom.value = i
+  if (e?.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    try { e.dataTransfer.setData('text/plain', String(i)) } catch {}
+  }
+}
+function moveLinkTo(from, to) {
+  const arr = form.author.links
+  if (from < 0 || to < 0 || from >= arr.length || to >= arr.length || from === to) return
+  const [it] = arr.splice(from, 1)
+  arr.splice(to, 0, it)
+}
+function dropLink(i) {
+  moveLinkTo(dragFrom.value, i)
+  dragFrom.value = dragOver.value = -1
+}
+function moveLink(i, d) {
+  moveLinkTo(i, i + d)
+}
 
 async function save() {
   busy.value = true
@@ -347,6 +372,7 @@ async function save() {
       default_expire_action: form.default_expire_action,
       public_portal: form.public_portal,
       portal_max: Number(form.portal_max) || 500,
+      portal_cols: Number(form.portal_cols) || 0,
       // 主题插件定整套画布令牌，主色可以在此基础上手改（custom）
       theme_plugin: pluginKey.value,
       theme_accent: accent.value,
@@ -520,6 +546,7 @@ const state = computed(() =>
     ea: form.default_expire_action,
     pp: form.public_portal,
     pm: form.portal_max,
+    pc: form.portal_cols,
     ac: accent.value,
     tp: pluginKey.value,
     au: form.author,
@@ -623,6 +650,16 @@ onUnmounted(() => {
                 </a>
               </div>
               <span class="hint">关闭后 /portal 需要登录；已发出去的直链预览不受影响</span>
+            </div>
+            <div class="frow">
+              <label>每行卡片</label>
+              <div class="inlinerow">
+                <div class="segs">
+                  <button v-for="o in [{v:0,t:'自动'},{v:3,t:'3'},{v:4,t:'4'},{v:5,t:'5'}]" :key="o.v" type="button"
+                    class="btn sm" :class="{ primary: form.portal_cols === o.v }" @click="form.portal_cols = o.v">{{ o.t }}</button>
+                </div>
+              </div>
+              <span class="hint">门户卡片视图每行最多几张。自动＝按屏幕宽度铺满；卡片最小 260px，屏幕不够宽时自动减列，不会出现半张</span>
             </div>
             <div class="frow">
               <label>门户上限</label>
@@ -900,7 +937,21 @@ onUnmounted(() => {
               <div class="frow">
                 <label>链接</label>
                 <div class="linkrows">
-                  <div v-for="(l, i) in form.author.links" :key="i" class="linkrow">
+                  <div
+                    v-for="(l, i) in form.author.links"
+                    :key="i"
+                    class="linkrow"
+                    :class="{ dragging: dragFrom === i, dropover: dragOver === i && dragFrom !== i }"
+                    @dragover.prevent="dragOver = i"
+                    @drop.prevent="dropLink(i)"
+                  >
+                    <span
+                      class="grip"
+                      draggable="true"
+                      title="拖动调整顺序"
+                      @dragstart="dragStart(i, $event)"
+                      @dragend="dragFrom = dragOver = -1"
+                    >⋮⋮</span>
                     <div class="typesel" :class="{ open: openType === i }">
                       <button type="button" class="ts-btn" @click.stop="toggleType(i, $event)">
                         <svg class="ts-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
@@ -919,6 +970,10 @@ onUnmounted(() => {
                       class="input url"
                       :placeholder="l.type === 'mail' ? 'hi@example.com' : 'https://…（可省略 https://）'"
                     />
+                    <span class="mv">
+                      <button type="button" class="btn sm ghost" title="上移" :disabled="i === 0" @click="moveLink(i, -1)">↑</button>
+                      <button type="button" class="btn sm ghost" title="下移" :disabled="i === form.author.links.length - 1" @click="moveLink(i, 1)">↓</button>
+                    </span>
                     <button class="btn sm ghost del" title="删除这条" @click="removeLink(i)">
                       <Icon name="close" :size="12" />
                     </button>
@@ -1290,6 +1345,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.segs { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.segs .btn { min-width: 44px; }
 /* ---------------- 布局：左导航 + 右单列 ----------------
    原来是一堆面板挤在双列网格里，左右高度不一样就到处是空洞；
    现在统一成「左侧分区导航 + 右侧单列纵向」，阅读顺序和滚动方向一致。 */
@@ -1679,6 +1736,18 @@ onUnmounted(() => {
 .linkrow .url { flex: 1 1 auto; min-width: 0; }
 .linkrow .del { flex: 0 0 auto; color: var(--ink-4); }
 .linkrow .del:hover { color: var(--danger); }
+.linkrow { border-radius: 8px; transition: background .15s, box-shadow .15s, opacity .15s; }
+.linkrow.dragging { opacity: .45; }
+.linkrow.dropover { box-shadow: 0 -2px 0 0 var(--brand) inset, 0 2px 0 0 var(--brand); }
+.linkrow .grip {
+  flex: 0 0 auto; width: 16px; text-align: center; cursor: grab; user-select: none;
+  color: var(--ink-4); letter-spacing: -2px; font-size: 13px; line-height: 32px;
+}
+.linkrow .grip:hover { color: var(--ink-2, var(--ink-4)); }
+.linkrow .grip:active { cursor: grabbing; }
+.linkrow .mv { display: inline-flex; gap: 2px; flex: 0 0 auto; }
+.linkrow .mv .btn { padding: 0 6px; color: var(--ink-4); }
+.linkrow .mv .btn:disabled { opacity: .3; cursor: default; }
 .emptyhint { font-size: 12px; padding: 2px 0 4px; }
 
 /* ---- 自绘类型下拉 ---- */
@@ -1792,6 +1861,9 @@ onUnmounted(() => {
   .linkrow .lab { grid-area: 1 / 2; flex: none; }
   .linkrow .url { grid-area: 2 / 1 / 3 / 3; }
   .linkrow .del { grid-area: 1 / 3; align-self: center; }
+  .linkrow .grip { display: none; }
+  .linkrow .mv { grid-area: 2 / 3; }
+  .linkrow .mv .btn { width: 36px; height: 36px; }
   .meter { flex: 1 1 140px; }
   .seriesgrid { grid-template-columns: minmax(0, 1fr); }
 }
