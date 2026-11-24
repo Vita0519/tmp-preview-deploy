@@ -1,7 +1,7 @@
 services:
   tmp-preview:
     # 优先用已推送的镜像；拉不动时可在 NAS 上用 build_image.sh 构建同名镜像
-    image: ghcr.io/vita0519/tmp-preview:2.4.0
+    image: ghcr.io/vita0519/tmp-preview:2.4.1
     container_name: tmp-preview
     restart: unless-stopped
     ports:
