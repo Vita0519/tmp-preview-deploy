@@ -541,7 +541,11 @@ font-size:12px;color:var(--ink,#e8eaf0);outline:none;cursor:pointer}
   .pgbtn{min-width:26px;height:26px;font-size:11.5px}
   .pgbtn.nav{padding:0 8px}
   .per{height:26px;font-size:11.5px}
-  .grid{grid-template-columns:1fr;padding-top:10px}
+  .grid,.wrap[data-cols] .grid{grid-template-columns:1fr;padding-top:10px}
+  .cbtn,.pgbtn{min-width:36px;min-height:36px}
+  .tagsbar{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tagsbar::-webkit-scrollbar{display:none}
+  .tagsbar button{flex:0 0 auto}
   .rows{padding-top:10px}
   .grid.list .card{flex-wrap:wrap;gap:8px 10px;padding:11px 12px}
   .grid.list .top{flex:1 1 100%;order:1}

@@ -729,6 +729,21 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
 .modal-head h2 { font-size: 14.5px; }
 .modal-body { padding: 15px 18px 14px; overflow-y: auto; }
 .modal-foot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; background: var(--surface-2); }
+/* 手机：弹窗改底部抽屉，按钮加大到 40px 便于点按 */
+@media (max-width: 620px) {
+  .modal {
+    left: 0; right: 0; top: auto; bottom: 0; transform: none;
+    width: 100%; max-width: none; max-height: 90vh;
+    border-radius: 16px 16px 0 0; border-bottom: 0;
+    animation: sheetUp 0.22s var(--ease);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .modal-foot .btn { min-height: 40px; flex: 1 1 0; justify-content: center; }
+  .modal-body { padding: 14px 14px 12px; }
+  .modal-head, .modal-foot { padding-left: 14px; padding-right: 14px; }
+}
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .modal { animation: none; } }
 
 /* ---------------- 表单 ---------------- */
 
