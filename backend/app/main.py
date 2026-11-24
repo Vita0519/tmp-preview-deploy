@@ -11,7 +11,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import cleanup, config, storage, tagspec, views
+from . import cleanup, config, storage, tagspec, views, autobackup
 from .db import init_db
 from .routers import agents, auth, collections, projects, public, settings, transfer
 from .security import bootstrap_admin
@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI):
     tasks = [
         asyncio.create_task(cleanup.flush_loop(stop)),
         asyncio.create_task(cleanup.sweep_loop(stop)),
+        asyncio.create_task(autobackup.loop(stop)),
     ]
     print(f"[boot] data={config.DATA_DIR} static={config.DIST_DIR}", flush=True)
     try:

@@ -175,20 +175,42 @@ async function toggleActive(item) {
   act(item, { active: !item.active }, item.active ? '已停用' : '已启用')
 }
 
-async function remove(item) {
-  const ok = await confirmAction({
-    title: '删除成员',
-    message: `将删除「${item.display_name}」及其名下 ${item.projects} 个项目（含全部文件），不可恢复。`,
-    confirmText: '删除',
-    danger: true,
-  })
-  if (!ok) return
+// 删除成员：名下有项目必须选「转移」或「一起删」；日常建议直接停用
+const del = reactive({ item: null, mode: 'transfer', to: null, confirm: '', busy: false })
+const transferTargets = computed(() =>
+  items.value.filter((a) => del.item && a.id !== del.item.id && a.role !== 'viewer'),
+)
+function remove(item) {
+  del.item = item
+  del.mode = item.projects ? 'transfer' : 'delete'
+  del.to = store.user?.id !== item.id ? store.user?.id : (transferTargets.value[0]?.id ?? null)
+  del.confirm = ''
+}
+const delReady = computed(() => {
+  if (!del.item) return false
+  if (!del.item.projects) return true
+  if (del.mode === 'transfer') return !!del.to
+  return del.confirm.trim() === del.item.username
+})
+async function disableInstead() {
+  const item = del.item
+  del.item = null
+  if (item.active) act(item, { active: false }, '已停用，项目照常在线')
+}
+async function doRemove() {
+  if (!delReady.value) return
+  del.busy = true
+  const it = del.item
+  const q = !it.projects ? '' : del.mode === 'transfer' ? `?mode=transfer&transfer_to=${del.to}` : '?mode=delete'
   try {
-    await api.del(`/api/agents/${item.id}`)
-    toast('成员已删除')
+    const d = await api.del(`/api/agents/${it.id}${q}`)
+    toast(d.transferred ? `已删除，${d.transferred} 个项目转给 ${d.to}` : `成员已删除${d.removed_projects ? `，连同 ${d.removed_projects} 个项目` : ''}`)
+    del.item = null
     load()
   } catch (e) {
     toast(e.message || '删除失败', 'err')
+  } finally {
+    del.busy = false
   }
 }
 
@@ -483,6 +505,43 @@ onMounted(load)
     </p>
   </div>
 
+
+  <div v-if="del.item" class="scrim" @click="del.item = null" />
+  <div v-if="del.item" class="modal" style="width: 460px">
+    <div class="modal-head">
+      <h2>删除成员「{{ del.item.display_name || del.item.username }}」</h2>
+      <div style="flex: 1" />
+      <button class="btn ghost icon" @click="del.item = null"><Icon name="close" :size="14" /></button>
+    </div>
+    <div class="modal-body">
+      <p class="hint" style="margin: 0 0 12px">
+        只是不让他再用？<a href="#" @click.prevent="disableInstead">改为停用</a>：不能登录、API Key 失效，项目照常在线，随时能恢复。
+      </p>
+      <template v-if="del.item.projects">
+        <p style="margin: 0 0 10px">名下有 <b>{{ del.item.projects }}</b> 个项目，删除前请选择处理方式：</p>
+        <label class="delopt">
+          <input v-model="del.mode" type="radio" value="transfer" />
+          <span><b>转移给其他成员</b>（推荐）——项目、合集一并转过去，分享链接不受影响</span>
+        </label>
+        <select v-if="del.mode === 'transfer'" v-model="del.to" class="input" style="margin: 6px 0 10px 24px; width: calc(100% - 24px)">
+          <option v-for="a in transferTargets" :key="a.id" :value="a.id">{{ a.display_name }}（{{ a.username }}）</option>
+        </select>
+        <label class="delopt">
+          <input v-model="del.mode" type="radio" value="delete" />
+          <span style="color: var(--danger)"><b>连同项目一起删除</b>——文件和链接全部失效，不可恢复</span>
+        </label>
+        <input v-if="del.mode === 'delete'" v-model="del.confirm" class="input" style="margin: 6px 0 0 24px; width: calc(100% - 24px)"
+          :placeholder="`输入账号 ${del.item.username} 确认`" />
+      </template>
+      <p v-else style="margin: 0">该成员名下没有项目，删除后账号不可恢复。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" @click="del.item = null">取消</button>
+      <button class="btn danger" :disabled="!delReady || del.busy" @click="doRemove">
+        {{ del.busy ? '处理中…' : del.mode === 'transfer' && del.item.projects ? '转移并删除' : '删除' }}
+      </button>
+    </div>
+  </div>
   <div v-if="createOpen" class="scrim" @click="createOpen = false" />
   <div v-if="createOpen" class="modal" style="width: 420px">
     <div class="modal-head">
@@ -574,6 +633,8 @@ onMounted(load)
 </template>
 
 <style scoped>
+.delopt { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; margin: 4px 0; }
+.delopt input { margin-top: 3px; }
 /* ---------- 角色切换下拉：三档，按角色着色 ---------- */
 .rolesel {
   appearance: none;

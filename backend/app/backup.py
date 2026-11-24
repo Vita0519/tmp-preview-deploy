@@ -65,11 +65,46 @@ def _counts(conn) -> dict:
     }
 
 
-def build_zip() -> Path:
-    """打一个全站备份包，返回 zip 路径（调用方负责删）。"""
+# 备份包里的数据目录：(实际目录, 包内前缀)。themes = 主题商店装的插件（v2.4.1 起）
+def _folders() -> list[tuple[Path, str]]:
+    d = Path(config.DATA_DIR)
+    return [
+        (Path(config.FILES_DIR), "projects"),
+        (Path(config.ZIPS_DIR), "zips"),
+        (d / "branding", "branding"),
+        (d / "themes", "themes"),
+    ]
+
+
+class _Sink:
+    """只进不退的写端：zipfile 发现不能 seek 会自动改用 data descriptor，边写边吐。"""
+
+    def __init__(self) -> None:
+        self.buf = bytearray()
+        self.pos = 0
+
+    def write(self, b) -> int:
+        self.buf += b
+        self.pos += len(b)
+        return len(b)
+
+    def tell(self) -> int:
+        return self.pos
+
+    def flush(self) -> None:
+        pass
+
+    def pop(self) -> bytes:
+        out = bytes(self.buf)
+        self.buf.clear()
+        return out
+
+
+def _snapshot() -> Path:
+    """数据库快照 + manifest 落到一个小临时目录（只有库那么大，不含项目文件）。"""
+    work = Path(tempfile.mkdtemp(prefix="pvbackup-"))
+    snap = work / "db.sqlite3"
     with LOCK:
-        work = Path(tempfile.mkdtemp(prefix="pvbackup-"))
-        snap = work / "db.sqlite3"
         src = sqlite3.connect(str(config.DB_PATH), timeout=15)
         try:
             dst = sqlite3.connect(str(snap))
@@ -80,38 +115,75 @@ def build_zip() -> Path:
                 dst.close()
         finally:
             src.close()
+    (work / MANIFEST).write_text(
+        json.dumps(
+            {"app": "tmp-preview-deploy", "format": 1, "created_at": now_ms(),
+             "counts": counts, "site_title": _site_title()},
+            ensure_ascii=False, indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return work
 
-        (work / MANIFEST).write_text(
-            json.dumps(
-                {
-                    "app": "tmp-preview-deploy",
-                    "format": 1,
-                    "created_at": now_ms(),
-                    "counts": counts,
-                    "site_title": _site_title(),
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
 
-        out = Path(tempfile.mkdtemp(prefix="pvbackupzip-")) / f"preview-backup-{time.strftime('%Y%m%d-%H%M%S')}.zip"
-        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-            z.write(snap, "db.sqlite3")
+def backup_name(prefix: str = "preview-backup") -> str:
+    return f"{prefix}-{time.strftime('%Y%m%d-%H%M%S')}.zip"
+
+
+def iter_zip(chunk: int = 1 << 20):
+    """流式生成备份 zip：边读边压边吐，服务器上不再先攒一整份包。
+
+    已经是压缩包的 zips/ 直接 STORED，不浪费 CPU 二次压缩。
+    """
+    work = _snapshot()
+    sink = _Sink()
+    try:
+        with zipfile.ZipFile(sink, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+            z.write(work / "db.sqlite3", "db.sqlite3")
             z.write(work / MANIFEST, MANIFEST)
-            for folder, prefix in (
-                (config.FILES_DIR, "projects"),
-                (config.ZIPS_DIR, "zips"),
-                (Path(config.DATA_DIR) / "branding", "branding"),
-            ):
+            yield sink.pop()
+            for folder, prefix in _folders():
                 if not folder.is_dir():
                     continue
                 for p in folder.rglob("*"):
-                    if p.is_file():
-                        z.write(p, str(Path(prefix) / p.relative_to(folder)))
+                    if not p.is_file():
+                        continue
+                    arc = str(Path(prefix) / p.relative_to(folder)).replace("\\", "/")
+                    zi = zipfile.ZipInfo.from_file(p, arc)
+                    zi.compress_type = zipfile.ZIP_STORED if prefix == "zips" else zipfile.ZIP_DEFLATED
+                    try:
+                        with open(p, "rb") as f, z.open(zi, "w") as w:
+                            while True:
+                                b = f.read(chunk)
+                                if not b:
+                                    break
+                                w.write(b)
+                                if len(sink.buf) >= chunk:
+                                    yield sink.pop()
+                    except OSError as exc:  # 文件在打包途中被删（到期清理）就跳过，别让整份备份失败
+                        print(f"[backup] 跳过 {arc}：{exc}", flush=True)
+                    if sink.buf:
+                        yield sink.pop()
+        yield sink.pop()
+    finally:
         _rm_tree(work)
-        return out
+
+
+def build_zip(dest: Path | None = None) -> Path:
+    """把流式备份写到磁盘文件（自动备份用）。先写 .part 再改名，半截文件永远不会被当成备份。"""
+    if dest is None:
+        dest = Path(tempfile.mkdtemp(prefix="pvbackupzip-")) / backup_name()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    try:
+        with open(part, "wb") as f:
+            for b in iter_zip():
+                f.write(b)
+        part.replace(dest)
+    finally:
+        if part.exists():
+            part.unlink()
+    return dest
 
 
 def _site_title() -> str:
@@ -153,7 +225,7 @@ def inspect(zip_path: Path) -> dict:
         names = z.namelist()
         if "db.sqlite3" not in names:
             raise ValueError("这个 zip 里没有 db.sqlite3，不像是本站的备份")
-        info = {"db": True, "files": 0, "zips": 0, "branding": 0, "manifest": None}
+        info = {"db": True, "files": 0, "zips": 0, "branding": 0, "themes": 0, "manifest": None}
         for n in names:
             if n.startswith("projects/"):
                 info["files"] += 1
@@ -161,6 +233,8 @@ def inspect(zip_path: Path) -> dict:
                 info["zips"] += 1
             elif n.startswith("branding/"):
                 info["branding"] += 1
+            elif n.startswith("themes/") and n.endswith("theme.json"):
+                info["themes"] += 1
         if MANIFEST in names:
             try:
                 info["manifest"] = json.loads(z.read(MANIFEST).decode("utf-8"))
@@ -215,6 +289,8 @@ def restore(zip_path: Path) -> dict:
                 (config.FILES_DIR, "projects"),
                 (config.ZIPS_DIR, "zips"),
                 (Path(config.DATA_DIR) / "branding", "branding"),
+                # 老备份包里没有 themes/：照样挪走现网的，保持「恢复 = 回到备份时」的语义
+                (Path(config.DATA_DIR) / "themes", "themes"),
                 # WAL 的两个侧文件必须跟着走：留下旧 -wal，SQLite 会把它当成
                 # 新库的日志往下重放，恢复完就是一堆错乱数据
                 (Path(str(config.DB_PATH) + "-wal"), "db.sqlite3-wal"),

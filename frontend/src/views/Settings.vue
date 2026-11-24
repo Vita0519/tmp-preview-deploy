@@ -409,6 +409,32 @@ async function changePassword() {
 }
 
 
+// ---------------- 自动备份 ----------------
+const auto = reactive({})
+const autoBusy = ref(false)
+async function loadAuto() {
+  try { Object.assign(auto, await api.get('/api/backup/auto')) } catch (e) { /* 老后端没有这个接口 */ }
+}
+async function saveAuto(patch) {
+  try {
+    Object.assign(auto, await api.patch('/api/backup/auto', patch))
+    toast('自动备份设置已保存')
+  } catch (e) { toast(e.message || '保存失败', 'err') }
+}
+async function runAuto() {
+  autoBusy.value = true
+  try {
+    Object.assign(auto, await api.post('/api/backup/auto/run', {}))
+    toast('备份完成')
+  } catch (e) { toast(e.message || '备份失败', 'err') } finally { autoBusy.value = false }
+}
+async function delAuto(f) {
+  const ok = await confirmAction({ title: '删除这份自动备份？', message: f.name, confirmText: '删除', danger: true })
+  if (!ok) return
+  try { Object.assign(auto, await api.del('/api/backup/auto/' + f.name)) } catch (e) { toast(e.message || '删除失败', 'err') }
+}
+onMounted(loadAuto)
+
 // ---------------- 备份与恢复 ----------------
 const backupFile = ref(null)
 const backupBusy = ref(false)
@@ -1053,7 +1079,7 @@ onUnmounted(() => {
         <section id="backup" class="panel">
           <div class="panel-head">
             <h2>备份与恢复</h2>
-            <span class="pdesc">数据库 + 项目文件 + 下载包 + 站点图标，一个 zip 全带走</span>
+            <span class="pdesc">数据库 + 项目文件 + 下载包 + 站点图标 + 主题插件，一个 zip 全带走</span>
           </div>
           <div class="panel-body form">
             <div class="frow">
@@ -1063,8 +1089,39 @@ onUnmounted(() => {
                   <Icon name="download" :size="13" /> 打包下载
                 </a>
                 <span class="hint" style="margin: 0">
-                  数据库用在线快照，正在写入也不会拷到半截
+                  边打包边下载，不占服务器临时空间；数据库用在线快照，正在写入也不会拷到半截
                 </span>
+              </div>
+            </div>
+
+            <div class="frow">
+              <label>自动备份</label>
+              <div class="colorrow" style="flex-wrap: wrap; gap: 8px">
+                <button type="button" class="btn sm" :class="{ primary: auto.enabled }" @click="saveAuto({ enabled: !auto.enabled })">
+                  {{ auto.enabled ? '已开启' : '已关闭' }}
+                </button>
+                <span class="hint" style="margin: 0">每天</span>
+                <select class="input" style="width: 84px" :value="auto.hour" @change="saveAuto({ hour: +$event.target.value })">
+                  <option v-for="h in 24" :key="h" :value="h - 1">{{ String(h - 1).padStart(2, '0') }}:00</option>
+                </select>
+                <span class="hint" style="margin: 0">保留最近</span>
+                <input class="input" type="number" min="1" max="60" style="width: 70px" :value="auto.keep" @change="saveAuto({ keep: +$event.target.value })" />
+                <span class="hint" style="margin: 0">份</span>
+                <button type="button" class="btn sm" :disabled="autoBusy" @click="runAuto">{{ autoBusy ? '备份中…' : '立即备份一次' }}</button>
+              </div>
+              <span class="hint">
+                存在服务器 data/backups/，按服务器时区（{{ auto.server_time || '—' }}）。
+                已有 {{ auto.files?.length || 0 }} 份，共 {{ fmtBytes(auto.total_size || 0) }}，磁盘剩余 {{ fmtBytes(auto.disk_free || 0) }}。
+                <template v-if="auto.last_at">上次成功 {{ relTime(auto.last_at) }}。</template>
+                <b v-if="auto.last_error" style="color: var(--danger)">上次失败：{{ auto.last_error }}</b>
+              </span>
+              <div v-if="auto.files?.length" class="autolist">
+                <div v-for="f in auto.files" :key="f.name" class="autorow">
+                  <code>{{ f.name }}</code>
+                  <span class="hint" style="margin: 0">{{ fmtBytes(f.size) }}</span>
+                  <a class="btn sm ghost" :href="'/api/backup/auto/' + f.name" download><Icon name="download" :size="12" /></a>
+                  <button type="button" class="btn sm ghost" style="color: var(--danger)" @click="delAuto(f)"><Icon name="trash" :size="12" /></button>
+                </div>
               </div>
             </div>
 
@@ -1345,6 +1402,9 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.autolist { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 220px; overflow: auto; }
+.autorow { display: flex; align-items: center; gap: 8px; }
+.autorow code { font-size: 12px; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .segs { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .segs .btn { min-width: 44px; }
 /* ---------------- 布局：左导航 + 右单列 ----------------

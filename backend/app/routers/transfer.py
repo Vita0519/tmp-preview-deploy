@@ -4,7 +4,7 @@
 备份与恢复只给管理员——恢复会覆盖整个 data 目录。
 """
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from starlette.background import BackgroundTask
 
 import json
@@ -12,7 +12,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from .. import backup as backup_mod, bookmarks, collections as colls
+from .. import autobackup, backup as backup_mod, bookmarks, collections as colls
 from ..db import db, log_event
 from ..security import admin_user, publisher_user
 
@@ -117,17 +117,58 @@ def export_bookmarks(
 
 @router.get("/backup")
 def download_backup(user: dict = Depends(admin_user)):
-    """打一个全站备份包直接下载（数据库 + 项目文件 + zip + 图标）。"""
+    """全站备份流式下载（数据库 + 项目文件 + zip + 图标 + 主题插件），服务器不落整包。"""
     if not Path(backup_mod.config.DB_PATH).exists():
         raise HTTPException(status_code=409, detail="数据库还没初始化")
-    zip_path = backup_mod.build_zip()
-    log_event("backup", user["id"], None, f"下载备份 {zip_path.name}")
-    return FileResponse(
-        zip_path,
+    name = backup_mod.backup_name()
+    log_event("backup", user["id"], None, f"下载备份 {name}")
+    return StreamingResponse(
+        backup_mod.iter_zip(),
         media_type="application/zip",
-        filename=zip_path.name,
-        background=BackgroundTask(lambda: shutil.rmtree(zip_path.parent, ignore_errors=True)),
+        headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"},
     )
+
+
+@router.get("/backup/auto")
+def auto_status(user: dict = Depends(admin_user)):
+    return autobackup.status()
+
+
+@router.patch("/backup/auto")
+def auto_update(payload: dict, user: dict = Depends(admin_user)):
+    c = autobackup.save_conf(payload or {})
+    log_event("backup", user["id"], None, f"自动备份设置 {json.dumps(c)}")
+    return autobackup.status()
+
+
+@router.post("/backup/auto/run")
+def auto_run(user: dict = Depends(admin_user)):
+    try:
+        r = autobackup.run_now()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"备份失败：{exc}") from exc
+    log_event("backup", user["id"], None, f"手动触发自动备份 {r['name']}")
+    return autobackup.status()
+
+
+@router.get("/backup/auto/{name}")
+def auto_download(name: str, user: dict = Depends(admin_user)):
+    p = autobackup.path_of(name)
+    if not p:
+        raise HTTPException(status_code=404, detail="没有这份备份")
+    return FileResponse(p, media_type="application/zip", filename=p.name)
+
+
+@router.delete("/backup/auto/{name}")
+def auto_delete(name: str, user: dict = Depends(admin_user)):
+    p = autobackup.path_of(name)
+    if not p:
+        raise HTTPException(status_code=404, detail="没有这份备份")
+    p.unlink()
+    log_event("backup", user["id"], None, f"删除自动备份 {name}")
+    return autobackup.status()
 
 
 @router.post("/backup/inspect")

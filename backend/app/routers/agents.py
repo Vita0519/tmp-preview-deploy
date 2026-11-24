@@ -194,26 +194,78 @@ async def patch_agent(agent_id: int, request: Request, user: dict = Depends(admi
 
 
 @router.delete("/{agent_id}")
-def delete_agent(agent_id: int, user: dict = Depends(admin_user)):
+def delete_agent(
+    agent_id: int,
+    mode: str = "",
+    transfer_to: int | None = None,
+    user: dict = Depends(admin_user),
+):
+    """删除成员。名下有项目时必须明确选：mode=transfer&transfer_to=<id> 转移，或 mode=delete 连项目删。
+
+    日常想让人「不能再用」应该先停用（PATCH active=false），项目照常在线，随时能恢复。
+    """
     if agent_id == user["id"]:
         raise HTTPException(status_code=400, detail="不能删除自己")
     with db() as conn:
         row = conn.execute("SELECT * FROM users WHERE id=?", (agent_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="成员不存在")
+        if row["role"] == "admin" and row["active"]:
+            left = conn.execute(
+                "SELECT COUNT(*) c FROM users WHERE role='admin' AND active=1 AND id<>?", (agent_id,)
+            ).fetchone()["c"]
+            if not left:
+                raise HTTPException(status_code=400, detail="这是最后一个启用的管理员，不能删除")
         projects = conn.execute("SELECT slug FROM projects WHERE owner_id=?", (agent_id,)).fetchall()
+        target = None
+        if projects or mode:
+            if mode not in ("transfer", "delete"):
+                raise HTTPException(status_code=400, detail="该成员名下有项目：请选择转移给其他成员，或连同项目一起删除")
+            if mode == "transfer":
+                if not transfer_to or transfer_to == agent_id:
+                    raise HTTPException(status_code=400, detail="请选择接收项目的成员")
+                target = conn.execute("SELECT * FROM users WHERE id=?", (transfer_to,)).fetchone()
+                if not target:
+                    raise HTTPException(status_code=404, detail="接收成员不存在")
+                if target["role"] == "viewer":
+                    raise HTTPException(status_code=400, detail="只读成员不能接收项目")
+
+    if target is not None:
+        with tx() as conn:
+            # 顶层合集同名会撞唯一索引：撞了就在名字后面标上原主人
+            tops = conn.execute(
+                "SELECT id, name FROM collections WHERE owner_id=? AND parent_id IS NULL", (agent_id,)
+            ).fetchall()
+            for c in tops:
+                clash = conn.execute(
+                    "SELECT 1 FROM collections WHERE owner_id=? AND parent_id IS NULL "
+                    "AND lower(trim(name))=lower(trim(?))",
+                    (target["id"], c["name"]),
+                ).fetchone()
+                if clash:
+                    conn.execute(
+                        "UPDATE collections SET name=? WHERE id=?",
+                        (f"{c['name']}（{row['display_name'] or row['username']}）"[:60], c["id"]),
+                    )
+            conn.execute("UPDATE collections SET owner_id=? WHERE owner_id=?", (target["id"], agent_id))
+            conn.execute("UPDATE projects SET owner_id=? WHERE owner_id=?", (target["id"], agent_id))
+            conn.execute("DELETE FROM users WHERE id=?", (agent_id,))
+        log_event("agent_delete", user["id"], None,
+                  f"{row['username']}，{len(projects)} 个项目转给 {target['username']}")
+        return {"ok": True, "transferred": len(projects), "to": target["username"], "removed_projects": 0}
+
     leftover = 0
     for p in projects:
         if not remove_project_files(p["slug"]):
             leftover += 1  # 文件被占用时记录先删，残留目录交给孤儿清理
     with db() as conn:
-        # 文件都删了，记录也不能留：owner_id 是 ON DELETE SET NULL，
-        # 光删用户会把项目变成「无主孤儿」，门户上挂着一条谁都认不出的记录。
-        # project_tags / daily_views 都是 ON DELETE CASCADE，跟着走。
+        # owner_id 是 ON DELETE SET NULL：光删用户会留下无主孤儿项目，记录必须一起删
         conn.execute("DELETE FROM projects WHERE owner_id=?", (agent_id,))
         conn.execute("DELETE FROM users WHERE id=?", (agent_id,))
-    log_event("agent_delete", user["id"], None, row["username"])
-    return {"ok": True, "removed_projects": len(projects), "leftover_dirs": leftover}
+    slugs = ",".join(p["slug"] for p in projects)[:400]
+    log_event("agent_delete", user["id"], None,
+              f"{row['username']}，连同 {len(projects)} 个项目删除" + (f"：{slugs}" if slugs else ""))
+    return {"ok": True, "removed_projects": len(projects), "leftover_dirs": leftover, "transferred": 0}
 
 
 @router.get("/{agent_id}/key")
