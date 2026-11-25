@@ -1899,11 +1899,20 @@ onUnmounted(() => {
 
 /* ---- 链接行 ---- */
 .linkrows { display: flex; flex-direction: column; gap: 8px; }
-.linkrow { display: flex; align-items: center; gap: 7px; }
-.linkrow .input { height: 32px; }
-.linkrow .lab { flex: 0 0 110px; }
-.linkrow .url { flex: 1 1 auto; min-width: 0; }
-.linkrow .del { flex: 0 0 auto; color: var(--ink-4); }
+/* 两行布局：第一行 拖柄/类型/显示文字/排序/删除，第二行 地址占满——窄栏里地址框也不会被挤没 */
+.linkrow {
+  display: grid; grid-template-columns: 14px 118px minmax(0, 1fr) auto auto;
+  gap: 6px 7px; align-items: center; padding: 8px 8px 8px 4px;
+  border: 1px solid var(--line); background: rgba(var(--ink-rgb, 0, 0, 0), 0.02);
+}
+.linkrow .grip { grid-area: 1 / 1 / 3 / 2; align-self: center; }
+.linkrow .typesel { grid-area: 1 / 2; min-width: 0; }
+.linkrow .lab { grid-area: 1 / 3; min-width: 0; }
+.linkrow .mv { grid-area: 1 / 4; }
+.linkrow .del { grid-area: 1 / 5; }
+.linkrow .url { grid-area: 2 / 2 / 3 / 6; min-width: 0; }
+.linkrow .input { height: 32px; width: 100%; }
+.linkrow .del { color: var(--ink-4); }
 .linkrow .del:hover { color: var(--danger); }
 .linkrow { border-radius: 8px; transition: background .15s, box-shadow .15s, opacity .15s; }
 .linkrow.dragging { opacity: .45; }
@@ -2022,14 +2031,11 @@ onUnmounted(() => {
   .author-grid .frow { grid-template-columns: minmax(0, 1fr); }
   .optcards { grid-template-columns: minmax(0, 1fr); }
   .ttlgrid { grid-template-columns: minmax(0, 1fr); max-width: none; }
-  .linkrow {
-    display: grid; grid-template-columns: 104px minmax(0, 1fr) auto;
-    gap: 6px; padding-bottom: 10px; border-bottom: 1px dashed var(--line);
-  }
-  .typesel { grid-area: 1 / 1; flex: none; }
-  .linkrow .lab { grid-area: 1 / 2; flex: none; }
+  .linkrow { grid-template-columns: 104px minmax(0, 1fr) auto; padding: 8px; }
+  .linkrow .typesel { grid-area: 1 / 1; }
+  .linkrow .lab { grid-area: 1 / 2; }
+  .linkrow .del { grid-area: 1 / 3; }
   .linkrow .url { grid-area: 2 / 1 / 3 / 3; }
-  .linkrow .del { grid-area: 1 / 3; align-self: center; }
   .linkrow .grip { display: none; }
   .linkrow .mv { grid-area: 2 / 3; }
   .linkrow .mv .btn { width: 36px; height: 36px; }
