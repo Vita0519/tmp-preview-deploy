@@ -568,7 +568,7 @@ async def patch_project(slug: str, request: Request, user: dict = Depends(curren
         args.append(new_title)
     if "description" in body:
         sets.append("description=?")
-        args.append(str(body["description"])[:1000])
+        args.append(str(body["description"])[:200])
     if "visibility" in body and body["visibility"] in VISIBILITY:
         sets.append("visibility=?")
         args.append(body["visibility"])
@@ -624,6 +624,10 @@ async def patch_project(slug: str, request: Request, user: dict = Depends(curren
     args.append(row["id"])
 
     with tx() as conn:
+        old_tags = [x["name"] for x in conn.execute(
+            "SELECT t.name FROM project_tags pt JOIN tags t ON t.id=pt.tag_id WHERE pt.project_id=?",
+            (row["id"],),
+        ).fetchall()] if tags is not None else []
         conn.execute(f"UPDATE projects SET {', '.join(sets)} WHERE id=?", args)
         if tags is not None:
             set_tags(conn, row["id"], tags)
@@ -634,13 +638,25 @@ async def patch_project(slug: str, request: Request, user: dict = Depends(curren
         except OSError as exc:
             raise HTTPException(status_code=500, detail=f"目录改名失败：{exc}") from exc
 
-    log_event("patch", user["id"], row["id"], str(list(body.keys())))
     with db() as conn:
         fresh = conn.execute(PROJECT_SELECT + " WHERE p.id=?", (row["id"],)).fetchone()
         tag_list = [x["name"] for x in conn.execute(
             "SELECT t.name FROM project_tags pt JOIN tags t ON t.id=pt.tag_id WHERE pt.project_id=?",
             (row["id"],),
         ).fetchall()]
+    diff = {}
+    for f in ("title", "description", "visibility", "expires_at", "expire_action",
+              "collection_id", "slug", "allow_download", "status"):
+        try:
+            a, b = row[f], fresh[f]
+        except (IndexError, KeyError):
+            continue
+        if a != b:
+            diff[f] = (a, b)
+    if tags is not None:
+        diff["tags"] = (old_tags, tag_list)
+    log_event("patch", user["id"], row["id"], ",".join(diff.keys()) or "noop",
+              slug=fresh["slug"], title=fresh["title"], diff=diff)
     return project_dict(fresh, origin_of(request), tag_list)
 
 
@@ -653,7 +669,7 @@ def delete_project(slug: str, user: dict = Depends(current_user)):
         conn.execute("DELETE FROM projects WHERE id=?", (row["id"],))
         # 项目没了，它独有的标签也就没人用了，顺手回收，池子不会越删越脏
         tagspec.prune_orphans(conn)
-    log_event("delete", user["id"], row["id"], row["slug"])
+    log_event("delete", user["id"], row["id"], row["slug"], slug=row["slug"], title=row["title"])
     return {"ok": True, "slug": row["slug"]}
 
 

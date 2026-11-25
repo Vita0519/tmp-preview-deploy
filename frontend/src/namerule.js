@@ -5,7 +5,7 @@
  * 这里只负责边打字边提示，别让人敲完才被打回。
  */
 
-export const TITLE_RULE = { max_width: 10, max_cjk: 10, max_narrow: 20 }
+export const TITLE_RULE = { max_width: 24, max_cjk: 24, max_narrow: 48 }
 
 // Unicode East Asian Width 里的 W / F 区间，跟 Python 侧 east_asian_width 对齐
 const WIDE =

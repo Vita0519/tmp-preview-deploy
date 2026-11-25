@@ -31,7 +31,8 @@ def main() -> int:
     # fpk compose 的镜像 tag
     comp = ROOT / 'packaging' / 'fnos' / 'template' / 'app' / 'docker' / 'docker-compose.yaml'
     ctext = comp.read_text(encoding='utf-8')
-    ctext = re.sub(r'(image: ghcr\.io/vita0519/tmp-preview:)\S+', rf'\g<1>{ver}', ctext)
+    # 只替换数字版本号；已改成 :latest（watchtower 自动更新）时保持不动
+    ctext = re.sub(r'(image: ghcr\.io/vita0519/tmp-preview:)\d[\d.]*', rf'\g<1>{ver}', ctext)
     comp.write_text(ctext, encoding='utf-8')
 
     # 根 compose 的镜像 tag

@@ -1,4 +1,5 @@
 """SQLite 访问层：WAL + 短事务，够轻够快（万级项目无压力）。"""
+import json
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -122,6 +123,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 DEFAULT_SETTINGS = {
     "site_title": "",
+    "event_retention_days": "90",
     "default_ttl_hours": "24",
     "default_ttl_portal": "",
     "default_ttl_link": "",
@@ -179,6 +181,7 @@ def init_db() -> None:
         _migrate_roles(conn)
         _add_user_key_cols(conn)
         _add_project_cols(conn)
+        _add_event_cols(conn)
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v))
         _migrate_tags(conn)
@@ -253,6 +256,31 @@ def _migrate_tags(conn) -> None:
         print(f"[migrate] 标签规范化跳过：{exc}", flush=True)
     conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES(?, '1')", (key,))
     conn.execute("UPDATE settings SET value='1' WHERE key=?", (key,))
+
+
+def _add_event_cols(conn) -> None:
+    """v2.5.0 日志增强：给 events 补上 slug / 标题快照 / 改动前后对比。
+
+    slug  项目被删后仍能按 slug 查到它的历史
+    title 发生时的项目名快照（改名、删除后仍可读）
+    diff  JSON：{字段: [旧值, 新值]}，只记短字段
+    """
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(events)").fetchall()}
+    for col in ("slug", "title", "diff"):
+        if col in have:
+            continue
+        try:
+            conn.execute(f"ALTER TABLE events ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError as exc:
+            print(f"[migrate] 跳过 events.{col}：{exc}", flush=True)
+    for ddl in (
+        "CREATE INDEX IF NOT EXISTS idx_events_slug ON events(slug, at)",
+        "CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id, at)",
+    ):
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError as exc:
+            print(f"[migrate] 跳过索引：{exc}", flush=True)
 
 
 def _add_project_cols(conn) -> None:
@@ -407,15 +435,54 @@ def all_settings() -> dict:
     return out
 
 
-def log_event(action: str, user_id: int | None = None, project_id: int | None = None, detail: str = "") -> None:
+def _short(v):
+    """diff 里只留短值：长文本截到 120 字，列表转字符串。"""
+    if isinstance(v, (list, tuple)):
+        v = ",".join(str(x) for x in v)
+    if isinstance(v, str) and len(v) > 120:
+        v = v[:120] + "…"
+    return v
+
+
+def log_event(action: str, user_id: int | None = None, project_id: int | None = None,
+              detail: str = "", *, slug: str | None = None, title: str | None = None,
+              diff: dict | None = None) -> None:
+    """记一条事件。slug/title 是快照，diff 是 {字段: [旧, 新]}；写失败不影响业务。"""
+    try:
+        d = None
+        if diff:
+            d = json.dumps({k: [_short(a), _short(b)] for k, (a, b) in diff.items()},
+                           ensure_ascii=False)[:2000]
+        with db() as conn:
+            if project_id and (slug is None or title is None):
+                # 没传快照就按项目当前值补（项目已删则保持空）
+                p = conn.execute("SELECT slug, title FROM projects WHERE id=?", (project_id,)).fetchone()
+                if p:
+                    slug = slug if slug is not None else p["slug"]
+                    title = title if title is not None else p["title"]
+            conn.execute(
+                "INSERT INTO events(at, user_id, action, project_id, detail, slug, title, diff) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (int(time.time() * 1000), user_id, action, project_id, (detail or "")[:500],
+                 slug, (title or None) and title[:100], d),
+            )
+    except (sqlite3.Error, TypeError, ValueError):
+        pass
+
+
+def prune_events(days: int | None = None) -> int:
+    """按保留天数清理旧日志（设置项 event_retention_days，默认 90，0=不清理）。"""
     try:
         with db() as conn:
-            conn.execute(
-                "INSERT INTO events(at, user_id, action, project_id, detail) VALUES(?,?,?,?,?)",
-                (int(time.time() * 1000), user_id, action, project_id, detail[:500]),
-            )
-    except sqlite3.Error:
-        pass
+            if days is None:
+                row = conn.execute("SELECT value FROM settings WHERE key='event_retention_days'").fetchone()
+                days = int(row["value"]) if row and str(row["value"]).strip() else 90
+            if days <= 0:
+                return 0
+            cut = int(time.time() * 1000) - days * 86400_000
+            return conn.execute("DELETE FROM events WHERE at < ?", (cut,)).rowcount
+    except (sqlite3.Error, ValueError):
+        return 0
 
 
 def tag_cap(conn: sqlite3.Connection | None = None) -> int:

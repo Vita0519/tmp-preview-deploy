@@ -75,6 +75,10 @@ docker compose up -d
 打开 `http://<机器IP>:8080`，用 `.env` 里的 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录。
 升级只需 `docker compose pull && docker compose up -d`，`./data` 里的数据启动时自动迁移。
 
+**自动更新（可选）**：`docker compose --profile autoupdate up -d` 会额外启动 Watchtower，每天 04:30 检查 `:latest`，有新版就自动拉取并重启（只管本应用容器，靠标签 `com.centurylinklabs.watchtower.enable` 识别）。fpk 安装包默认已启用。
+
+> ⚠️ Watchtower 需要挂载 `/var/run/docker.sock`，等同于拥有宿主机 Docker 的完全控制权。只在自己信任的机器上使用；不想要就别加 `--profile autoupdate`（fpk 用户可在 NAS 的 Docker 管理里停掉 `tmp-preview-watchtower`）。自动更新后应用会重启几秒，实际运行版本以控制台「设置 → 关于」为准。
+
 <details>
 <summary><b>飞牛 fnOS 应用包（.fpk）</b></summary>
 
@@ -136,6 +140,12 @@ python cli/agentctl.py selfcheck
 | <img src="docs/qr-wechat.png" width="200" alt="微信赞赏"> | <img src="docs/qr-alipay.png" width="200" alt="支付宝赞赏"> |
 
 问题反馈：[Issues](https://github.com/Vita0519/tmp-preview-deploy/issues)（附上版本号，设置 → 关于 可见）· 邮箱 admin@allfather.de5.net · QQ 群 `154578485` · 鸣谢 [linux.do](https://linux.do/)
+
+## ⚠️ 安全提示与免责声明
+
+- **仅面向个人用户与个人 Agent。** 所有预览内容与管理后台同源，成员上传页面中的脚本可以读取访问者在本站的登录状态并操作后台。**不要给不信任的人开通账号。**
+- 本软件按「原样」提供，不附带任何明示或默示担保。因使用本软件、开通账号或托管内容造成的数据泄露、损失或法律责任，由部署者自行承担，与作者无关。
+- 部署者应自行确保托管内容合法合规。
 
 ## 📄 许可
 

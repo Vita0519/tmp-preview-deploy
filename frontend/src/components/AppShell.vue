@@ -18,6 +18,7 @@ const roleLabel = computed(() => {
 })
 const nav = computed(() => [
   { name: 'projects', label: '项目', icon: 'folder', show: !isViewer.value },
+  { name: 'logs', label: '日志', icon: 'clock', show: !isViewer.value },
   { name: 'agents', label: '成员', icon: 'users', show: isAdmin.value },
   { name: 'settings', label: '设置', icon: 'sliders', show: isAdmin.value },
 ])

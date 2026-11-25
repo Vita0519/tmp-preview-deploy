@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import cleanup, config, storage, tagspec, views, autobackup
 from .db import init_db
-from .routers import agents, auth, collections, projects, public, settings, transfer
+from .routers import agents, auth, collections, events, projects, public, settings, transfer
 from .security import bootstrap_admin
 
 # 图标与清单文件的 MIME：Python 的 mimetypes 还不认识 webmanifest
@@ -59,6 +59,7 @@ app.include_router(projects.router)
 app.include_router(agents.router)
 app.include_router(settings.router)
 app.include_router(transfer.router)
+app.include_router(events.router)
 app.include_router(public.router)
 
 

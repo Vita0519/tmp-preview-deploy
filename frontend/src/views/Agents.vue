@@ -8,6 +8,7 @@ import Icon from '../components/Icon.vue'
 const items = ref([])
 const loading = ref(true)
 const createOpen = ref(false)
+const ack = ref(false) // 开账号前必须勾选「已了解同源风险」
 const created = ref(null)
 const form = reactive({ username: '', display_name: '', password: '', role: 'publisher', key_label: '' })
 const busy = ref(false)
@@ -119,6 +120,7 @@ function resetFilters() {
 onUnmounted(() => clearTimeout(searchTimer))
 
 async function submit() {
+  if (!ack.value) return toast('请先勾选确认已了解风险', 'err')
   if (!form.username.trim()) return toast('请填写账号', 'err')
   busy.value = true
   try {
@@ -130,6 +132,7 @@ async function submit() {
     form.password = ''
     form.key_label = ''
     load()
+    ack.value = false
     toast('成员已创建')
   } catch (e) {
     toast(e.message || '创建失败', 'err')
@@ -550,6 +553,12 @@ onMounted(load)
       <button class="btn ghost icon" @click="createOpen = false"><Icon name="close" :size="14" /></button>
     </div>
     <div class="modal-body">
+      <div class="trustnote">
+        <b>⚠️ 只给你信任的人或自己的 Agent 开账号</b>
+        <p>本系统面向个人用户与个人 Agent 使用。所有预览内容与管理后台同源：成员上传的页面里的脚本，可以读到访问者在本站的登录状态，进而操作后台。不要给不信任的人开通发布权限。</p>
+        <p>免责声明：本软件按「原样」提供，不附带任何担保。因开通账号、成员上传的内容或使用本软件造成的数据泄露、损失或法律责任，由部署者自行承担，与作者无关。</p>
+        <label class="ackline"><input v-model="ack" type="checkbox" /> 我已了解风险，该成员是我信任的人或我自己的 Agent</label>
+      </div>
       <div class="form">
         <div class="frow">
           <label>账号</label>
@@ -633,6 +642,13 @@ onMounted(load)
 </template>
 
 <style scoped>
+.trustnote {
+  margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; font-size: 12px; line-height: 1.6;
+  background: var(--danger-soft, rgba(200, 60, 40, 0.06)); border: 1px solid var(--danger-line, rgba(200, 60, 40, 0.25));
+}
+.trustnote b { color: var(--danger); font-size: 12.5px; }
+.trustnote p { margin: 6px 0 0; color: var(--ink-3, var(--ink-4)); }
+.ackline { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-weight: 600; cursor: pointer; }
 .delopt { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; margin: 4px 0; }
 .delopt input { margin-top: 3px; }
 /* ---------- 角色切换下拉：三档，按角色着色 ---------- */

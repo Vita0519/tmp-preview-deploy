@@ -75,6 +75,10 @@ docker compose up -d
 Open `http://<host>:8080` and sign in with `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
 Upgrade any time with `docker compose pull && docker compose up -d` — data in `./data` is migrated automatically.
 
+**Auto-update (optional)**: `docker compose --profile autoupdate up -d` also starts Watchtower, which checks `:latest` daily at 04:30 and pulls + restarts on a new release. It only touches this app's container (via the `com.centurylinklabs.watchtower.enable` label). The fpk package enables it by default.
+
+> ⚠️ Watchtower mounts `/var/run/docker.sock`, which grants full control over the host's Docker. Only use it on machines you trust; skip `--profile autoupdate` if you don't want it (fpk users can stop `tmp-preview-watchtower` in the NAS Docker manager). The app restarts for a few seconds after each update; the actually running version is shown under Settings → About.
+
 <details>
 <summary><b>fnOS NAS package (.fpk)</b></summary>
 
@@ -132,6 +136,12 @@ Public access: Cloudflare Tunnel works great — use `--protocol http2` for larg
 Issues and PRs are welcome — please include your version (Settings → About). 
 Questions: [Issues](https://github.com/Vita0519/tmp-preview-deploy/issues) · admin@allfather.de5.net · QQ group `154578485`. 
 If it saves you time, you can [buy the author a coffee](README.zh-CN.md#-赞赏与联系). Thanks to [linux.do](https://linux.do/).
+
+## ⚠️ Security notice & disclaimer
+
+- **For personal use and your own agents only.** All previews share the same origin as the admin console, so scripts in a member's uploaded page can read a visitor's session on this site and act on the console. **Never create accounts for people you don't trust.**
+- This software is provided "as is", without warranty of any kind. The deployer bears sole responsibility for any data leak, loss or legal liability arising from using it, granting accounts or hosting content; the author is not liable.
+- Deployers are responsible for keeping hosted content lawful.
 
 ## 📄 License
 

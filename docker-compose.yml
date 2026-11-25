@@ -7,6 +7,8 @@ services:
     #   dockerfile: Dockerfile
     container_name: tmp-preview
     restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     ports:
       - "${PORT:-8080}:8000"
     environment:
@@ -39,3 +41,17 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # 可选：自动更新（每天 04:30 检查 :latest）。启用：docker compose --profile autoupdate up -d
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: tmp-preview-watchtower
+    restart: unless-stopped
+    profiles: ["autoupdate"]
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: ${WATCHTOWER_SCHEDULE:-0 30 4 * * *}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

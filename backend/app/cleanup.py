@@ -3,7 +3,7 @@ import asyncio
 import time
 
 from . import storage, tagspec, views
-from .db import db, log_event
+from .db import db, log_event, prune_events
 
 TICK_FLUSH = 3.0
 TICK_SWEEP = 60.0
@@ -14,7 +14,7 @@ def sweep() -> dict:
     now = int(time.time() * 1000)
     with db() as conn:
         rows = conn.execute(
-            "SELECT id, slug, expire_action FROM projects "
+            "SELECT id, slug, title, expire_action FROM projects "
             "WHERE status='active' AND expires_at IS NOT NULL AND expires_at<=?",
             (now,),
         ).fetchall()
@@ -26,12 +26,12 @@ def sweep() -> dict:
             with db() as conn:
                 conn.execute("DELETE FROM projects WHERE id=?", (r["id"],))
                 tagspec.prune_orphans(conn)  # 项目被删，它独有的标签一并回收
-            log_event("expire_delete", None, r["id"], r["slug"])
+            log_event("expire_delete", None, r["id"], r["slug"], slug=r["slug"], title=r["title"])
             purged += 1
         else:
             with db() as conn:
                 conn.execute("UPDATE projects SET status='expired' WHERE id=?", (r["id"],))
-            log_event("expire_block", None, r["id"], r["slug"])
+            log_event("expire_block", None, r["id"], r["slug"], slug=r["slug"], title=r["title"])
             blocked += 1
     return {"blocked": blocked, "purged": purged}
 
@@ -86,6 +86,9 @@ async def sweep_loop(stop: asyncio.Event) -> None:
                 gone = sweep_orphans()
                 if gone:
                     print(f"[orphan] 清理无主目录 {gone} 个", flush=True)
+                pruned = prune_events()
+                if pruned:
+                    print(f"[events] 清理过期日志 {pruned} 条", flush=True)
             except Exception as exc:
                 print(f"[orphan] 清理失败: {exc}", flush=True)
         try:

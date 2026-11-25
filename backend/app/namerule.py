@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import unicodedata
 
-# 10 个中文字符（≈20 个半角字符）
-MAX_WIDTH = 10.0
+# 服务端硬上限：24 个中文字符（≈48 个半角字符）。
+# 「10 字以内」只是 skill 层面的建议，服务端只兜底防止离谱长名。
+MAX_WIDTH = 24.0
 
 # 半角字符的权重
 NARROW = 0.5

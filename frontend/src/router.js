@@ -5,6 +5,7 @@ import { store } from './store'
 const routes = [
   { path: '/login', name: 'login', component: () => import('./views/Login.vue'), meta: { bare: true } },
   { path: '/', name: 'projects', component: () => import('./views/Projects.vue') },
+  { path: '/logs', name: 'logs', component: () => import('./views/Logs.vue') },
   { path: '/agents', name: 'agents', component: () => import('./views/Agents.vue'), meta: { admin: true } },
   { path: '/settings', name: 'settings', component: () => import('./views/Settings.vue'), meta: { admin: true } },
   { path: '/:pathMatch(.*)*', name: 'missing', component: () => import('./views/Missing.vue') },

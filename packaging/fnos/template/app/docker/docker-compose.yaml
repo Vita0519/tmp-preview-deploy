@@ -1,9 +1,13 @@
 services:
   tmp-preview:
     # 优先用已推送的镜像；拉不动时可在 NAS 上用 build_image.sh 构建同名镜像
-    image: ghcr.io/vita0519/tmp-preview:2.4.4
+    # 跟 :latest 走，由下方 watchtower 每天凌晨自动拉新版并重启；
+    # 应用中心显示的版本号是安装包版本，实际运行版本以控制台「设置 → 关于」为准
+    image: ghcr.io/vita0519/tmp-preview:latest
     container_name: tmp-preview
     restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     ports:
       - "519:8000"
     environment:
@@ -16,3 +20,17 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - "${TRIM_PKGVAR}/data:/data"
+
+  # 自动更新：只管带 watchtower.enable 标签的容器（即上面这一个），不碰 NAS 上其它容器
+  tmp-preview-watchtower:
+    image: containrrr/watchtower:latest
+    container_name: tmp-preview-watchtower
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: "0 30 4 * * *"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
