@@ -1,5 +1,6 @@
 # ---------- 阶段 1：构建前端 ----------
-FROM node:20-alpine AS web
+# 前端产物与架构无关：固定在构建机原生平台跑 npm build，避免 QEMU 模拟拖慢 arm64 构建
+FROM --platform=$BUILDPLATFORM node:20-alpine AS web
 
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json* ./

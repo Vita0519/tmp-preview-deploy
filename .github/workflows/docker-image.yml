@@ -26,6 +26,8 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "building $V"
 
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
@@ -35,13 +37,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push (amd64)
+      - name: Build and push (amd64 + arm64)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/vita0519/tmp-preview:${{ steps.ver.outputs.version }}
             ghcr.io/vita0519/tmp-preview:latest
