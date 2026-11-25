@@ -15,7 +15,7 @@
 |---|---|---|---|
 | POST | `/api/auth/login` | 🟢 | `{username, password}` → 设置 Cookie，返回 user |
 | POST | `/api/auth/logout` | 👤 | 清会话 |
-| GET | `/api/auth/me` | 👤 | 当前用户 + 自己的 api_key |
+| GET | `/api/auth/me` | 👤 | 当前用户；仅当用 API Key 调用时才回显 api_key（浏览器会话不返回） |
 | POST | `/api/auth/token` | 🟢 | `{username, password}` → 长期 API Key（CLI 用） |
 | POST | `/api/auth/password` | 👤 | `{old_password, new_password}` |
 

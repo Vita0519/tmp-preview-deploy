@@ -362,7 +362,8 @@ def main() -> None:
     check("meta 的老字段都在（新增的 project 只是叠加）", need <= set(meta), sorted(need - set(meta)))
 
     print("\n== [E] 老 CLI 写法 ==")
-    token = admin.get("/api/auth/me").json().get("api_key") or ""
+    # v2.4.2 起浏览器会话的 /me 不再返回 Key，改用账号密码换
+    token = admin.post("/api/auth/token", {"username": USER, "password": PASSWORD}).json().get("token") or ""
     rc, out = run_cli("whoami", "--json", token=token)
     check("whoami 老写法能用", rc == 0, out[:160])
     rc, out = run_cli("collections", "--json", token=token)

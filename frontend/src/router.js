@@ -22,7 +22,6 @@ export async function ensureUser() {
   try {
     const d = await api.me()
     store.user = d.user
-    if (d.api_key) store.apiKey = d.api_key
     booted = true
     return store.user
   } catch {
