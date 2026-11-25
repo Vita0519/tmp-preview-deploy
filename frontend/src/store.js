@@ -5,6 +5,7 @@ export const store = reactive({
   version: '',
   siteTitle: '临时预览站',
   toasts: [],
+  update: null, // 有新版本时放 /api/settings/version 的返回
   confirm: null,
   mobileNav: false,
   // 标签规则由站点设置决定（管理员可调小），启动时从 /api/meta 同步过来。

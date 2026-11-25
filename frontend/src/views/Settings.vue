@@ -34,6 +34,26 @@ const actionLabel = (a) => ACTION_LABEL[a] || a
 const siteIcon = ref({ custom: false, url: '', ext: '', size: 0, max_kb: 512 })
 const ver = ref(null)
 const verBusy = ref(false)
+// 模板里一直调用 checkVersion，但函数从没定义过——点了直接报错，所以"没任何提示"
+async function checkVersion(manual = false) {
+  verBusy.value = true
+  try {
+    const d = await api.get('/api/settings/version' + (manual ? '?force=true' : ''))
+    ver.value = d
+    store.update = d?.ok && d.has_update ? d : null
+    if (manual) {
+      if (!d.ok) toast(`检查失败：${d.error || '网络不通'}`, 'err')
+      else if (d.has_update) toast(`发现新版本 v${d.latest}`)
+      else toast(`已是最新（v${d.current}）`)
+    }
+  } catch (e) {
+    ver.value = { ok: false, error: e.message || '请求失败' }
+    if (manual) toast(e.message || '检查失败', 'err')
+  } finally {
+    verBusy.value = false
+  }
+}
+onMounted(() => checkVersion(false))
 const iconFile = ref(null)
 const iconBusy = ref(false)
 const iconPreview = computed(() => (siteIcon.value.custom ? siteIcon.value.url : '/favicon.svg'))
@@ -436,24 +456,50 @@ async function delAuto(f) {
 onMounted(loadAuto)
 
 // ---------------- 备份与恢复 ----------------
+// 恢复来源二选一：服务器上的备份（backupSrc = 文件名）或本地上传（backupFile）
 const backupFile = ref(null)
+const backupSrc = ref('')
 const backupBusy = ref(false)
 const backupInfo = ref(null)
+const backupLabel = computed(() => backupSrc.value || backupFile.value?.name || '')
+
+function fmtAutoName(n) {
+  const m = /^auto-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.zip$/.exec(n || '')
+  return m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}` : n
+}
 
 function pickBackupFile(e) {
   backupFile.value = e.target.files?.[0] || null
+  backupSrc.value = ''
   backupInfo.value = null
   e.target.value = ''
+  if (backupFile.value) inspectBackup()
+}
+
+function pickServerBackup(f) {
+  backupSrc.value = f.name
+  backupFile.value = null
+  backupInfo.value = null
+  inspectBackup()
+}
+
+function clearBackupPick() {
+  backupSrc.value = ''
+  backupFile.value = null
+  backupInfo.value = null
 }
 
 async function inspectBackup() {
-  if (!backupFile.value) return toast('先选一个备份包（.zip）', 'err')
+  if (!backupSrc.value && !backupFile.value) return toast('先选一个备份', 'err')
   backupBusy.value = true
   try {
-    const fd = new FormData()
-    fd.append('file', backupFile.value, backupFile.value.name)
-    backupInfo.value = await api.postForm('/api/backup/inspect', fd)
-    toast('读到了，确认下面内容后再恢复')
+    if (backupSrc.value) {
+      backupInfo.value = await api.get(`/api/backup/auto/${backupSrc.value}/inspect`)
+    } else {
+      const fd = new FormData()
+      fd.append('file', backupFile.value, backupFile.value.name)
+      backupInfo.value = await api.postForm('/api/backup/inspect', fd)
+    }
   } catch (e) {
     backupInfo.value = null
     toast(e.message || '读不了这个备份包', 'err')
@@ -463,7 +509,7 @@ async function inspectBackup() {
 }
 
 async function doRestore() {
-  if (!backupFile.value || !backupInfo.value) return
+  if ((!backupFile.value && !backupSrc.value) || !backupInfo.value) return
   const ok = await confirmAction({
     title: '用这个备份覆盖现网数据？',
     message:
@@ -476,12 +522,16 @@ async function doRestore() {
   if (!ok) return
   backupBusy.value = true
   try {
-    const fd = new FormData()
-    fd.append('file', backupFile.value, backupFile.value.name)
-    const d = await api.postForm('/api/backup/restore', fd)
+    let d
+    if (backupSrc.value) {
+      d = await api.post(`/api/backup/auto/${backupSrc.value}/restore`, {})
+    } else {
+      const fd = new FormData()
+      fd.append('file', backupFile.value, backupFile.value.name)
+      d = await api.postForm('/api/backup/restore', fd)
+    }
     toast(`已恢复：${d.counts?.projects ?? '?'} 个项目，${d.counts?.users ?? '?'} 个账号`)
-    backupInfo.value = null
-    backupFile.value = null
+    clearBackupPick()
     setTimeout(() => location.reload(), 1200)
   } catch (e) {
     toast(e.message || '恢复失败', 'err')
@@ -1115,37 +1165,79 @@ onUnmounted(() => {
                 <template v-if="auto.last_at">上次成功 {{ relTime(auto.last_at) }}。</template>
                 <b v-if="auto.last_error" style="color: var(--danger)">上次失败：{{ auto.last_error }}</b>
               </span>
-              <div v-if="auto.files?.length" class="autolist">
-                <div v-for="f in auto.files" :key="f.name" class="autorow">
-                  <code>{{ f.name }}</code>
-                  <span class="hint" style="margin: 0">{{ fmtBytes(f.size) }}</span>
-                  <a class="btn sm ghost" :href="'/api/backup/auto/' + f.name" download><Icon name="download" :size="12" /></a>
-                  <button type="button" class="btn sm ghost" style="color: var(--danger)" @click="delAuto(f)"><Icon name="trash" :size="12" /></button>
+            </div>
+
+            <div class="frow">
+              <label>备份列表</label>
+              <div class="bklist">
+                <div v-if="!auto.files?.length" class="bkempty">服务器上还没有备份，点上面「立即备份一次」生成第一份</div>
+                <div
+                  v-for="(f, i) in auto.files"
+                  :key="f.name"
+                  class="bkrow"
+                  :class="{ on: backupSrc === f.name }"
+                >
+                  <Icon name="clock" :size="14" class="bkicon" />
+                  <div class="bkmain">
+                    <div class="bktime">
+                      {{ fmtAutoName(f.name) }}
+                      <span v-if="i === 0" class="badge">最新</span>
+                    </div>
+                    <div class="bkmeta">{{ fmtBytes(f.size) }} · {{ relTime(f.at) }}</div>
+                  </div>
+                  <div class="bkacts">
+                    <button type="button" class="btn sm" :class="{ primary: backupSrc === f.name }" :disabled="backupBusy" @click="pickServerBackup(f)">
+                      {{ backupSrc === f.name ? '已选中' : '用它恢复' }}
+                    </button>
+                    <a class="btn sm ghost" title="下载" :href="'/api/backup/auto/' + f.name" download><Icon name="download" :size="13" /></a>
+                    <button type="button" class="btn sm ghost" title="删除" style="color: var(--danger)" @click="delAuto(f)"><Icon name="trash" :size="13" /></button>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div class="frow">
               <label>从备份恢复</label>
-              <div class="colorrow" style="flex-wrap: wrap">
-                <button class="btn" :disabled="backupBusy" @click="$refs.bk.click()">
-                  {{ backupFile ? backupFile.name : '选择备份 zip' }}
-                </button>
-                <input ref="bk" type="file" accept=".zip,application/zip" style="display: none" @change="pickBackupFile" />
-                <button class="btn" :disabled="backupBusy || !backupFile" @click="inspectBackup">
-                  {{ backupBusy ? '处理中…' : '先看看里面有什么' }}
-                </button>
-                <button
-                  class="btn danger"
-                  :disabled="backupBusy || !backupInfo"
-                  @click="doRestore"
-                >
-                  覆盖恢复
-                </button>
+              <div style="flex: 1; min-width: 0">
+                <div class="colorrow" style="flex-wrap: wrap; gap: 8px">
+                  <button class="btn" :disabled="backupBusy" @click="$refs.bk.click()">
+                    <Icon name="upload" :size="13" /> 上传外部备份 zip
+                  </button>
+                  <input ref="bk" type="file" accept=".zip,application/zip" style="display: none" @change="pickBackupFile" />
+                  <span class="hint" style="margin: 0">或在上面的列表里点「用它恢复」</span>
+                </div>
+
+                <div v-if="backupLabel" class="bkpick">
+                  <div class="bkpick-head">
+                    <span>
+                      {{ backupSrc ? '服务器备份' : '本地文件' }}：<b class="mono">{{ backupSrc ? fmtAutoName(backupSrc) : backupLabel }}</b>
+                    </span>
+                    <button type="button" class="btn sm ghost" :disabled="backupBusy" @click="clearBackupPick">取消</button>
+                  </div>
+                  <div v-if="backupBusy && !backupInfo" class="hint" style="margin: 6px 0 0">正在读取备份内容…</div>
+                  <template v-else-if="backupInfo">
+                    <div class="bkstats">
+                      <span><b>{{ backupInfo.manifest?.counts?.projects ?? '?' }}</b> 个项目</span>
+                      <span><b>{{ backupInfo.manifest?.counts?.users ?? '?' }}</b> 个账号</span>
+                      <span><b>{{ backupInfo.files }}</b> 个文件</span>
+                      <span><b>{{ backupInfo.zips }}</b> 个下载包</span>
+                      <span><b>{{ backupInfo.themes }}</b> 个主题插件</span>
+                    </div>
+                    <div v-if="backupInfo.manifest?.created_at" class="hint" style="margin: 4px 0 0">
+                      备份于 {{ new Date(backupInfo.manifest.created_at).toLocaleString() }}
+                      <template v-if="backupInfo.manifest.site_title"> · {{ backupInfo.manifest.site_title }}</template>
+                    </div>
+                    <div v-else class="hint" style="margin: 4px 0 0">老格式备份：没有清单信息，恢复后会自动迁移数据库</div>
+                    <button class="btn danger" style="margin-top: 10px" :disabled="backupBusy" @click="doRestore">
+                      {{ backupBusy ? '恢复中…' : '覆盖恢复' }}
+                    </button>
+                  </template>
+                </div>
+
+                <span class="hint">
+                  恢复会替换现网数据；旧数据保留在 data/.backup-before-restore-&lt;时间&gt;/，只留最近 3 份。服务器上的备份列表不受恢复影响。
+                </span>
               </div>
-              <span class="hint">
-                恢复会替换现网数据；旧数据保留在 data/.backup-before-restore-&lt;时间&gt;/，只留最近 3 份
-              </span>
             </div>
 
             <div v-if="backupInfo" class="panel" style="padding: 10px 12px; background: var(--surface-2); box-shadow: none">
@@ -1402,9 +1494,26 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.autolist { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; max-height: 220px; overflow: auto; }
-.autorow { display: flex; align-items: center; gap: 8px; }
-.autorow code { font-size: 12px; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bklist { flex: 1; min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; max-height: 300px; overflow-y: auto; }
+.bkempty { padding: 14px; font-size: 12.5px; color: var(--ink-3, var(--ink-4)); }
+.bkrow { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--line); transition: background .15s; }
+.bkrow:first-child { border-top: 0; }
+.bkrow:hover { background: rgba(var(--ink-rgb, 255,255,255), .03); }
+.bkrow.on { background: color-mix(in srgb, var(--brand) 10%, transparent); }
+.bkicon { color: var(--ink-3, var(--ink-4)); flex: none; }
+.bkmain { flex: 1; min-width: 0; }
+.bktime { font-size: 13px; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 6px; }
+.bkmeta { font-size: 11.5px; color: var(--ink-3, var(--ink-4)); margin-top: 1px; }
+.bkacts { display: flex; align-items: center; gap: 4px; flex: none; }
+.bkpick { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--line-2, var(--line)); border-radius: 10px; background: var(--surface); }
+.bkpick-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.bkpick-head b { word-break: break-all; }
+.bkstats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12.5px; color: var(--ink-3, var(--ink-4)); }
+.bkstats b { color: var(--ink, inherit); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .bkrow { flex-wrap: wrap; }
+  .bkacts { width: 100%; justify-content: flex-end; }
+}
 .segs { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .segs .btn { min-width: 44px; }
 /* ---------------- 布局：左导航 + 右单列 ----------------

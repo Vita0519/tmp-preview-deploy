@@ -171,6 +171,38 @@ def auto_delete(name: str, user: dict = Depends(admin_user)):
     return autobackup.status()
 
 
+@router.get("/backup/auto/{name}/inspect")
+def auto_inspect(name: str, user: dict = Depends(admin_user)):
+    """服务器上的备份直接看内容，不用先下载再上传。"""
+    p = autobackup.path_of(name)
+    if not p:
+        raise HTTPException(status_code=404, detail="没有这份备份")
+    try:
+        return {"ok": True, **backup_mod.inspect(p)}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"读不了这份备份：{exc}") from exc
+
+
+@router.post("/backup/auto/{name}/restore")
+def auto_restore(name: str, user: dict = Depends(admin_user)):
+    """从服务器上的备份恢复。backups/ 不会被恢复挪走，所以直接读原文件是安全的。"""
+    p = autobackup.path_of(name)
+    if not p:
+        raise HTTPException(status_code=404, detail="没有这份备份")
+    try:
+        result = backup_mod.restore(p)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"恢复失败：{exc}") from exc
+    backup_mod.cleanup_old_safety()
+    try:
+        log_event("restore", user["id"], None, f"从服务器备份 {name} 恢复，{json.dumps(result.get('counts', {}))}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[backup] 记录恢复日志失败：{exc}", flush=True)
+    return result
+
+
 @router.post("/backup/inspect")
 async def inspect_backup(file: UploadFile = File(...), user: dict = Depends(admin_user)):
     """先看包里有什么，再决定要不要恢复。"""

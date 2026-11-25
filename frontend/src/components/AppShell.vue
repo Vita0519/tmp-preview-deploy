@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { store, toast } from '../store'
 import { api } from '../api'
@@ -45,6 +45,30 @@ async function logout() {
 function closeNav() {
   store.mobileNav = false
 }
+
+// 新版本提醒：管理员进后台就查一次（后端 1 小时缓存），之后每 6 小时再查
+const update = computed(() => store.update)
+const dismissedVer = ref(localStorage.getItem('pv_upd_dismiss') || '')
+const showUpd = computed(() => isAdmin.value && update.value?.latest && update.value.latest !== dismissedVer.value)
+async function pollUpdate() {
+  if (!isAdmin.value) return
+  try {
+    const d = await api.get('/api/settings/version')
+    store.update = d?.ok && d.has_update ? d : null
+  } catch {
+    /* 网络不通就算了，不打扰 */
+  }
+}
+function dismissUpd() {
+  dismissedVer.value = update.value?.latest || ''
+  try { localStorage.setItem('pv_upd_dismiss', dismissedVer.value) } catch {}
+}
+let updTimer = null
+onMounted(() => {
+  pollUpdate()
+  updTimer = setInterval(pollUpdate, 6 * 3600 * 1000)
+})
+onUnmounted(() => clearInterval(updTimer))
 </script>
 
 <template>
@@ -104,6 +128,13 @@ function closeNav() {
     </aside>
 
     <main class="main">
+      <div v-if="showUpd" class="updbar">
+        <span>发现新版本 <b>v{{ update.latest }}</b>（当前 v{{ update.current }}）</span>
+        <a v-if="update.url" :href="update.url" target="_blank" rel="noopener">查看更新内容</a>
+        <router-link :to="{ name: 'settings', hash: '#about' }">去设置</router-link>
+        <span class="grow" />
+        <button class="x" title="这个版本不再提示" @click="dismissUpd">×</button>
+      </div>
       <template v-if="isViewer">
         <header class="topbar">
           <h1>受限账号</h1>
@@ -128,3 +159,15 @@ function closeNav() {
     </main>
   </div>
 </template>
+
+<style scoped>
+.updbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 12px 20px 0; padding: 9px 14px; border-radius: 9px; font-size: 12.5px;
+  background: rgba(var(--ink-rgb, 0, 0, 0), 0.04); border: 1px solid var(--line, #ddd);
+  border-left: 3px solid var(--brand, #4a7);
+}
+.updbar a { color: var(--brand); }
+.updbar .grow { flex: 1; }
+.updbar .x { background: none; border: 0; font-size: 16px; cursor: pointer; color: var(--ink-3, var(--ink-4)); }
+</style>
