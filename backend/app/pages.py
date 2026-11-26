@@ -589,7 +589,42 @@ PORTAL_JS = """
   var cnt=document.getElementById('cnt'), blank=document.getElementById('blank');
   var pager=document.getElementById('pager'), pgnums=document.getElementById('pgnums');
   var perSel=document.getElementById('per');
-  var state={kind:'all',q:'',tag:'',owner:'',sort:'created',page:1,per:24};
+  var state={kind:'all',q:'',tag:'',owner:'',sort:'created',tf:'',page:1,per:24,view:''};
+  // v2.7.0：筛选条件 ⇄ 地址栏。SERVER=1 表示项目超过上限、由服务端按参数筛选，
+  // 改条件要整页跳转重新取数；否则只在前端筛，用 replaceState 改地址不刷新。
+  var SERVER=__SERVER__;
+  (function(){
+    var u=new URLSearchParams(location.search);
+    var k=u.get('type')||u.get('c')||'';
+    if(['static','link','zip'].indexOf(k)>=0) state.kind=k;
+    state.q=u.get('q')||''; state.tag=u.get('tag')||''; state.owner=u.get('owner')||'';
+    if(['exp','views','name'].indexOf(u.get('sort'))>=0) state.sort=u.get('sort');
+    if(['7d','30d','soon'].indexOf(u.get('t'))>=0) state.tf=u.get('t');
+    var pg=parseInt(u.get('page'),10); if(pg>1) state.page=pg;
+    if(u.get('view')==='list'||u.get('view')==='grid') state.view=u.get('view');
+  })();
+  function buildQS(){
+    var u=new URLSearchParams();
+    if(state.kind!=='all') u.set('type',state.kind);
+    if(state.q) u.set('q',state.q);
+    if(state.tag) u.set('tag',state.tag);
+    if(state.owner) u.set('owner',state.owner);
+    if(state.sort!=='created') u.set('sort',state.sort);
+    if(state.tf) u.set('t',state.tf);
+    if(state.page>1) u.set('page',state.page);
+    if(state.view) u.set('view',state.view);
+    var s=u.toString(); return s?'?'+s:'';
+  }
+  var navT=null;
+  function syncURL(serverKeyChanged){
+    var qs=buildQS();
+    if(SERVER && serverKeyChanged){
+      clearTimeout(navT);
+      navT=setTimeout(function(){ location.href=location.pathname+qs; }, state.q?450:0);
+      return;
+    }
+    try{ history.replaceState(null,'',location.pathname+qs+location.hash); }catch(e){}
+  }
   function pad(n){return n<10?'0'+n:''+n}
   function fmt(ms){
     if(ms<=0) return '已到期';
@@ -655,7 +690,15 @@ PORTAL_JS = """
     if(top<0) top=0;
     if(Math.abs(top-(window.pageYOffset||0))>40) window.scrollTo({top:top,behavior:'smooth'});
   }
-  function apply(reset){
+  function tfOk(d){
+    if(!state.tf) return true;
+    var now=Date.now()+off, day=864e5;
+    if(state.tf==='7d') return (+d.created||0)>=now-7*day;
+    if(state.tf==='30d') return (+d.created||0)>=now-30*day;
+    if(state.tf==='soon'){ var e=+d.exp||0; return e>0 && e<=now+7*day; }
+    return true;
+  }
+  function apply(reset, sk){
     if(reset) state.page=1;
     var q=state.q.toLowerCase(), sel=[];
     items.forEach(function(it){
@@ -664,6 +707,7 @@ PORTAL_JS = """
       var ok = (state.kind==='all'||d.kind===state.kind)
         && (!state.owner||d.owner===state.owner)
         && (!state.tag||tags.indexOf(state.tag)>=0)
+        && tfOk(d)
         && (!q||hay.toLowerCase().indexOf(q)>=0);
       if(ok) sel.push(it);
     });
@@ -687,20 +731,33 @@ PORTAL_JS = """
     }
     if(blank) blank.hidden = total>0;
     renderPager(total,pages);
+    if(apply._ready) syncURL(!!sk);
   }
   document.querySelectorAll('.seg[data-kind] button').forEach(function(b){
     b.onclick=function(){
       state.kind=b.dataset.v;
       document.querySelectorAll('.seg[data-kind] button').forEach(function(x){x.classList.toggle('on',x===b)});
-      apply(true);
+      apply(true,1);
     };
   });
+  document.querySelectorAll('.seg[data-kind] button').forEach(function(x){ x.classList.toggle('on', x.dataset.v===state.kind); });
   var q=document.getElementById('q');
-  if(q) q.oninput=function(){ state.q=q.value.trim(); apply(true); };
+  if(q){ q.value=state.q; q.oninput=function(){ state.q=q.value.trim(); apply(true,1); }; }
   var s=document.getElementById('sort');
-  if(s) s.onchange=function(){ state.sort=s.value; apply(true); };
+  if(s){ s.value=state.sort; s.onchange=function(){ state.sort=s.value; apply(true,1); }; }
+  var tfs=document.getElementById('tf');
+  if(tfs){ tfs.value=state.tf; tfs.onchange=function(){ state.tf=tfs.value; apply(true,1); }; }
   var ow=document.getElementById('owner');
-  if(ow) ow.onchange=function(){ state.owner=ow.value; apply(true); };
+  if(ow){ if(state.owner) ow.value=state.owner; ow.onchange=function(){ state.owner=ow.value; apply(true,1); }; }
+  // 快捷键：/ 或 Ctrl/⌘+K 聚焦搜索；Esc 清空搜索
+  document.addEventListener('keydown',function(e){
+    var t=e.target, typing=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable);
+    if(((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')) || (!typing&&e.key==='/')){
+      if(q){ e.preventDefault(); q.focus(); q.select(); }
+    } else if(e.key==='Escape' && t===q){
+      if(q.value){ q.value=''; state.q=''; apply(true,1); } else q.blur();
+    }
+  });
   if(perSel){
     var savedPer=24;
     try{ var pv=localStorage.getItem('pv_per'); if(pv!==null) savedPer=+pv; }catch(e){}
@@ -722,8 +779,9 @@ PORTAL_JS = """
   if(vs){
     var saved='grid';
     try{ saved=localStorage.getItem('pv_view')||'grid'; }catch(e){}
+    if(state.view) saved=state.view;
     setView(saved==='list'?'list':'grid');
-    [].forEach.call(vs.children,function(b){ b.onclick=function(){ setView(b.dataset.view); }; });
+    [].forEach.call(vs.children,function(b){ b.onclick=function(){ setView(b.dataset.view); state.view=b.dataset.view; syncURL(false); }; });
   }
   // 快捷复制链接：成功后打勾 + 冒出「已复制」，失败标红「复制失败」
   function mark(btn, ok){
@@ -801,7 +859,7 @@ PORTAL_JS = """
       b.onclick=function(){
         state.tag = (val===state.tag) ? '' : val;
         [].forEach.call(tb.children,function(x){ x.classList.toggle('on', (x.dataset.tag||'')===state.tag); });
-        apply(true);
+        apply(true,1);
       };
       tb.appendChild(b);
       return b;
@@ -828,7 +886,7 @@ PORTAL_JS = """
     window.addEventListener('resize',syncFade);
     syncFade();
   }
-  tick(); setInterval(tick,1000); apply(false); if(tb) syncFade();
+  tick(); setInterval(tick,1000); apply(false); apply._ready=true; if(tb) syncFade();
 })();
 """
 
@@ -990,6 +1048,9 @@ def portal_page(
     truncated: int = 0,
     tag_limit: int = 12,
     cols: int = 0,
+    server_mode: bool = False,
+    owner_opts: list | None = None,
+    total_public: int | None = None,
 ) -> str:
     accent = accent or theme.current()
     cols_attr = f' data-cols="{cols}" style="--pcols:{cols}"' if cols in (3, 4, 5) else ''
@@ -1000,7 +1061,11 @@ def portal_page(
         oid = p.get("owner_id") or 0
         rec = owners.setdefault(oid, [_owner_name(p), 0])
         rec[1] += 1
-    owner_opts = sorted(owners.items(), key=lambda kv: (-kv[1][1], kv[1][0]))
+    if owner_opts is not None:
+        # 服务端筛选模式：成员下拉用全站统计，不随当前筛选结果缩水
+        owner_opts = [(oid or 0, [name, n]) for oid, name, n in owner_opts]
+    else:
+        owner_opts = sorted(owners.items(), key=lambda kv: (-kv[1][1], kv[1][0]))
     cards: list[str] = []
     rows: list[str] = []
     for p in items:
@@ -1119,10 +1184,16 @@ def portal_page(
     # 服务端只取最近 N 个：超出部分必须明说，不能让人以为「就这么多」
     trunc_note = ""
     if truncated > 0:
-        trunc_note = (
-            f'<div class="trunc">只列出最近的 {len(items)} 个项目，'
-            f'另有 {truncated} 个更早的未显示</div>'
-        )
+        if server_mode:
+            trunc_note = (
+                f'<div class="trunc">当前条件共匹配 {len(items) + truncated} 个，只显示前 {len(items)} 个，'
+                f'另有 {truncated} 个匹配项未显示，请缩小筛选范围</div>'
+            )
+        else:
+            trunc_note = (
+                f'<div class="trunc">只列出最近的 {len(items)} 个项目，'
+                f'另有 {truncated} 个更早的未显示</div>'
+            )
     # 只有真的存在多个归属人时，成员筛选才有意义
     owner_sel = ""
     if len(owner_opts) > 1:
@@ -1180,7 +1251,13 @@ def portal_page(
     <option value="views">访问最多</option>
     <option value="name">名称 A→Z</option>
   </select>
-  <input class="search" id="q" type="search" placeholder="搜索名称或标签" aria-label="搜索">
+  <select class="sort" id="tf" aria-label="按时间筛选">
+    <option value="">全部时间</option>
+    <option value="7d">近 7 天</option>
+    <option value="30d">近 30 天</option>
+    <option value="soon">7 天内到期</option>
+  </select>
+  <input class="search" id="q" type="search" placeholder="搜索名称或标签（按 / 聚焦）" aria-label="搜索">
 </div>
 <div class="tagsbar" id="tagsbar"></div>
 </div>
@@ -1200,7 +1277,7 @@ def portal_page(
 {foot}
 </div>
 <script>
-{PORTAL_JS.replace("__NOW__", str(server_now)).replace("__TAGBAR__", str(tag_limit))}
+{PORTAL_JS.replace("__NOW__", str(server_now)).replace("__TAGBAR__", str(tag_limit)).replace("__SERVER__", "1" if server_mode else "0")}
 </script></body></html>"""
 
 

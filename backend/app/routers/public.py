@@ -327,21 +327,74 @@ def portal(request: Request):
         return RedirectResponse("/admin/login?back=/", status_code=302)
 
     now = now_ms()
-    # 门户是纯前端筛选/排序/分页：一次给够，别让人翻两页就翻空。
-    # 上限仍然要有，否则公开门户被人刷几千个项目会把首页撑爆。
+    cap = portal_max()
+    # 项目不多（≤ 上限）：一次全给，前端筛选/排序/分页，地址栏参数只在前端还原。
+    # 项目超过上限：前端只拿到一部分，筛选必须交给服务端按地址栏参数做，
+    # 否则第 501 个以后的项目永远搜不到。
+    base_where = (
+        "p.visibility='portal' AND p.status='active' "
+        "AND (p.expires_at IS NULL OR p.expires_at>?)"
+    )
     with db() as conn:
+        total_public = conn.execute(
+            f"SELECT COUNT(*) c FROM projects p WHERE {base_where}", (now,)
+        ).fetchone()["c"]
+        server_mode = total_public > cap
+        where, args = base_where, [now]
+        order = "p.created_at DESC"
+        owner_opts = None
+        if server_mode:
+            qp = request.query_params
+            kind = qp.get("type") or qp.get("c") or ""
+            if kind in ("static", "link", "zip"):
+                where += " AND p.kind=?"; args.append(kind)
+            owner = qp.get("owner") or ""
+            if owner.isdigit():
+                where += " AND p.owner_id=?"; args.append(int(owner))
+            tag = (qp.get("tag") or "").strip()
+            if tag:
+                where += (" AND EXISTS (SELECT 1 FROM project_tags pt JOIN tags t ON t.id=pt.tag_id "
+                          "WHERE pt.project_id=p.id AND t.name=?)")
+                args.append(tag)
+            q = (qp.get("q") or "").strip()
+            if q:
+                like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+                where += (" AND (p.title LIKE ? ESCAPE '\\' OR IFNULL(u.display_name,u.username) LIKE ? ESCAPE '\\' "
+                          "OR EXISTS (SELECT 1 FROM project_tags pt JOIN tags t ON t.id=pt.tag_id "
+                          "WHERE pt.project_id=p.id AND t.name LIKE ? ESCAPE '\\'))")
+                args += [like, like, like]
+            tf = qp.get("t") or ""
+            day = 86400_000
+            if tf == "7d":
+                where += " AND p.created_at>=?"; args.append(now - 7 * day)
+            elif tf == "30d":
+                where += " AND p.created_at>=?"; args.append(now - 30 * day)
+            elif tf == "soon":
+                where += " AND p.expires_at IS NOT NULL AND p.expires_at<=?"; args.append(now + 7 * day)
+            order = {
+                "exp": "p.expires_at IS NULL, p.expires_at ASC",
+                "views": "p.views DESC",
+                "name": "p.title COLLATE NOCASE ASC",
+            }.get(qp.get("sort") or "", "p.created_at DESC")
+            # 成员下拉要列全站成员，不能只列当前筛选结果里的
+            owner_opts = [
+                (r["oid"], r["name"] or "未知", r["n"])
+                for r in conn.execute(
+                    "SELECT p.owner_id oid, IFNULL(u.display_name,u.username) name, COUNT(*) n "
+                    "FROM projects p LEFT JOIN users u ON u.id=p.owner_id "
+                    f"WHERE {base_where} GROUP BY p.owner_id ORDER BY n DESC, name",
+                    (now,),
+                ).fetchall()
+            ]
+        sql_from = "FROM projects p LEFT JOIN users u ON u.id=p.owner_id"
         rows = conn.execute(
             "SELECT p.*, u.display_name AS owner_display_name, u.username AS owner_username "
-            "FROM projects p LEFT JOIN users u ON u.id=p.owner_id "
-            "WHERE p.visibility='portal' AND p.status='active' "
-            "AND (p.expires_at IS NULL OR p.expires_at>?) ORDER BY p.created_at DESC LIMIT ?",
-            (now, portal_max()),
+            f"{sql_from} WHERE {where} ORDER BY {order} LIMIT ?",
+            (*args, cap),
         ).fetchall()
-        total_public = conn.execute(
-            "SELECT COUNT(*) c FROM projects WHERE visibility='portal' AND status='active' "
-            "AND (expires_at IS NULL OR expires_at>?)",
-            (now,),
-        ).fetchone()["c"]
+        matched = conn.execute(
+            f"SELECT COUNT(*) c {sql_from} WHERE {where}", args
+        ).fetchone()["c"] if server_mode else total_public
 
     items = [_dict(r, "") for r in rows]
     return HTMLResponse(
@@ -353,9 +406,12 @@ def portal(request: Request):
             bool(user),
             author.load(),
             theme.current(),
-            truncated=max(0, total_public - len(items)),
+            truncated=max(0, matched - len(items)),
             tag_limit=tag_bar_limit(),
             cols=portal_cols(),
+            server_mode=server_mode,
+            owner_opts=owner_opts,
+            total_public=total_public,
         ),
         headers=NOINDEX,
     )
