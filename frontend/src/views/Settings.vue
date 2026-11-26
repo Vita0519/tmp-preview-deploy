@@ -1424,10 +1424,10 @@ onUnmounted(() => {
   <Teleport to="body">
     <template v-if="shop.open">
       <div class="scrim" @click="shop.open = false" />
-      <div class="modal storemodal">
+      <div class="modal lg">
         <div class="modal-head">
           <h2>主题商店</h2>
-          <span class="pdesc">从 GitHub 仓库安装主题插件</span>
+          <span class="sub">从 GitHub 仓库安装主题插件</span>
           <div class="grow" style="flex: 1" />
           <button class="btn ghost icon" title="关闭" @click="shop.open = false">
             <Icon name="close" :size="16" />
@@ -1606,6 +1606,9 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .setmain .form .frow > .hint { grid-column: 2; margin-top: 1px; }
+/* 短字段按内容收窄：站点标题 / 显示名 / 一句话介绍不该横跨 700px */
+.setmain .form .frow > .input { max-width: 380px; }
+.setmain .form .frow > .textarea { max-width: 560px; }
 .inlinerow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .linkbtn {
   display: inline-flex;
@@ -1735,7 +1738,6 @@ onUnmounted(() => {
 .scard { position: relative; }
 
 /* ---------------- 主题商店弹窗 ---------------- */
-.storemodal { width: 640px; }
 .storerepo { display: flex; gap: 8px; flex-wrap: wrap; }
 .storerepo .input { flex: 1 1 240px; min-width: 0; }
 .storeerr {
@@ -2029,8 +2031,8 @@ onUnmounted(() => {
     overflow-x: auto; scrollbar-width: none;
     background: var(--bg);
     border-bottom: 1px solid var(--line);
-    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
-    mask-image: linear-gradient(90deg, #000 88%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, #000 80%, transparent);
+    mask-image: linear-gradient(90deg, #000 80%, transparent);
   }
   .setnav::-webkit-scrollbar { display: none; }
   .setnav a { flex: 0 0 auto; height: 28px; }

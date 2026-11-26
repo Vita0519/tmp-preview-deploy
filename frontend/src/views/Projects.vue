@@ -392,13 +392,13 @@ onBeforeUnmount(() => {
     <button class="btn ghost icon" title="刷新" :disabled="loading" @click="load(true)">
       <Icon name="refresh" :size="16" />
     </button>
-    <button class="btn ghost" title="导入浏览器书签（Chrome / Edge / Firefox）" @click="importOpen = true">
+    <button class="btn ghost" title="导入浏览器书签（Chrome / Edge / Firefox）" aria-label="导入书签" @click="importOpen = true">
       <Icon name="download" :size="16" /> <span class="btxt">导入书签</span>
     </button>
-    <a class="btn ghost" :href="exportHref" title="导出为书签 HTML，可被浏览器直接导入">
+    <a class="btn ghost" :href="exportHref" title="导出为书签 HTML，可被浏览器直接导入" aria-label="导出书签">
       <Icon name="external" :size="16" /> <span class="btxt">导出</span>
     </a>
-    <button class="btn primary" @click="uploadOpen = true">
+    <button class="btn primary" title="新建项目（上传 HTML / zip）" aria-label="新建项目" @click="uploadOpen = true">
       <Icon name="plus" :size="16" /> <span class="btxt">新建项目</span>
     </button>
   </header>

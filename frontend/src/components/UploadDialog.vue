@@ -240,7 +240,7 @@ async function submitLink() {
 
 <template>
   <div class="scrim" @click="emit('close')" />
-  <div class="modal" role="dialog" aria-modal="true">
+  <div class="modal md" role="dialog" aria-modal="true">
     <div class="modal-head">
       <h2>新建项目</h2>
       <div style="flex: 1" />
@@ -440,7 +440,7 @@ async function submitLink() {
     </div>
 
     <div class="modal-foot">
-      <button class="btn" @click="emit('close')">取消</button>
+      <button class="btn ghost cancel" @click="emit('close')">取消</button>
       <button class="btn primary" :disabled="uploading" @click="submit">
         {{ uploading ? (progress ? `上传中 ${progress}%` : '处理中…') : '创建' }}
       </button>

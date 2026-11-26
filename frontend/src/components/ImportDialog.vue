@@ -112,7 +112,7 @@ async function doImport() {
 
 <template>
   <div class="scrim" @click="emit('close')" />
-  <div class="modal" role="dialog" aria-modal="true" style="max-width: 520px">
+  <div class="modal" role="dialog" aria-modal="true">
     <div class="modal-head">
       <h2>导入浏览器书签</h2>
       <div style="flex: 1" />
@@ -135,10 +135,9 @@ async function doImport() {
       </div>
       <input ref="bm" type="file" accept=".html,.htm,text/html" style="display: none" @change="pick" />
 
-      <div class="hint" style="margin: 8px 0 14px; line-height: 1.6">
-        文件夹会变成分组（只取前两级，更深的折进第二级），书签变成外链项目；
-        选了「导入到」某个分组时，书签的文件夹会挂在它下面，只多一层。
-        同一个网址重复导入会自动跳过。
+      <div class="hint" style="margin: 10px 0 14px">
+        <p style="margin: 0">文件夹会变成分组（只取前两级，更深的折进第二级），书签变成外链项目；选了「导入到」某个分组时，书签的文件夹会挂在它下面，只多一层。</p>
+        <p style="margin: 4px 0 0">同一个网址重复导入会自动跳过。</p>
       </div>
 
       <div class="frow two">
@@ -160,7 +159,7 @@ async function doImport() {
       </div>
 
       <div class="frow">
-        <label>打一个标签（可选）</label>
+        <label>标签（可选）</label>
         <input v-model="tag" class="field" placeholder="例如：书签" />
       </div>
 
@@ -187,8 +186,7 @@ async function doImport() {
     </div>
 
     <div class="modal-foot">
-      <button class="btn ghost" @click="emit('close')">取消</button>
-      <div style="flex: 1" />
+      <button class="btn ghost cancel" @click="emit('close')">取消</button>
       <button class="btn" :disabled="busy || !file" @click="runPreview">
         {{ busy ? '解析中…' : '先预览' }}
       </button>

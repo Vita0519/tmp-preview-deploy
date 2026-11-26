@@ -54,7 +54,7 @@ watch(
 
   <template v-if="update">
     <div class="scrim" @click="update = null" />
-    <div class="modal" style="width: 470px">
+    <div class="modal sm">
       <div class="modal-head">
         <h2>发现新版本 {{ update.latest }}</h2>
       </div>
@@ -65,7 +65,7 @@ watch(
         <pre v-if="update.notes" class="upd-notes">{{ update.notes }}</pre>
       </div>
       <div class="modal-foot">
-        <button class="btn" @click="skipVersion">跳过此版本</button>
+        <button class="btn ghost cancel" @click="skipVersion">跳过此版本</button>
         <button class="btn" @click="update = null">稍后</button>
         <a
           class="btn primary"
@@ -80,7 +80,7 @@ watch(
 
   <template v-if="store.confirm">
     <div class="scrim" @click="resolveConfirm(false)" />
-    <div class="modal" style="width: 400px">
+    <div class="modal sm">
       <div class="modal-head">
         <h2>{{ store.confirm.title }}</h2>
       </div>
@@ -88,7 +88,7 @@ watch(
         <p class="muted" style="font-size: 12.5px; line-height: 1.65">{{ store.confirm.message }}</p>
       </div>
       <div class="modal-foot">
-        <button class="btn" @click="resolveConfirm(false)">{{ store.confirm.cancelText }}</button>
+        <button class="btn ghost cancel" @click="resolveConfirm(false)">{{ store.confirm.cancelText }}</button>
         <button
           class="btn"
           :class="store.confirm.danger ? 'danger' : 'primary'"

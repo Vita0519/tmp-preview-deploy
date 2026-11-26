@@ -510,7 +510,7 @@ onMounted(load)
 
 
   <div v-if="del.item" class="scrim" @click="del.item = null" />
-  <div v-if="del.item" class="modal" style="width: 460px">
+  <div v-if="del.item" class="modal sm">
     <div class="modal-head">
       <h2>删除成员「{{ del.item.display_name || del.item.username }}」</h2>
       <div style="flex: 1" />
@@ -539,14 +539,14 @@ onMounted(load)
       <p v-else style="margin: 0">该成员名下没有项目，删除后账号不可恢复。</p>
     </div>
     <div class="modal-foot">
-      <button class="btn" @click="del.item = null">取消</button>
+      <button class="btn ghost cancel" @click="del.item = null">取消</button>
       <button class="btn danger" :disabled="!delReady || del.busy" @click="doRemove">
         {{ del.busy ? '处理中…' : del.mode === 'transfer' && del.item.projects ? '转移并删除' : '删除' }}
       </button>
     </div>
   </div>
   <div v-if="createOpen" class="scrim" @click="createOpen = false" />
-  <div v-if="createOpen" class="modal" style="width: 420px">
+  <div v-if="createOpen" class="modal sm">
     <div class="modal-head">
       <h2>添加成员</h2>
       <div style="flex: 1" />
@@ -554,9 +554,9 @@ onMounted(load)
     </div>
     <div class="modal-body">
       <div class="trustnote">
-        <b><Icon name="warning" :size="14" class="warnico" />只给你信任的人或自己的 Agent 开账号</b>
-        <p>本系统面向个人用户与个人 Agent 使用。所有预览内容与管理后台同源：成员上传的页面里的脚本，可以读到访问者在本站的登录状态，进而操作后台。不要给不信任的人开通发布权限。</p>
-        <p>免责声明：本软件按「原样」提供，不附带任何担保。因开通账号、成员上传的内容或使用本软件造成的数据泄露、损失或法律责任，由部署者自行承担，与作者无关。</p>
+        <b><Icon name="warning" :size="13" class="warnico" />只给你信任的人或自己的 Agent 开账号</b>
+        <p>预览内容与管理后台同源：成员上传的页面里的脚本，可以读到访问者在本站的登录状态，进而操作后台。不要给不信任的人开通发布权限。</p>
+        <p class="fine">免责声明：本软件按「原样」提供，不附带任何担保。因开通账号、成员上传的内容或使用本软件造成的数据泄露、损失或法律责任，由部署者自行承担，与作者无关。</p>
         <label class="ackline"><input v-model="ack" type="checkbox" /> 我已了解风险，该成员是我信任的人或我自己的 Agent</label>
       </div>
       <div class="form">
@@ -564,13 +564,15 @@ onMounted(load)
           <label>账号</label>
           <input v-model="form.username" class="input" placeholder="小写字母/数字，如 alice" />
         </div>
-        <div class="frow">
-          <label>显示名</label>
-          <input v-model="form.display_name" class="input" placeholder="用于列表展示" />
-        </div>
-        <div class="frow">
-          <label>初始密码</label>
-          <input v-model="form.password" class="input" placeholder="留空自动生成" />
+        <div class="frow two">
+          <div class="frow">
+            <label>显示名</label>
+            <input v-model="form.display_name" class="input" placeholder="用于列表展示" />
+          </div>
+          <div class="frow">
+            <label>初始密码</label>
+            <input v-model="form.password" class="input" placeholder="留空自动生成" />
+          </div>
         </div>
         <div class="frow">
           <label>绑定 Agent</label>
@@ -600,13 +602,13 @@ onMounted(load)
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn" @click="createOpen = false">取消</button>
+      <button class="btn ghost cancel" @click="createOpen = false">取消</button>
       <button class="btn primary" :disabled="busy" @click="submit">创建</button>
     </div>
   </div>
 
   <div v-if="created" class="scrim" @click="created = null" />
-  <div v-if="created" class="modal" style="width: 440px">
+  <div v-if="created" class="modal sm">
     <div class="modal-head"><h2>凭据（只显示一次）</h2></div>
     <div class="modal-body">
       <p class="muted" style="font-size: 12.5px; margin-bottom: 12px">
@@ -643,13 +645,23 @@ onMounted(load)
 
 <style scoped>
 .trustnote {
-  margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; font-size: 12px; line-height: 1.6;
-  background: var(--danger-soft, rgba(200, 60, 40, 0.06)); border: 1px solid var(--danger-line, rgba(200, 60, 40, 0.25));
+  margin-bottom: 18px; padding: 12px 14px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  font-size: 12px; line-height: 1.65;
 }
-.trustnote b { color: var(--danger); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
-.trustnote b .warnico { flex: 0 0 auto; }
-.trustnote p { margin: 6px 0 0; color: var(--ink-3, var(--ink-4)); }
-.ackline { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-weight: 600; cursor: pointer; }
+.trustnote b {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+}
+.trustnote b .warnico { flex: 0 0 auto; color: var(--danger); opacity: 0.75; }
+.trustnote p { margin: 7px 0 0; color: var(--ink-3, var(--ink-4)); }
+.trustnote p.fine { color: var(--ink-4); font-size: 11.5px; line-height: 1.6; }
+.ackline {
+  display: flex; align-items: flex-start; gap: 7px; margin-top: 11px;
+  padding-top: 10px; border-top: 1px solid var(--line);
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+}
+.ackline input { margin-top: 2px; flex: 0 0 auto; }
 .delopt { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; margin: 4px 0; }
 .delopt input { margin-top: 3px; }
 /* ---------- 角色切换下拉：三档，按角色着色 ---------- */
@@ -710,13 +722,16 @@ onMounted(load)
 .rl-hint { flex: 1 1 100%; font-size: 11px; color: var(--ink-4); line-height: 1.45; }
 
 /* ---------- 创建对话框的角色单选 ---------- */
+/* 一行一个：圆点 + 角色名 + 一句话说明。两行式卡片会让整个弹窗撑到 828px，
+   900 高的屏幕上最后一张卡片永远被截一半 */
 .rolepick { display: flex; flex-direction: column; gap: 6px; }
 .rp {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 8px 11px;
+  min-height: 34px;
+  padding: 4px 11px;
   border: 1px solid var(--line-2);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -732,7 +747,6 @@ onMounted(load)
   flex: 0 0 auto;
   width: 13px;
   height: 13px;
-  margin-top: 3px;
   border: 1.5px solid var(--line-2);
   border-radius: 50%;
   transition: border-color 0.16s var(--ease);
@@ -745,9 +759,12 @@ onMounted(load)
   border-radius: 50%;
   background: var(--brand);
 }
-.rp-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.rp-txt b { font-size: 12.5px; font-weight: 650; color: var(--ink); }
-.rp-txt em { font-style: normal; font-size: 11.5px; color: var(--ink-4); }
+.rp-txt { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.rp-txt b { flex: 0 0 auto; font-size: 12.5px; font-weight: 650; color: var(--ink); }
+.rp-txt em {
+  font-style: normal; font-size: 11.5px; color: var(--ink-4);
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 /* ---------- 绑定 Agent（一个账号只绑一把 Key） ---------- */
 /* 多了这一列后成员名会被压窄，账号不能折行拆成两行 */
 table .pcell { min-width: 128px; }
