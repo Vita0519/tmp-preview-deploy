@@ -14,6 +14,7 @@ export default defineConfig({
       '^/p/': { target, changeOrigin: true },
       '^/v/': { target, changeOrigin: true },
       '^/download/': { target, changeOrigin: true },
+      '^/$': { target, changeOrigin: true },
       '/portal': { target, changeOrigin: true },
     },
   },

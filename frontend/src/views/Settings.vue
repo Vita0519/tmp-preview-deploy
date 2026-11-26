@@ -251,7 +251,7 @@ const authorTypes = ref([
 ])
 
 const VIS = [
-  { key: 'portal', label: '门户可见', hint: '出现在 /portal 列表' },
+  { key: 'portal', label: '门户可见', hint: '出现在门户首页（/）' },
   { key: 'link', label: '持链接可见', hint: '不列出，有链接就能开' },
   { key: 'private', label: '仅自己可见', hint: '需登录且为本人' },
 ]
@@ -721,11 +721,11 @@ onUnmounted(() => {
                   <input v-model="form.public_portal" type="checkbox" />
                   允许未登录访客浏览门户列表
                 </label>
-                <a class="linkbtn" href="/portal" target="_blank" rel="noopener">
+                <a class="linkbtn" href="/" target="_blank" rel="noopener">
                   打开门户 <Icon name="external" :size="11" />
                 </a>
               </div>
-              <span class="hint">关闭后 /portal 需要登录；已发出去的直链预览不受影响</span>
+              <span class="hint">关闭后门户首页（/）需要登录；已发出去的直链预览不受影响</span>
             </div>
             <div class="frow">
               <label>每行卡片</label>
@@ -995,7 +995,7 @@ onUnmounted(() => {
         <section id="author" class="panel">
           <div class="panel-head">
             <h2>作者名片</h2>
-            <span class="pdesc">展示在访客门户 <span class="mono">/portal</span> 顶部</span>
+            <span class="pdesc">展示在门户首页（<span class="mono">/</span>）顶部</span>
           </div>
           <div class="panel-body author-grid">
             <div class="form">

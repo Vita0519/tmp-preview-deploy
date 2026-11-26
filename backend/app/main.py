@@ -96,6 +96,12 @@ async def spa(full_path: str, request: Request):
             "生产：<code>docker compose up -d --build</code></p>",
             status_code=503,
         )
+    # v2.6.0：后台搬到 /admin，老书签 /logs /settings /agents /login 301 过去
+    head = full_path.split("/", 1)[0]
+    if head in ("login", "logs", "agents", "settings"):
+        from fastapi.responses import RedirectResponse
+        q = request.url.query
+        return RedirectResponse("/admin/" + full_path + (f"?{q}" if q else ""), status_code=301)
     if full_path:
         candidate = (config.DIST_DIR / full_path).resolve()
         if config.DIST_DIR in candidate.parents and candidate.is_file():

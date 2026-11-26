@@ -17,7 +17,7 @@ NOINDEX = {"X-Robots-Tag": "noindex, nofollow"}
 
 # 失效链接的落点：门户首页。门户本身有权限控制（未登录/不公开时会转去登录），
 # 所以这里无脑指 /portal 即可，不需要在跳转处再判一次权限，也不会泄露项目是否存在。
-PORTAL_HOME = "/portal?gone=1"
+PORTAL_HOME = "/?gone=1"
 
 # 门户一次最多取多少个（前端在其上做筛选/排序/分页）。
 # 公开门户可能被大量项目灌满，必须有个天花板；超出部分由页面明确提示，不静默截断。
@@ -301,13 +301,30 @@ def preview(slug: str, request: Request):
     )
 
 
+@router.get("/")
+def home(request: Request):
+    """v2.6.0：根路径默认就是访客门户；ROOT_PAGE=admin 时保持老习惯进后台。"""
+    if config.ROOT_PAGE == "admin":
+        return RedirectResponse("/admin/", status_code=302)
+    return portal(request)
+
+
 @router.get("/portal")
+def portal_legacy(request: Request):
+    """老地址：门户在根路径时 301 过去（带上 ?gone=1 等参数）；admin 模式下照常出门户。"""
+    if config.ROOT_PAGE == "admin":
+        return portal(request)
+    q = request.url.query
+    return RedirectResponse("/" + (f"?{q}" if q else ""), status_code=301)
+
+
 def portal(request: Request):
     user = resolve_user(request)
     env_public = config.PUBLIC_PORTAL
     db_public = get_setting("public_portal", "0") == "1"
     if not (env_public or db_public or user):
-        return RedirectResponse("/", status_code=302)
+        # 门户不公开且没登录 → 去后台登录，登录完回门户（不能回 /，门户就在 / 会死循环）
+        return RedirectResponse("/admin/login?back=/", status_code=302)
 
     now = now_ms()
     # 门户是纯前端筛选/排序/分页：一次给够，别让人翻两页就翻空。
@@ -388,7 +405,7 @@ def rss(request: Request):
         '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">'
         "<channel>"
         f"<title>{escape(site_title)}</title>"
-        f"<link>{escape(base + '/portal')}</link>"
+        f"<link>{escape(base + '/')}</link>"
         f"<description>{escape(config.SITE_SUBTITLE or site_title)}</description>"
         "<language>zh-CN</language>"
         f"<lastBuildDate>{_rfc822(now)}</lastBuildDate>"

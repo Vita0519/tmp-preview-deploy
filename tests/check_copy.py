@@ -54,7 +54,7 @@ with sync_playwright() as p:
     pg.on("console", lambda m: errs.append(m.text)
           if m.type == "error" and "favicon" not in m.text and "404" not in m.text else None)
 
-    pg.goto(BASE + "/portal", wait_until="networkidle")
+    pg.goto(BASE + "/", wait_until="networkidle")
     pg.wait_for_timeout(400)
 
     cards = pg.locator("#grid .card").count()
@@ -144,7 +144,7 @@ with sync_playwright() as p:
     )
     ctx2.grant_permissions(["clipboard-read", "clipboard-write"])
     m = login(ctx2)
-    m.goto(BASE + "/portal", wait_until="networkidle")
+    m.goto(BASE + "/", wait_until="networkidle")
     m.wait_for_timeout(400)
     m.evaluate("localStorage.setItem('pv_view','grid')")
     m.reload(wait_until="networkidle")

@@ -12,7 +12,8 @@ const routes = [
 ]
 
 export const router = createRouter({
-  history: createWebHistory(),
+  // v2.6.0：后台挂在 /admin 下，根路径留给访客门户；静态资源仍是 /assets（vite base 不变）
+  history: createWebHistory('/admin/'),
   routes,
   scrollBehavior: () => ({ top: 0 }),
 })

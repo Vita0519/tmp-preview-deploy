@@ -113,7 +113,7 @@ python cli/agentctl.py selfcheck
 ```
 浏览器 ──┬── /v/<slug>          访客预览外壳（倒计时 + 下载）
          ├── /p/<slug>/...      项目本体（原始文件直出，支持 SPA 回退）
-         ├── /portal            访客门户 · /rss.xml
+         ├── /            访客门户 · /rss.xml
          └── /                  控制台（Vue 3）
                     │
               FastAPI (uvicorn) ── SQLite(WAL) + /data 磁盘

@@ -25,7 +25,10 @@ async function submit() {
     store.user = d.user
     toast(`欢迎回来，${d.user.display_name}`)
     const next = typeof route.query.next === 'string' && route.query.next.startsWith('/') ? route.query.next : '/'
-    router.replace(next)
+    // ?back= 是后台外的地址（如门户 /），只认站内绝对路径，整页跳过去
+const back = typeof route.query.back === 'string' && /^\/(?!\/)/.test(route.query.back) ? route.query.back : ''
+if (back) location.href = back
+else router.replace(next)
   } catch (e) {
     err.value = e.message || '登录失败'
   } finally {

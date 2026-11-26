@@ -1094,7 +1094,7 @@ def portal_page(
         )
     body = "".join(cards) or ""
     rowbody = "".join(rows)
-    login = '<a class="btn ghost" href="/">进入控制台</a>' if logged_in else ""
+    login = '<a class="btn ghost" href="/admin/">进入控制台</a>' if logged_in else ""
     # RSS 放在页脚：顶栏塞两个幽灵按钮太挤，订阅入口也本来就该在页面末尾
     rss_icon = (
         '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">'
@@ -1205,7 +1205,7 @@ def portal_page(
 
 
 
-def gone_page(target: str = "/portal?gone=1") -> str:
+def gone_page(target: str = "/?gone=1") -> str:
     """失效链接的中转页：把**顶层窗口**带走，而不是在 iframe 里显示一张 404。
 
     访客预览外壳是用 iframe 装项目内容的，项目没了/过期了如果直接回 404，

@@ -66,7 +66,7 @@ settings(key, value)
 | 缓存头 | 入口文档 `no-store`；静态子资源 `public, max-age=300`；均带 `ETag`，命中 `If-None-Match` 返回 304 |
 | 计数 | 只有「入口文档 + `Accept: text/html` + GET」才 +1，子资源与 SPA 内部跳转不重复计 |
 | `GET /download/<slug>` | 有预置 zip 直接发；没有则按需打包（`ZIP_DEFLATED`，保留 mtime）并缓存到 `/data/zips`；项目失效则 302 回门户 |
-| `GET /v/<slug>` | 可见且未到期 → 预览外壳；外链 → 302 到 `link_url`；失效/无权/无入口 → 302 `/portal?gone=1` |
+| `GET /v/<slug>` | 可见且未到期 → 预览外壳；外链 → 302 到 `link_url`；失效/无权/无入口 → 302 `/?gone=1` |
 
 ## 到期处理
 

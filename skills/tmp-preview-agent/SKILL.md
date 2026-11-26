@@ -73,7 +73,7 @@ python scripts/agentctl.py selfcheck     # 用当前身份真跑一遍：建→�
 所以你以「不是 200」来判定打不开即可（`--no-verify` 可跳过探活）。
 
 > **失效不是 404 了。** 过期 / 已删除 / 改私有 / 访问别人私有项目，预览地址统一 `302` 回门户首页，
-> 门户需要登录时再转 `/login`。所以拿 `curl -I` 看到的常常是 302 而不是 404，别误判成「还能访问」。
+> 门户需要登录时再转 `/admin/login`。所以拿 `curl -I` 看到的常常是 302 而不是 404，别误判成「还能访问」。
 > 判定标准只有一个：**原地返回 200 才算活着**。
 
 **图标**：预览页自动用项目自带的 `favicon.ico / favicon.svg / favicon.png / apple-touch-icon.png`，
@@ -121,7 +121,7 @@ curl -H "Authorization: Bearer pv_xxx" https://preview.example.com/api/projects
 
 | 能力 | `viewer`（仅门户） | `publisher`（可发布） | `admin`（管理员） |
 |---|---|---|---|
-| 打开门户 `/portal` | ✅ | ✅ | ✅ |
+| 打开门户 `/` | ✅ | ✅ | ✅ |
 | 打开 `link` / `portal` 项目 | ✅ | ✅ | ✅ |
 | 打开别人的 `private` 项目 | ❌ 302 回门户 | ❌ 302 回门户 | ✅ |
 | `GET /api/projects`（项目列表） | ❌ 403 | ✅ 只返回自己的 | ✅ 全部 |
@@ -132,7 +132,7 @@ curl -H "Authorization: Bearer pv_xxx" https://preview.example.com/api/projects
 
 判定实现：`backend/app/security.py`（`admin_user` / `publisher_user`）+
 `projects.py::can_edit`（`admin` 或 `owner_id == 自己`）。
-`viewer` 的 Key 能读**访客侧**（`/v/<slug>`、`/portal`），但进不了 `/api/projects`。
+`viewer` 的 Key 能读**访客侧**（`/v/<slug>`、`/`），但进不了 `/api/projects`。
 
 管理员给自己的 Key 就带着管理员权限——**这是最危险的一把钥匙**，
 建议日常跑脚本用 `publisher` 账号，只有需要管成员时才用管理员 Key。

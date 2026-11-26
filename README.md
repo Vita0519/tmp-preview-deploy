@@ -113,7 +113,7 @@ Prefer raw HTTP? See [docs/api.md](docs/api.md). Agent skill & permission bounda
 ```
 Browser ──┬── /v/<slug>          viewer shell (countdown + download)
           ├── /p/<slug>/...      raw project files (SPA fallback)
-          ├── /portal            public card wall · /rss.xml
+          ├── /            public card wall · /rss.xml
           └── /                  admin console (Vue 3)
                      │
                FastAPI (uvicorn) ── SQLite (WAL) + /data disk

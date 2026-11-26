@@ -111,7 +111,7 @@ def main():
     print("[4] 改：可见性 / 续期 / 标签")
     rc, d, _ = run(url, token, "set", slug, "--visibility", "portal")
     check("set 改可见性生效", d.get("data", {}).get("visibility") == "portal", d)
-    code, html = admin.req("GET", "/portal", raw=True)
+    code, html = admin.req("GET", "/", raw=True)
     text = html.decode("utf-8", "replace") if isinstance(html, bytes) else str(html)
     check("改完真的出现在门户列表", f'data-path="/v/{slug}"' in text)
 

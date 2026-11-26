@@ -84,6 +84,10 @@ COOKIE_SECURE = _bool("COOKIE_SECURE", False)
 # 是否允许匿名访问 /portal 列表（默认关闭：只认直链）
 PUBLIC_PORTAL = _bool("PUBLIC_PORTAL", False)
 
+# 根路径放什么（v2.6.0）：portal = 访客门户在 /、后台在 /admin（默认）；
+# admin = 老习惯，打开域名直接进后台，门户仍在 /portal。
+ROOT_PAGE = "admin" if _env("ROOT_PAGE", "portal").lower() == "admin" else "portal"
+
 # 主题商店取文件的镜像前缀（可选）：raw.githubusercontent 不通的网络上，
 # 填一个 {repo}/{ref}/{path} 形式的自建/第三方镜像，如 https://ghfast.top/https://raw.githubusercontent.com
 THEME_RAW_MIRROR = _env("THEME_RAW_MIRROR", "")

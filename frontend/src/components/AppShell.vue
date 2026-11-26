@@ -112,7 +112,7 @@ onUnmounted(() => clearInterval(updTimer))
       </nav>
 
       <div class="sidebar-foot">
-        <a class="nav-item" href="/portal" target="_blank" rel="noopener" title="访客门户（新窗口打开）">
+        <a class="nav-item" href="/" target="_blank" rel="noopener" title="访客门户（新窗口打开）">
           <span class="ico"><Icon name="eye" /></span>
           <span class="lbl">访客门户</span>
           <span class="ico out"><Icon name="external" :size="13" /></span>
@@ -150,7 +150,7 @@ onUnmounted(() => clearInterval(updTimer))
             <p class="muted" style="margin: 0 auto 18px; max-width: 380px; font-size: 12.5px">
               你的角色是「仅门户访客」，可以浏览已发布的内容，但没有上传、管理项目的权限。需要发布请联系管理员调整角色。
             </p>
-            <a class="btn primary" href="/portal" target="_blank" rel="noopener">
+            <a class="btn primary" href="/" target="_blank" rel="noopener">
               <Icon name="eye" :size="13" /> 打开访客门户
             </a>
           </div>

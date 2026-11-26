@@ -146,7 +146,7 @@ def main():
         if kind == "list":
             return c.req("GET", "/api/projects?limit=50")[0]
         if kind == "portal":
-            return c.req("GET", "/portal", raw=True)[0]
+            return c.req("GET", "/", raw=True)[0]
         if kind == "rm":
             return c.req("DELETE", f"/api/projects/{slug}")[0]
         return -1
