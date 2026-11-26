@@ -410,16 +410,17 @@ box-shadow:0 16px 36px -20px rgba(245,158,11,.28)}
 .card.del::before,.row.del::before{content:'';position:absolute;left:-1px;top:11px;bottom:11px;width:3px;
 border-radius:0 3px 3px 0;background:linear-gradient(180deg,#fbbf24,#d97706)}
 .card.del .track > i{background:var(--warn)}
-/* 访问圆环：整张卡片的右上角 */
+/* 访问圆环：整张卡片的右上角。已完成段跟主色走（原来用墨色，换主题时纹丝不动，
+   跟卡片底部的主色倒计时条放一起很割裂）；未走完的轨道仍用淡墨，不抢戏 */
 .ring{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;
 display:grid;place-items:center;
-background:conic-gradient(rgba(var(--ink-rgb),.42) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.1) 0)}
+background:conic-gradient(rgba(var(--brand-rgb),.75) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.12) 0)}
 .ring::after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--surface,#14171d)}
 .ring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:2px}
 .ring b{font-size:12px;font-weight:650;color:var(--ink,#e8eaf0);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 .ring b.sm{font-size:9.5px}
 .ring i{font-style:normal;font-size:8px;color:var(--ink-4,#4d5357);letter-spacing:.02em}
-.card:hover .ring{background:conic-gradient(rgba(var(--ink-rgb),.55) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.14) 0)}
+.card:hover .ring{background:conic-gradient(rgba(var(--brand-rgb),.95) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.16) 0)}
 /* 整卡可点：一层覆盖式链接，复制按钮浮在上面 */
 .hit{position:absolute;inset:0;z-index:1;border-radius:inherit}
 .cbtn{position:absolute;z-index:3;top:11px;right:61px;width:26px;height:26px;padding:0;
@@ -460,7 +461,7 @@ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rtags{grid-area:tags;display:flex;gap:5px;flex-wrap:nowrap;overflow:hidden;min-width:0}
 .rring{grid-area:ring;position:relative;width:32px;height:32px;border-radius:50%;display:grid;
-place-items:center;background:conic-gradient(rgba(var(--ink-rgb),.42) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.1) 0)}
+place-items:center;background:conic-gradient(rgba(var(--brand-rgb),.75) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.12) 0)}
 .rring::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--surface,#14171d)}
 .rring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
 .rring b{font-size:10.5px;font-weight:650;color:var(--ink,#e8eaf0);font-variant-numeric:tabular-nums;letter-spacing:-.03em}

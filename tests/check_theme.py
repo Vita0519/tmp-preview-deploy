@@ -127,11 +127,11 @@ def main() -> int:
     check("PATCH 成功", code == 200, d)
     check("返回新主色", (d.get("theme") or {}).get("accent") == "#3b5bdb", d.get("theme"))
 
-    code, _, portal = admin.fetch("/portal")
+    code, _, portal = admin.fetch("/")
     v = brand_vars(portal)
     check("门户 --brand 变了", v.get("brand") == "#3b5bdb", v.get("brand"))
     check("门户 theme-color 变了", 'content="#3b5bdb"' in portal)
-    check("门户圆环用主色", "conic-gradient(var(--brand)" in portal or "var(--brand)" in portal)
+    check("门户圆环用主色", "conic-gradient(rgba(var(--brand-rgb)" in portal, "圆环没跟主色走")
 
     code, _, prev = admin.fetch(f"/v/{slug}")
     check("预览页 --brand 变了", brand_vars(prev).get("brand") == "#3b5bdb", brand_vars(prev).get("brand"))
@@ -154,7 +154,7 @@ def main() -> int:
     print("[5] 还原进来时的主色（不覆盖管理员的选择）")
     code, d = admin.req("PATCH", "/api/settings", {"theme_accent": orig_raw})
     check("还原成功", (d.get("theme") or {}).get("raw") == orig_raw, d.get("theme"))
-    code, _, portal = admin.fetch("/portal")
+    code, _, portal = admin.fetch("/")
     check("门户也回到原色", brand_vars(portal).get("brand") == orig, brand_vars(portal).get("brand"))
 
     print("[6] 站点图标")
@@ -192,7 +192,7 @@ def main() -> int:
     check("webmanifest 图标指向 /site-icon", "/site-icon" in manifest, manifest[:120])
     check("webmanifest theme_color 跟随主色", f'"theme_color":"{orig}"' in manifest, manifest[-120:])
 
-    code, _, portal = admin.fetch("/portal")
+    code, _, portal = admin.fetch("/")
     check("门户 <link rel=icon> 用自定义图标", "/site-icon" in portal)
 
     code, d = post_icon("note.txt", b"hello")
@@ -215,7 +215,7 @@ def main() -> int:
     check("删除后回到内置", code == 200 and (d.get("site_icon") or {}).get("custom") is False, d)
     code, _, _ = admin.fetch("/site-icon")
     check("没有自定义图标时 /site-icon 404", code == 404, code)
-    code, _, portal = admin.fetch("/portal")
+    code, _, portal = admin.fetch("/")
     check("门户回到内置图标", "/site-icon" not in portal)
     code, meta = admin.req("GET", "/api/meta")
     check("/api/meta 无自定义图标时给空壳", (meta.get("site_icon") or {}).get("custom") is False
