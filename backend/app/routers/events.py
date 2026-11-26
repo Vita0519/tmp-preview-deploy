@@ -30,6 +30,10 @@ def _row(r) -> dict:
         "actor": r["username"] or ("系统" if r["user_id"] is None else f"#{r['user_id']}"),
         "actor_label": r["key_label"] or "",
         "slug": r["slug"],
+        # 项目当前（而不是当时）的 slug：项目改过名之后，老日志也能点到正确地址。
+        # 项目已删则为 None，前端据此把「查看相关对象」换成「项目已删除」。
+        "project_id": r["project_id"],
+        "live_slug": r["live_slug"],
         "title": r["title"],
         "detail": r["detail"],
         "diff": diff,
@@ -77,16 +81,23 @@ def list_events(
             args.append(actor)
     if q and q.strip():
         kw = "%" + q.strip().replace("%", r"\%").replace("_", r"\_") + "%"
+        # 项目改过名时，用新 slug 也应该搜得到旧日志，所以快照和现名一起匹配
         where.append(
-            "(e.slug LIKE ? ESCAPE '\\' OR e.title LIKE ? ESCAPE '\\' "
+            "(e.slug LIKE ? ESCAPE '\\' OR p.slug LIKE ? ESCAPE '\\' OR e.title LIKE ? ESCAPE '\\' "
             "OR e.detail LIKE ? ESCAPE '\\' OR u.username LIKE ? ESCAPE '\\')"
         )
-        args += [kw] * 4
+        args += [kw] * 5
 
-    base = "FROM events e LEFT JOIN users u ON u.id=e.user_id"
+    # LEFT JOIN projects：拿项目当前的 slug（p.slug），跟事件里的历史快照 e.slug 区分开。
+    # 1:1 关联，不影响 COUNT。
+    base = (
+        "FROM events e LEFT JOIN users u ON u.id=e.user_id "
+        "LEFT JOIN projects p ON p.id=e.project_id"
+    )
     cond = (" WHERE " + " AND ".join(where)) if where else ""
     cols = (
         "SELECT e.id, e.at, e.user_id, e.action, e.detail, e.slug, e.title, e.diff, "
+        "e.project_id, p.slug AS live_slug, "
         "u.username, u.key_label "
     )
 

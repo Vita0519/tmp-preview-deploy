@@ -120,6 +120,18 @@ function summary(e) {
 }
 const initial = (s) => (s || '?').slice(0, 1).toUpperCase()
 
+/* 项目预览地址是 /v/<slug>（外壳页：管权限、到期、外链跳转）。
+   以前这里拼的是 /<slug>/，会落到前端路由的 404，看着像「项目不存在」。
+   slug 优先用后端联查出来的当前值 live_slug：改过名的项目，老日志也能点对。
+   项目已删（有 project_id 但没有 live_slug）就不再给死链，改显示「项目已删除」。 */
+const GONE_ACTIONS = new Set(['delete', 'expire_delete'])
+function objHref(e) {
+  if (GONE_ACTIONS.has(e.action)) return ''
+  if (e.project_id) return e.live_slug ? `/v/${e.live_slug}` : ''
+  return e.slug ? `/v/${e.slug}` : '' // v2.5 之前的老事件没有 project_id，只能退回快照
+}
+const objGone = (e) => !GONE_ACTIONS.has(e.action) && !!e.project_id && !e.live_slug
+
 async function copy(e) {
   const txt = JSON.stringify(e, null, 2)
   try { await navigator.clipboard.writeText(txt); toast('已复制详情') } catch { toast('复制失败', 'err') }
@@ -251,7 +263,8 @@ async function exportCsv() {
               <p v-if="e.detail && !e.diff" class="raw mono">{{ e.detail }}</p>
               <div class="dacts">
                 <button class="lnk" @click.stop="copy(e)">复制详情</button>
-                <a v-if="e.slug && !['delete', 'expire_delete'].includes(e.action)" class="lnk" :href="'/' + e.slug + '/'" target="_blank" rel="noopener" @click.stop>查看相关对象 ↗</a>
+                <a v-if="objHref(e)" class="lnk" :href="objHref(e)" target="_blank" rel="noopener" @click.stop>查看相关对象 ↗</a>
+                <span v-else-if="objGone(e)" class="lnk off" @click.stop>项目已删除</span>
               </div>
             </div>
           </div>
@@ -365,6 +378,9 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 .dacts { display: flex; gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .lnk { border: 0; background: none; padding: 0; color: var(--ink-2); font-size: 12px; cursor: pointer; }
 .lnk:hover { color: var(--brand); }
+/* 项目已经不在了：只留一句说明，不要再给能点的死链 */
+.lnk.off { color: var(--ink-4); cursor: default; }
+.lnk.off:hover { color: var(--ink-4); }
 
 .pager { display: flex; align-items: center; gap: 4px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
 .pager label { display: inline-flex; align-items: center; gap: 8px; }
