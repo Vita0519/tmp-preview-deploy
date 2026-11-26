@@ -86,6 +86,10 @@ settings(key, value)
 
 ## 前端
 
-Vue 3 + Vite，无 UI 框架，`styles.css` 是一套手写设计系统（暖灰画布 + 墨绿单强调色、
-1px 描边分层、160–220ms 缓动）。列表页的分面、筛选、排序全部走服务端，
-前端只维护筛选状态（写入 localStorage），倒计时用 `server_now` 校准后本地每秒重算。
+Vue 3 + Vite，无 UI 框架，`styles.css` 是一套手写设计系统（暖灰画布 + 单强调色、
+1px 描边分层、160–220ms 缓动）。强调色默认电光蓝 `#2563eb`，由设置页写进
+`--brand*` 一组 token，全站（含门户页）跟着换。图标是一套 16px 栅格的线性图标
+（`Icon.vue`，1.5 描边、圆头端点），标志是纯色平涂的直角沙漏（`BrandMark.vue`，
+`frontend/public/favicon.svg` 为唯一矢量源，其余尺寸由 `tools/gen_icons.py` 生成）。
+列表页的分面、筛选、排序全部走服务端，前端只维护筛选状态（写入 localStorage），
+倒计时用 `server_now` 校准后本地每秒重算。

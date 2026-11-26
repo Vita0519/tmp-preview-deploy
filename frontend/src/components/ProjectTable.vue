@@ -140,7 +140,7 @@ function copyLink(p) {
                     class="badge del"
                     title="到期后自动删除项目与文件，不可恢复"
                   >
-                    <Icon name="trash" :size="10" />到期删除
+                    <Icon name="trash" :size="14" />到期删除
                   </span>
                   <span v-if="!p.permanent && p.expired" class="badge danger">已到期</span>
                 </div>
@@ -202,7 +202,7 @@ function copyLink(p) {
           <td class="cell-num col-ops" @click.stop>
             <div class="rowactions">
               <button class="btn sm icon" title="复制链接" @click="copyLink(p)">
-                <Icon name="copy" :size="13" />
+                <Icon name="copy" :size="16" />
               </button>
               <a
                 class="btn sm icon"
@@ -211,7 +211,7 @@ function copyLink(p) {
                 rel="noopener"
                 title="打开预览"
               >
-                <Icon name="external" :size="13" />
+                <Icon name="external" :size="16" />
               </a>
             </div>
           </td>
@@ -220,7 +220,7 @@ function copyLink(p) {
     </table>
 
     <div v-if="!loading && !items.length" class="empty">
-      <div class="ico"><Icon name="inbox" :size="18" /></div>
+      <div class="ico"><Icon name="inbox" :size="16" /></div>
       <h3>没有匹配的项目</h3>
       <p>换个筛选条件，或者上传一个新项目试试。</p>
     </div>

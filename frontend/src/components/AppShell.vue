@@ -92,7 +92,7 @@ onUnmounted(() => clearInterval(updTimer))
           :aria-expanded="!mini"
           @click="toggleNav"
         >
-          <Icon name="chevron" :size="12" />
+          <Icon name="chevron" :size="14" />
         </button>
       </div>
 
@@ -115,7 +115,7 @@ onUnmounted(() => clearInterval(updTimer))
         <a class="nav-item" href="/" target="_blank" rel="noopener" title="访客门户（新窗口打开）">
           <span class="ico"><Icon name="eye" /></span>
           <span class="lbl">访客门户</span>
-          <span class="ico out"><Icon name="external" :size="13" /></span>
+          <span class="ico out"><Icon name="external" :size="16" /></span>
         </a>
         <button class="userchip" :title="`${user?.display_name || user?.username} · ${roleLabel}（点击退出）`" @click="logout">
           <span class="avatar">{{ (user?.display_name || user?.username || '?').slice(0, 1) }}</span>
@@ -123,7 +123,7 @@ onUnmounted(() => clearInterval(updTimer))
             <b>{{ user?.display_name || user?.username }}</b>
             <span>{{ roleLabel }}</span>
           </span>
-          <span class="ico out" :style="{ color: 'var(--ink-4)' }"><Icon name="logout" :size="14" /></span>
+          <span class="ico out" :style="{ color: 'var(--ink-4)' }"><Icon name="logout" :size="16" /></span>
         </button>
       </div>
     </aside>
@@ -151,7 +151,7 @@ onUnmounted(() => clearInterval(updTimer))
               你的角色是「仅门户访客」，可以浏览已发布的内容，但没有上传、管理项目的权限。需要发布请联系管理员调整角色。
             </p>
             <a class="btn primary" href="/" target="_blank" rel="noopener">
-              <Icon name="eye" :size="13" /> 打开访客门户
+              <Icon name="eye" :size="16" /> 打开访客门户
             </a>
           </div>
         </div>

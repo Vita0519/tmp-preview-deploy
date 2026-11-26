@@ -241,7 +241,7 @@ onMounted(async () => {
                 {{ detail.title }}
               </h2>
               <button class="editbtn" title="重命名" @click="startRename">
-                <Icon name="edit" :size="12" />
+                <Icon name="edit" :size="14" />
               </button>
             </div>
             <div v-else class="renamebox">
@@ -274,7 +274,7 @@ onMounted(async () => {
             </div>
           </div>
           <button class="btn ghost icon" title="关闭" @click="emit('close')">
-            <Icon name="close" :size="14" />
+            <Icon name="close" :size="16" />
           </button>
         </div>
         <div style="display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap">
@@ -287,7 +287,7 @@ onMounted(async () => {
             class="badge del"
             title="到期后自动删除项目与文件，不可恢复"
           >
-            <Icon name="trash" :size="10" />到期删除
+            <Icon name="trash" :size="14" />到期删除
           </span>
           <span class="badge">{{ detail.visibility === 'portal' ? '门户可见' : detail.visibility === 'private' ? '仅自己' : '链接可见' }}</span>
         </div>
@@ -447,7 +447,7 @@ onMounted(async () => {
 
       <div class="drawer-foot">
         <a class="btn primary" :href="detail.kind === 'link' ? detail.link_url : previewUrl" target="_blank" rel="noopener" style="flex: 1">
-          <Icon name="external" :size="13" /> 打开预览
+          <Icon name="external" :size="16" /> 打开预览
         </a>
         <a v-if="detail.allow_download" class="btn" :href="`/download/${detail.slug}`">下载 zip</a>
         <button class="btn ghost" @click="copy(`/p/${detail.slug}/`, '原始路径已复制')">复制原始路径</button>

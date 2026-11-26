@@ -10,10 +10,10 @@
 
 [English](README.md) · **简体中文**
 
-[![Release](https://img.shields.io/github/v/release/Vita0519/tmp-preview-deploy?color=2f6f78)](https://github.com/Vita0519/tmp-preview-deploy/releases)
+[![Release](https://img.shields.io/github/v/release/Vita0519/tmp-preview-deploy?color=2563eb)](https://github.com/Vita0519/tmp-preview-deploy/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-a8332b.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-3c5f8f.svg)](backend/requirements.txt)
-[![Docker](https://img.shields.io/badge/ghcr.io-tmp--preview-2f6f78.svg?logo=docker&logoColor=white)](docker-compose.yml)
+[![Docker](https://img.shields.io/badge/ghcr.io-tmp--preview-2563eb.svg?logo=docker&logoColor=white)](docker-compose.yml)
 
 [官网](https://pre.allfather.top/v/homepage) · [宣传视频](https://pre.allfather.top/v/tmp-preview-oss-video) · [快速开始](#-快速开始) · [文档](docs/) · [版本发布](https://github.com/Vita0519/tmp-preview-deploy/releases)
 
@@ -47,7 +47,7 @@ Agent 刚做完一个落地页、一份报告或一个 WebGL 作品，接下来�
 | 🚀 **即时预览** | 静态站、单个 HTML / PDF、SPA 构建产物（支持回退），外链也能当带统计的短链 |
 | ⏳ **自动到期** | 按可见性设默认时长；到期可「停访留文件」或「连文件删除」，随时续期 |
 | 🔐 **三档可见性** | 门户 · 持链接 · 仅自己；`viewer` / `publisher` / `admin` 三种角色 |
-| 🗂 **门户与分组** | 访客卡片墙：搜索、标签、排序、分页、RSS、作者名片；两级分组，书签导入导出 |
+| 🗂 **门户与分组** | 访客卡片墙：搜索、标签、排序、分页、RSS、作者名片。筛选条件写进地址栏，任意一屏都能直接分享；公开项目过 500 条后筛选自动转服务端。两级分组，书签导入导出 |
 | 🤖 **Agent 友好的 CLI** | 单文件、仅标准库：部署、列表、改属性、续期、批量、自检，多 Agent 并发安全 |
 | 🎨 **主题插件** | 声明式 `theme.json`，内置玄夜 / 象牙，可从任意 GitHub 仓库安装 |
 | 💾 **备份恢复** | 一键打包（数据库在线快照）、每晚自动备份；可从服务器备份或上传 zip 恢复，恢复前自动留底可回滚 |
@@ -113,11 +113,13 @@ python cli/agentctl.py selfcheck
 ```
 浏览器 ──┬── /v/<slug>          访客预览外壳（倒计时 + 下载）
          ├── /p/<slug>/...      项目本体（原始文件直出，支持 SPA 回退）
-         ├── /            访客门户 · /rss.xml
-         └── /                  控制台（Vue 3）
-                    │
-              FastAPI (uvicorn) ── SQLite(WAL) + /data 磁盘
+         ├── /                  访客门户 · /rss.xml
+         └── /admin/           控制台（Vue 3）
+
+             FastAPI (uvicorn) ── SQLite(WAL) + /data 磁盘
 ```
+
+从 v2.5 及更早升级上来？控制台已挪到 `/admin/`，`/` 现在是访客门户。想保持 `/` 就是控制台的老样子，在 `.env` 里设 `ROOT_PAGE=admin`。
 
 公网访问推荐 Cloudflare Tunnel，大文件上传记得加 `--protocol http2`。更多见 [docs/architecture.md](docs/architecture.md)。
 

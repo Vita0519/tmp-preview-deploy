@@ -386,20 +386,20 @@ onBeforeUnmount(() => {
     <span class="sub num">{{ fmtNum(data.total) }} 个</span>
     <div class="grow" />
     <div class="search">
-      <Icon name="search" :size="13" />
+      <Icon name="search" :size="16" />
       <input v-model="filters.q" class="field" placeholder="搜索名称 / slug / 说明" />
     </div>
     <button class="btn ghost icon" title="刷新" :disabled="loading" @click="load(true)">
-      <Icon name="refresh" :size="14" />
+      <Icon name="refresh" :size="16" />
     </button>
     <button class="btn ghost" title="导入浏览器书签（Chrome / Edge / Firefox）" @click="importOpen = true">
-      <Icon name="download" :size="13" /> 导入书签
+      <Icon name="download" :size="16" /> 导入书签
     </button>
     <a class="btn ghost" :href="exportHref" title="导出为书签 HTML，可被浏览器直接导入">
-      <Icon name="external" :size="13" /> 导出
+      <Icon name="external" :size="16" /> 导出
     </a>
     <button class="btn primary" @click="uploadOpen = true">
-      <Icon name="plus" :size="13" /> 新建项目
+      <Icon name="plus" :size="16" /> 新建项目
     </button>
   </header>
 

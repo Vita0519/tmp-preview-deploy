@@ -96,8 +96,8 @@ async function resetIcon() {
 }
 
 // 主题：插件清单（内置 + 商店安装）+ 当前插件 + 主色。点卡片即时预览，保存后才落库
-const accent = ref('#0f766e')
-const accentInput = ref('#0f766e')
+const accent = ref('#2563eb')
+const accentInput = ref('#2563eb')
 const plugins = ref([])        // [{id,name,version,author,desc,mode,builtin,default_accent,preview,vars}]
 const pluginKey = ref('noir')
 const themeVars = ref({})      // 当前预览基座：正在看的这套插件的完整语义令牌
@@ -138,7 +138,7 @@ function pickAccent(v) {
 }
 
 function resetTheme() {
-  pickAccent(activePlugin.value ? activePlugin.value.default_accent : '#0f766e')
+  pickAccent(activePlugin.value ? activePlugin.value.default_accent : '#2563eb')
 }
 
 // ---------------- 主题商店 ----------------
@@ -327,7 +327,7 @@ async function load() {
     pluginKey.value = th.plugin || 'noir'
     custom.value = !!th.custom
     // 记用户填的原值；palette 内部会为可读性校正，实际生效值在 th.accent
-    const hex = normalize(th.raw || th.accent || '#0f766e')
+    const hex = normalize(th.raw || th.accent || '#2563eb')
     accent.value = hex
     accentInput.value = hex
     savedBoard = th.accent ? th : null
@@ -661,7 +661,7 @@ onUnmounted(() => {
           :class="{ on: active === s.id }"
           @click.prevent="jump(s.id)"
         >
-          <Icon :name="s.icon" :size="13" />
+          <Icon :name="s.icon" :size="16" />
           <span>{{ s.label }}</span>
         </a>
       </nav>
@@ -722,7 +722,7 @@ onUnmounted(() => {
                   允许未登录访客浏览门户列表
                 </label>
                 <a class="linkbtn" href="/" target="_blank" rel="noopener">
-                  打开门户 <Icon name="external" :size="11" />
+                  打开门户 <Icon name="external" :size="14" />
                 </a>
               </div>
               <span class="hint">关闭后门户首页（/）需要登录；已发出去的直链预览不受影响</span>
@@ -821,7 +821,7 @@ onUnmounted(() => {
               <label>主题商店</label>
               <div class="colorrow">
                 <button type="button" class="btn" @click="shop.open = true">
-                  <Icon name="external" :size="13" /> 打开主题商店
+                  <Icon name="external" :size="16" /> 打开主题商店
                 </button>
                 <span class="hint" style="margin-left: 2px">
                   填一个 GitHub 仓库（owner/repo、仓库链接均可），枚举里面的 theme.json 一键安装
@@ -980,7 +980,7 @@ onUnmounted(() => {
                   {{ tagInfo.tagged_projects }} 个项目有标签
                 </span>
                 <button type="button" class="btn ghost sm" :disabled="!tagInfo.orphans" @click="pruneTags">
-                  <Icon name="trash" :size="12" />
+                  <Icon name="trash" :size="14" />
                   清理没人用的{{ tagInfo.orphans ? `（${tagInfo.orphans}）` : '' }}
                 </button>
               </div>
@@ -1051,7 +1051,7 @@ onUnmounted(() => {
                       <button type="button" class="btn sm ghost" title="下移" :disabled="i === form.author.links.length - 1" @click="moveLink(i, 1)">↓</button>
                     </span>
                     <button class="btn sm ghost del" title="删除这条" @click="removeLink(i)">
-                      <Icon name="close" :size="12" />
+                      <Icon name="close" :size="14" />
                     </button>
                   </div>
 
@@ -1059,7 +1059,7 @@ onUnmounted(() => {
                     还没有链接。加几个，访客门户顶部就会出现对应的图标。
                   </div>
                   <div>
-                    <button class="btn sm" @click="addLink"><Icon name="plus" :size="12" /> 添加链接</button>
+                    <button class="btn sm" @click="addLink"><Icon name="plus" :size="14" /> 添加链接</button>
                   </div>
                 </div>
                 <span class="hint">
@@ -1136,7 +1136,7 @@ onUnmounted(() => {
               <label>下载备份</label>
               <div class="colorrow">
                 <a class="btn" href="/api/backup" download>
-                  <Icon name="download" :size="13" /> 打包下载
+                  <Icon name="download" :size="16" /> 打包下载
                 </a>
                 <span class="hint" style="margin: 0">
                   边打包边下载，不占服务器临时空间；数据库用在线快照，正在写入也不会拷到半截
@@ -1177,7 +1177,7 @@ onUnmounted(() => {
                   class="bkrow"
                   :class="{ on: backupSrc === f.name }"
                 >
-                  <Icon name="clock" :size="14" class="bkicon" />
+                  <Icon name="clock" :size="16" class="bkicon" />
                   <div class="bkmain">
                     <div class="bktime">
                       {{ fmtAutoName(f.name) }}
@@ -1189,8 +1189,8 @@ onUnmounted(() => {
                     <button type="button" class="btn sm" :class="{ primary: backupSrc === f.name }" :disabled="backupBusy" @click="pickServerBackup(f)">
                       {{ backupSrc === f.name ? '已选中' : '用它恢复' }}
                     </button>
-                    <a class="btn sm ghost" title="下载" :href="'/api/backup/auto/' + f.name" download><Icon name="download" :size="13" /></a>
-                    <button type="button" class="btn sm ghost" title="删除" style="color: var(--danger)" @click="delAuto(f)"><Icon name="trash" :size="13" /></button>
+                    <a class="btn sm ghost" title="下载" :href="'/api/backup/auto/' + f.name" download><Icon name="download" :size="16" /></a>
+                    <button type="button" class="btn sm ghost" title="删除" style="color: var(--danger)" @click="delAuto(f)"><Icon name="trash" :size="16" /></button>
                   </div>
                 </div>
               </div>
@@ -1201,7 +1201,7 @@ onUnmounted(() => {
               <div style="flex: 1; min-width: 0">
                 <div class="colorrow" style="flex-wrap: wrap; gap: 8px">
                   <button class="btn" :disabled="backupBusy" @click="$refs.bk.click()">
-                    <Icon name="upload" :size="13" /> 上传外部备份 zip
+                    <Icon name="upload" :size="16" /> 上传外部备份 zip
                   </button>
                   <input ref="bk" type="file" accept=".zip,application/zip" style="display: none" @change="pickBackupFile" />
                   <span class="hint" style="margin: 0">或在上面的列表里点「用它恢复」</span>
@@ -1415,7 +1415,7 @@ onUnmounted(() => {
           <span class="pdesc">从 GitHub 仓库安装主题插件</span>
           <div class="grow" style="flex: 1" />
           <button class="btn ghost icon" title="关闭" @click="shop.open = false">
-            <Icon name="close" :size="14" />
+            <Icon name="close" :size="16" />
           </button>
         </div>
         <div class="modal-body">

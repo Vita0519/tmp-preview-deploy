@@ -6,8 +6,8 @@
   --ink-2: #4b4e45;
   --ink-3: #7a7d72;
   --line: #e2ded1;
-  --brand: #0f766e;
-  --brand-soft: #e3f1ee;
+  --brand: #2563eb;
+  --brand-soft: #e8effd;
   --code-bg: #14201d;
   --code-ink: #e6f2ee;
   --warn: #b4671a;
@@ -212,7 +212,7 @@ td { color: var(--ink-2); }
   font-size: 14px;
   margin: 12px 0 16px;
 }
-.note { background: var(--brand-soft); color: #0d5c56; }
+.note { background: var(--brand-soft); color: #1e40af; }
 .warn { background: var(--warn-bg); color: #8a4d10; }
 .note b, .warn b { color: inherit; }
 

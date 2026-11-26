@@ -10,10 +10,10 @@ Self-hosted · built for AI agents · one container, one disk
 
 **English** · [简体中文](README.zh-CN.md)
 
-[![Release](https://img.shields.io/github/v/release/Vita0519/tmp-preview-deploy?color=2f6f78)](https://github.com/Vita0519/tmp-preview-deploy/releases)
+[![Release](https://img.shields.io/github/v/release/Vita0519/tmp-preview-deploy?color=2563eb)](https://github.com/Vita0519/tmp-preview-deploy/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-a8332b.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-3c5f8f.svg)](backend/requirements.txt)
-[![Docker](https://img.shields.io/badge/ghcr.io-tmp--preview-2f6f78.svg?logo=docker&logoColor=white)](docker-compose.yml)
+[![Docker](https://img.shields.io/badge/ghcr.io-tmp--preview-2563eb.svg?logo=docker&logoColor=white)](docker-compose.yml)
 
 [Website](https://pre.allfather.top/v/homepage) · [Demo video](https://pre.allfather.top/v/tmp-preview-oss-video) · [Quick start](#-quick-start) · [Docs](docs/) · [Releases](https://github.com/Vita0519/tmp-preview-deploy/releases)
 
@@ -47,7 +47,7 @@ Your agent just built a landing page, a report or a WebGL demo. Now someone has 
 | 🚀 **Instant previews** | Static sites, single HTML / PDF files, SPA builds (with fallback), or plain external links as tracked short links |
 | ⏳ **Auto expiry** | Per-visibility default TTL; on expiry either stop serving or delete files. Extend anytime |
 | 🔐 **Three visibility levels** | Portal · link-only · private, plus `viewer` / `publisher` / `admin` roles |
-| 🗂 **Portal & groups** | Public card wall with search, tags, sorting, pagination, RSS and an author card. Two-level groups; browser bookmark import/export |
+| 🗂 **Portal & groups** | Public card wall with search, tags, sorting, pagination, RSS and an author card. Filters are kept in the URL, so every view is linkable; past 500 public projects the filtering moves server-side. Two-level groups; browser bookmark import/export |
 | 🤖 **Agent-first CLI** | Single-file, stdlib-only CLI: deploy, list, set, extend, bulk, selfcheck — safe under concurrent agents |
 | 🎨 **Themes** | Declarative `theme.json` plugins, built-in dark/light, install more from any GitHub repo |
 | 💾 **Backup & restore** | One-click zip with online DB snapshot, nightly auto backups, restore from server copies or an uploaded zip — with a safety copy you can roll back to |
@@ -113,11 +113,13 @@ Prefer raw HTTP? See [docs/api.md](docs/api.md). Agent skill & permission bounda
 ```
 Browser ──┬── /v/<slug>          viewer shell (countdown + download)
           ├── /p/<slug>/...      raw project files (SPA fallback)
-          ├── /            public card wall · /rss.xml
-          └── /                  admin console (Vue 3)
-                     │
-               FastAPI (uvicorn) ── SQLite (WAL) + /data disk
+          ├── /                  visitor portal · /rss.xml
+          └── /admin/           admin console (Vue 3)
+
+              FastAPI (uvicorn) ── SQLite (WAL) + /data disk
 ```
+
+Upgrading from v2.5 or earlier? The console now lives at `/admin/` and `/` is the visitor portal. Set `ROOT_PAGE=admin` in `.env` to keep the old layout where `/` is the console.
 
 Public access: Cloudflare Tunnel works great — use `--protocol http2` for large uploads. More in [docs/architecture.md](docs/architecture.md).
 

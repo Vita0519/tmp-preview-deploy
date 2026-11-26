@@ -5,8 +5,8 @@
   "author": "tmp-preview",
   "desc": "暖白画布 + 纯白卡片，1px 描边分层，克制耐看的经典浅色。",
   "mode": "light",
-  "default_accent": "#0f766e",
-  "accents": ["#0f766e", "#3b5bdb", "#0b7285", "#6741d9", "#c2410c", "#be1250", "#a16207", "#475569"],
+  "default_accent": "#2563eb",
+  "accents": ["#2563eb", "#3b5bdb", "#0b7285", "#6741d9", "#c2410c", "#be1250", "#a16207", "#475569"],
   "vars": {
     "--scheme": "light",
     "--bg": "#f6f7f5",

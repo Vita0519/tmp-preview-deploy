@@ -45,24 +45,15 @@ def site_icon_links(accent: str | None = None) -> str:
 def brand_mark(accent: str | None = None, size: int = 30) -> str:
     """门户/预览页顶部的品牌标记（与 favicon.svg 同一份路径数据；沙漏 = 限时可用）。
 
-    渐变跟着主题色走，换主色时标记不会还是墨绿。
+    平涂单色：瓦片取当前主色，沙漏用近白。不用渐变、高光和彩色投影——
+    那三样加起来就是「模板图标」最典型的配方。
     """
     p = theme.palette(accent)
     return (
         f'<svg class="mark" viewBox="0 0 32 32" width="{size}" height="{size}" aria-hidden="true">'
-        '<defs>'
-        '<linearGradient id="pvMarkG" x1="2" y1="0" x2="30" y2="32" gradientUnits="userSpaceOnUse">'
-        f'<stop offset="0" stop-color="{p["light"]}"/><stop offset=".48" stop-color="{p["accent"]}"/>'
-        f'<stop offset="1" stop-color="{p["deep"]}"/></linearGradient>'
-        '<linearGradient id="pvMarkS" x1="16" y1="0" x2="16" y2="19" gradientUnits="userSpaceOnUse">'
-        '<stop offset="0" stop-color="#fff" stop-opacity=".2"/>'
-        '<stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
-        '</defs>'
-        '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkG)"/>'
-        '<rect width="32" height="32" rx="7.6" fill="url(#pvMarkS)"/>'
-        '<path fill="#fff" d="M12.1 7.4H19.9C21 7.4 21.7 8 21.7 8.9V9.2L17.2 15.2V16.8'
-        'L21.7 22.8V23.1C21.7 24 21 24.6 19.9 24.6H12.1C11 24.6 10.3 24 10.3 23.1V22.8'
-        'L14.8 16.8V15.2L10.3 9.2V8.9C10.3 8 11 7.4 12.1 7.4Z"/></svg>'
+        f'<rect width="32" height="32" rx="8" fill="{p["accent"]}"/>'
+        f'<path fill="#f4f7ff" d="M10.4 8.2H21.6L17.4 15.3H14.6Z"/>'
+        f'<path fill="#f4f7ff" d="M14.6 16.7H17.4L21.6 23.8H10.4Z"/></svg>'
     )
 
 
@@ -146,8 +137,7 @@ body{{height:100vh;display:flex;flex-direction:column;overflow:hidden}}
 background:var(--glass);backdrop-filter:blur(16px) saturate(160%);
 -webkit-backdrop-filter:blur(16px) saturate(160%);
 border-bottom:1px solid rgba(var(--ink-rgb),.09);position:relative;z-index:5}}
-.mark{{width:26px;height:26px;border-radius:23.75%;flex:0 0 auto;
-box-shadow:0 6px 14px -9px rgba(var(--brand-rgb),.85)}}
+.mark{{width:26px;height:26px;border-radius:25%;flex:0 0 auto}}
 .ttl{{min-width:0;display:flex;flex-direction:column;gap:1px}}
 .ttl b{{font-size:13.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}}
 .ttl span{{font-size:11.5px;color:var(--ink-3,#757a7e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
@@ -297,7 +287,7 @@ background:var(--warn-soft);border:1px solid var(--warn-line);color:var(--warn);
 .gonebar b{font-weight:650}
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}
 .hgroup{display:flex;align-items:center;gap:12px;min-width:0}
-.hgroup .mark{flex:0 0 auto;border-radius:23.75%;box-shadow:0 9px 20px -12px rgba(var(--brand-rgb),.9)}
+.hgroup .mark{flex:0 0 auto;border-radius:25%}
 .htext{min-width:0}
 h1{margin:0;font-size:26px;letter-spacing:-.02em}
 .sub{color:var(--ink-3,#7b8189);font-size:12.5px;margin-top:5px}
@@ -375,7 +365,7 @@ padding-top:14px;margin-bottom:18px}
 border-radius:var(--card-radius,12px);padding:14px 15px 12px;
 transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s}
 .card[hidden]{display:none}
-.card:hover{transform:translateY(-2px);box-shadow:var(--shadow-2);border-color:rgba(var(--brand-rgb),.42)}
+.card:hover{box-shadow:var(--shadow-2);border-color:rgba(var(--ink-rgb),.22)}
 .top{min-width:0;padding-right:90px}
 .tinfo{min-width:0}
 .name{display:flex;align-items:center;gap:6px;font-weight:650;font-size:14.5px;letter-spacing:-.01em;color:var(--ink,#e8eaf0);
@@ -423,13 +413,13 @@ border-radius:0 3px 3px 0;background:linear-gradient(180deg,#fbbf24,#d97706)}
 /* 访问圆环：整张卡片的右上角 */
 .ring{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;
 display:grid;place-items:center;
-background:conic-gradient(var(--brand) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.1) 0)}
+background:conic-gradient(rgba(var(--ink-rgb),.42) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.1) 0)}
 .ring::after{content:'';position:absolute;inset:4px;border-radius:50%;background:var(--surface,#14171d)}
 .ring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:2px}
 .ring b{font-size:12px;font-weight:650;color:var(--ink,#e8eaf0);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 .ring b.sm{font-size:9.5px}
 .ring i{font-style:normal;font-size:8px;color:var(--ink-4,#4d5357);letter-spacing:.02em}
-.card:hover .ring{background:conic-gradient(var(--brand-light) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.14) 0)}
+.card:hover .ring{background:conic-gradient(rgba(var(--ink-rgb),.55) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.14) 0)}
 /* 整卡可点：一层覆盖式链接，复制按钮浮在上面 */
 .hit{position:absolute;inset:0;z-index:1;border-radius:inherit}
 .cbtn{position:absolute;z-index:3;top:11px;right:61px;width:26px;height:26px;padding:0;
@@ -470,7 +460,7 @@ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rtags{grid-area:tags;display:flex;gap:5px;flex-wrap:nowrap;overflow:hidden;min-width:0}
 .rring{grid-area:ring;position:relative;width:32px;height:32px;border-radius:50%;display:grid;
-place-items:center;background:conic-gradient(var(--brand) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.1) 0)}
+place-items:center;background:conic-gradient(rgba(var(--ink-rgb),.42) calc(var(--p,0) * 1%), rgba(var(--ink-rgb),.1) 0)}
 .rring::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--surface,#14171d)}
 .rring .in{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
 .rring b{font-size:10.5px;font-weight:650;color:var(--ink,#e8eaf0);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
@@ -561,7 +551,7 @@ font-size:12px;color:var(--ink,#e8eaf0);outline:none;cursor:pointer}
 margin:auto 0 0;padding-top:15px;border-top:1px solid rgba(var(--ink-rgb),.09);
 color:var(--ink-3,#757a7e);font-size:12px;line-height:1.5}
 .pfoot .fleft{display:flex;align-items:center;gap:7px;min-width:0}
-.pfoot .fleft .mark{width:15px;height:15px;border-radius:23.75%;flex:0 0 auto;box-shadow:none}
+.pfoot .fleft .mark{width:15px;height:15px;border-radius:25%;flex:0 0 auto;box-shadow:none}
 .pfoot b{font-weight:600;color:var(--ink-2,#a1a5aa)}
 .pfoot .sep{color:rgba(var(--ink-rgb),.25)}
 .flinks{display:flex;align-items:center;gap:16px}

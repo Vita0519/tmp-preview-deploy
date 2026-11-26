@@ -116,7 +116,7 @@ async function doImport() {
     <div class="modal-head">
       <h2>导入浏览器书签</h2>
       <div style="flex: 1" />
-      <button class="btn ghost icon" @click="emit('close')"><Icon name="close" :size="14" /></button>
+      <button class="btn ghost icon" @click="emit('close')"><Icon name="close" :size="16" /></button>
     </div>
 
     <div class="modal-body">

@@ -323,7 +323,7 @@ Chrome、Edge、Firefox、Safari 导出的书签都是同一种 Netscape HTML，
 
 `PATCH /api/settings {"theme_series": "tech"}` 换整套配色：系列决定中性色画布，并把主色换成该系列的
 （除非同一请求里也给了 `theme_accent`，那就以 `theme_accent` 为准——允许选完系列再微调）。
-`theme_accent` 接受 `#abc` / `abc` 简写，非法值静默回落 `#0f766e`。未知的 `theme_series` 回落 `classic`。
+`theme_accent` 接受 `#abc` / `abc` 简写，非法值静默回落 `#2563eb`。未知的 `theme_series` 回落 `classic`。
 
 服务端渲染的页面把变量写进 `:root`（`--brand*` + `--bg/--ink/--line` 一整套），控制台启动时用
 `/api/meta` 的同一份色板覆盖。设置页的 6 张系列卡就是按 `series_list` 里每套的真实配色渲染的缩略图，

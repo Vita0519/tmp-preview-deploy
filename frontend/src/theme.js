@@ -8,7 +8,7 @@
  */
 
 export const PRESETS = [
-  { name: '墨绿', value: '#0f766e' },
+  { name: '电光蓝', value: '#2563eb' },
   { name: '翠绿', value: '#10b981' },
   { name: '靛蓝', value: '#6366f1' },
   { name: '深青', value: '#0ea5e9' },
@@ -18,7 +18,7 @@ export const PRESETS = [
   { name: '石板', value: '#94a3b8' },
 ]
 
-export const DEFAULT_ACCENT = '#0f766e'
+export const DEFAULT_ACCENT = '#2563eb'
 
 /** 两种画布参照（与内置主题 noir / ivory 的 --bg 一致） */
 export const CANVAS_DARK = '#0b0d10'

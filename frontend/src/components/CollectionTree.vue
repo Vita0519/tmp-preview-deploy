@@ -204,13 +204,13 @@ function countOf(node) {
     <div class="railhead">
       <span>分类</span>
       <button class="railadd" title="新建分组" @click="startNew(null)">
-        <Icon name="plus" :size="12" />
+        <Icon name="plus" :size="14" />
       </button>
     </div>
 
     <div class="raillist">
       <div class="railrow" :class="{ on: active === '' && !visibility }" role="button" tabindex="0" @click="pick('')" @keydown.enter="pick('')">
-        <Icon name="layers" :size="12" />
+        <Icon name="layers" :size="14" />
         <span class="nm">全部项目</span>
         <span class="n num">{{ grandTotal }}</span>
       </div>
@@ -226,13 +226,13 @@ function countOf(node) {
         @click="pick('vis:' + v.key)"
         @keydown.enter="pick('vis:' + v.key)"
       >
-        <Icon :name="v.icon" :size="12" />
+        <Icon :name="v.icon" :size="14" />
         <span class="nm">{{ v.label }}</span>
         <span class="n num">{{ vis[v.key] || 0 }}</span>
       </div>
 
       <div class="railrow" :class="{ on: active === 'none' }" role="button" tabindex="0" @click="pick('none')" @keydown.enter="pick('none')">
-        <Icon name="inbox" :size="12" />
+        <Icon name="inbox" :size="14" />
         <span class="nm">未归类</span>
         <span class="n num">{{ loose }}</span>
       </div>
@@ -268,7 +268,7 @@ function countOf(node) {
           <i class="dot" :style="{ background: dotColor(g.id) }" />
           <span class="gn">{{ isSelf(g.id) ? '我的分组' : g.display_name }}</span>
           <span class="gc num">{{ g.count }}</span>
-          <Icon name="chevron" :size="10" class="crt" />
+          <Icon name="chevron" :size="14" class="crt" />
         </div>
 
         <div v-if="g.flat || groupOpen(g.key)" class="railgbody">
@@ -286,7 +286,7 @@ function countOf(node) {
               :class="{ open: open[node.id], leaf: !node.children?.length }"
               @click.stop="node.children?.length && toggle(node.id)"
             >
-              <Icon v-if="node.children?.length" name="chevron" :size="10" />
+              <Icon v-if="node.children?.length" name="chevron" :size="14" />
             </span>
             <span class="nm" :title="node.name">{{ node.name }}</span>
             <span class="n num">

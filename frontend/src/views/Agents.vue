@@ -270,7 +270,7 @@ onMounted(load)
     </span>
     <div class="grow" />
     <span class="dim hide-sm" style="font-size: 12px">一个账号 = 一个 Agent = 一把 API Key，互相看不到对方项目</span>
-    <button class="btn primary" @click="createOpen = true"><Icon name="plus" :size="13" /> 添加成员</button>
+    <button class="btn primary" @click="createOpen = true"><Icon name="plus" :size="16" /> 添加成员</button>
   </header>
 
   <div class="content">
@@ -279,7 +279,7 @@ onMounted(load)
       style="border-radius: var(--radius); border-bottom: 1px solid var(--line); margin-bottom: 10px"
     >
       <div class="search">
-        <Icon name="search" :size="13" />
+        <Icon name="search" :size="16" />
         <input v-model="q" class="field" placeholder="搜索账号 / 显示名 / 绑定 Agent" />
       </div>
 
@@ -387,12 +387,12 @@ onMounted(load)
             <td class="cell-num">
               <div style="display: flex; gap: 4px; justify-content: flex-end">
                 <button class="btn sm" title="重置密码" @click="resetPassword(a)">重置密码</button>
-                <button class="btn sm" title="轮换 Key" @click="rotateKey(a)"><Icon name="key" :size="12" /></button>
+                <button class="btn sm" title="轮换 Key" @click="rotateKey(a)"><Icon name="key" :size="14" /></button>
                 <button v-if="a.id !== store.user?.id" class="btn sm" @click="toggleActive(a)">
                   {{ a.active ? '停用' : '启用' }}
                 </button>
                 <button v-if="a.id !== store.user?.id" class="btn sm ghost" style="color: var(--danger)" title="删除成员" @click="remove(a)">
-                  <Icon name="trash" :size="12" />
+                  <Icon name="trash" :size="14" />
                 </button>
               </div>
             </td>
@@ -462,7 +462,7 @@ onMounted(load)
           </div>
           <div class="acard-ops">
             <button class="btn sm" @click="resetPassword(a)">重置密码</button>
-            <button class="btn sm" @click="rotateKey(a)"><Icon name="key" :size="12" /> 轮换 Key</button>
+            <button class="btn sm" @click="rotateKey(a)"><Icon name="key" :size="14" /> 轮换 Key</button>
             <button v-if="a.id !== store.user?.id" class="btn sm" @click="toggleActive(a)">
               {{ a.active ? '停用' : '启用' }}
             </button>
@@ -472,7 +472,7 @@ onMounted(load)
               style="color: var(--danger)"
               @click="remove(a)"
             >
-              <Icon name="trash" :size="12" /> 删除
+              <Icon name="trash" :size="14" /> 删除
             </button>
           </div>
         </div>
@@ -514,7 +514,7 @@ onMounted(load)
     <div class="modal-head">
       <h2>删除成员「{{ del.item.display_name || del.item.username }}」</h2>
       <div style="flex: 1" />
-      <button class="btn ghost icon" @click="del.item = null"><Icon name="close" :size="14" /></button>
+      <button class="btn ghost icon" @click="del.item = null"><Icon name="close" :size="16" /></button>
     </div>
     <div class="modal-body">
       <p class="hint" style="margin: 0 0 12px">
@@ -550,11 +550,11 @@ onMounted(load)
     <div class="modal-head">
       <h2>添加成员</h2>
       <div style="flex: 1" />
-      <button class="btn ghost icon" @click="createOpen = false"><Icon name="close" :size="14" /></button>
+      <button class="btn ghost icon" @click="createOpen = false"><Icon name="close" :size="16" /></button>
     </div>
     <div class="modal-body">
       <div class="trustnote">
-        <b>⚠️ 只给你信任的人或自己的 Agent 开账号</b>
+        <b><Icon name="warning" :size="14" class="warnico" />只给你信任的人或自己的 Agent 开账号</b>
         <p>本系统面向个人用户与个人 Agent 使用。所有预览内容与管理后台同源：成员上传的页面里的脚本，可以读到访问者在本站的登录状态，进而操作后台。不要给不信任的人开通发布权限。</p>
         <p>免责声明：本软件按「原样」提供，不附带任何担保。因开通账号、成员上传的内容或使用本软件造成的数据泄露、损失或法律责任，由部署者自行承担，与作者无关。</p>
         <label class="ackline"><input v-model="ack" type="checkbox" /> 我已了解风险，该成员是我信任的人或我自己的 Agent</label>
@@ -646,7 +646,8 @@ onMounted(load)
   margin-bottom: 14px; padding: 10px 12px; border-radius: 9px; font-size: 12px; line-height: 1.6;
   background: var(--danger-soft, rgba(200, 60, 40, 0.06)); border: 1px solid var(--danger-line, rgba(200, 60, 40, 0.25));
 }
-.trustnote b { color: var(--danger); font-size: 12.5px; }
+.trustnote b { color: var(--danger); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+.trustnote b .warnico { flex: 0 0 auto; }
 .trustnote p { margin: 6px 0 0; color: var(--ink-3, var(--ink-4)); }
 .ackline { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-weight: 600; cursor: pointer; }
 .delopt { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; margin: 4px 0; }

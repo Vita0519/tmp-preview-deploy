@@ -25,7 +25,7 @@ from pathlib import Path
 
 from . import config
 
-DEFAULT = "#0f766e"
+DEFAULT = "#2563eb"
 
 # 校正主色用的两种画布参照（与内置主题 --bg 一致）
 DARK_CANVAS = "#0b0d10"
@@ -60,7 +60,7 @@ LAYOUT_KEYS = {
 }
 
 PRESETS = [
-    ("墨绿", "#0f766e"),
+    ("电光蓝", "#2563eb"),
     ("翠绿", "#10b981"),
     ("靛蓝", "#6366f1"),
     ("深青", "#0ea5e9"),

@@ -52,7 +52,7 @@ def main() -> int:
     code, d0 = admin.req("GET", "/api/settings")
     th0 = d0.get("theme") or {}
     orig_plugin = th0.get("plugin") or "noir"
-    orig_accent = str(th0.get("raw") or th0.get("accent") or "#0f766e")
+    orig_accent = str(th0.get("raw") or th0.get("accent") or "#2563eb")
 
     print("[1] 载荷与内置清单")
     check("meta 可取", code == 200)

@@ -47,7 +47,7 @@ watch(
 
   <div class="toastwrap">
     <div v-for="t in store.toasts" :key="t.id" class="toast" :class="{ err: t.type === 'err' }">
-      <Icon :name="t.type === 'err' ? 'close' : 'check'" :size="13" />
+      <Icon :name="t.type === 'err' ? 'close' : 'check'" :size="16" />
       {{ t.message }}
     </div>
   </div>

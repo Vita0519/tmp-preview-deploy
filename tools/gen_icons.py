@@ -22,7 +22,7 @@ PUBLIC = ROOT / "frontend" / "public"
 SRC = PUBLIC / "favicon.svg"
 
 # iOS 主屏图标与 maskable 图标不能有透明角（会被垫黑底），所以铺一层实色底
-FLAT_BG = "#0d6a62"
+FLAT_BG = "#2563eb"
 
 ICO_SIZES = (16, 32, 48)
 PNG_TARGETS = {
@@ -45,7 +45,15 @@ def _png(svg_markup: str, size: int, opaque: bool) -> bytes:
         f"{svg_markup}"
     )
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(channel="chrome")
+        # 先找系统 Chrome，再退回 Edge，最后用 Playwright 自带的那份
+        for opts in ({"channel": "chrome"}, {"channel": "msedge"}, {}):
+            try:
+                browser = pw.chromium.launch(**opts)
+                break
+            except Exception:
+                browser = None
+        if browser is None:
+            raise RuntimeError("找不到可用的 Chromium，先跑一次 playwright install chromium")
         page = browser.new_page(viewport={"width": size, "height": size}, device_scale_factor=1)
         page.set_content(html)
         el = page.query_selector("svg")
@@ -113,9 +121,17 @@ def build() -> int:
 
 
 def check() -> int:
-    stale = [p.name for p in PUBLIC.glob("*.png") if p.stat().st_mtime < SRC.stat().st_mtime]
-    if (PUBLIC / "favicon.ico").exists() and (PUBLIC / "favicon.ico").stat().st_mtime < SRC.stat().st_mtime:
-        stale.append("favicon.ico")
+    # 只看本脚本自己产出的那几张图：public 里还有二维码之类的无关 PNG，
+    # 用 *.png 通配会把它们算进来，永远报「产物过期」。
+    names = [f"favicon-{s}.png" for s in ICO_SIZES] + list(PNG_TARGETS) + ["favicon.ico", "icon.svg"]
+    stale = [
+        n for n in names
+        if (PUBLIC / n).exists() and (PUBLIC / n).stat().st_mtime < SRC.stat().st_mtime
+    ]
+    missing = [n for n in names if not (PUBLIC / n).exists()]
+    if missing:
+        print("缺少图标产物：" + "、".join(missing))
+        return 1
     if stale:
         print("产物比矢量源旧，需要重新生成：" + "、".join(sorted(stale)))
         return 1

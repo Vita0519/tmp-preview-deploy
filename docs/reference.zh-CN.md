@@ -12,7 +12,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-a8332b.svg)](../LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-3c5f8f.svg)](../backend/requirements.txt)
-[![Docker](https://img.shields.io/badge/docker-compose-2f6f78.svg)](../docker-compose.yml)
+[![Docker](https://img.shields.io/badge/docker-compose-2563eb.svg)](../docker-compose.yml)
 
 ```
 浏览器 ──┬── /v/<slug>          访客预览外壳（倒计时 + 下载）

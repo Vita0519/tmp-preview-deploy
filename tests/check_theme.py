@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from smoke_test import FAIL, PASS, Client, check, multipart  # noqa: E402
 
 HTML = b"<!doctype html><meta charset=utf-8><h1>theme</h1>"
-DEFAULT = "#0f766e"
+DEFAULT = "#2563eb"
 
 
 def hex2rgb(h):

@@ -244,7 +244,7 @@ async function submitLink() {
     <div class="modal-head">
       <h2>新建项目</h2>
       <div style="flex: 1" />
-      <button class="btn ghost icon" @click="emit('close')"><Icon name="close" :size="14" /></button>
+      <button class="btn ghost icon" @click="emit('close')"><Icon name="close" :size="16" /></button>
     </div>
 
     <div class="modal-body">
@@ -384,10 +384,10 @@ async function submitLink() {
 
         <div ref="advEl" class="adv" :class="{ open: advOpen }">
           <button type="button" class="advhead" @click="toggleAdv">
-            <Icon name="sliders" :size="13" />
+            <Icon name="sliders" :size="16" />
             <span>高级设置</span>
             <span class="advsum">{{ advSummary }}</span>
-            <Icon name="chevron" :size="13" class="advcaret" />
+            <Icon name="chevron" :size="16" class="advcaret" />
           </button>
 
           <div v-if="advOpen" class="advbody">
