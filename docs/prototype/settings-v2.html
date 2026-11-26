@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>设置 v2 原型 · 临时预览站</title>
+<style>
+:root{--brand:#2bb39a;--brand-rgb:43,179,154}
+[data-theme=dark]{--bg:#0f1214;--panel:#151a1d;--panel-2:#1a2024;--line:#242c31;--ink-1:#e8eef0;--ink-2:#c3ccd0;--ink-3:#8b979d;--ink-4:#5d686e;--danger:#e5675f;--warn:#e0a43a;--info:#5b9be6}
+[data-theme=light]{--bg:#f5f7f8;--panel:#fff;--panel-2:#f8fafb;--line:#e3e8eb;--ink-1:#1b2327;--ink-2:#36424a;--ink-3:#66737a;--ink-4:#98a3a9;--danger:#d24a41;--warn:#b97d12;--info:#2f74c9}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink-1);font:14px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px;background:var(--panel)}
+.brand{display:flex;gap:10px;align-items:center;margin:0 4px 18px}.logo{width:30px;height:30px;border-radius:8px;background:var(--brand)}
+.brand b{display:block}.brand span{font-size:11px;color:var(--ink-4)}
+.lbl{font-size:11px;color:var(--ink-4);margin:6px 8px}
+.nav{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--ink-2);cursor:pointer;border:1px solid transparent}
+.nav:hover{background:var(--panel-2)}.nav.on{background:rgba(var(--brand-rgb),.12);border-color:rgba(var(--brand-rgb),.35);color:var(--brand)}
+.side .foot{margin-top:auto;border-top:1px solid var(--line);padding-top:10px}
+.main{padding:28px 32px;min-width:0}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+h1{font-size:20px;margin:0}.sub{color:var(--ink-3);font-size:13px;margin:2px 0 20px}
+.tbtn{border:1px solid var(--line);background:var(--panel);color:var(--ink-2);border-radius:8px;padding:6px 12px;cursor:pointer}
+.set{display:grid;grid-template-columns:180px 1fr;gap:28px;align-items:start}
+.snav{position:sticky;top:24px;display:flex;flex-direction:column;gap:2px}
+.sgrp{font-size:11px;color:var(--ink-4);margin:14px 10px 4px}.sgrp:first-child{margin-top:0}
+.si{padding:7px 10px;border-radius:7px;color:var(--ink-3);cursor:pointer;display:flex;justify-content:space-between}
+.si:hover{color:var(--ink-1);background:var(--panel-2)}.si.on{color:var(--ink-1);background:var(--panel);box-shadow:inset 2px 0 0 var(--brand)}
+.badge{font-size:11px;padding:0 6px;border-radius:10px;background:rgba(var(--brand-rgb),.15);color:var(--brand)}
+.pane{display:none}.pane.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:16px}
+.card-h{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.card-h h3{margin:0;font-size:15px}.card-h p{margin:2px 0 0;font-size:12px;color:var(--ink-3)}
+.row{display:grid;grid-template-columns:200px 1fr;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line);align-items:center}
+.row:last-child{border-bottom:0}.row .k b{display:block;font-weight:500}.row .k span{font-size:12px;color:var(--ink-4)}
+input,select{background:var(--panel-2);border:1px solid var(--line);color:var(--ink-1);border-radius:8px;padding:7px 10px;font:inherit;width:100%;max-width:360px}
+.btn{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer}
+.ghost{background:transparent;border:1px solid var(--line);color:var(--ink-2)}
+.savebar{position:sticky;bottom:0;display:flex;justify-content:flex-end;gap:8px;padding:12px 0;background:linear-gradient(transparent,var(--bg) 40%)}
+/* 活动日志 */
+.filters{display:flex;gap:8px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line);align-items:center}
+.chip{border:1px solid var(--line);background:var(--panel-2);color:var(--ink-3);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer}
+.chip.on{border-color:rgba(var(--brand-rgb),.5);color:var(--brand);background:rgba(var(--brand-rgb),.1)}
+.filters input{max-width:220px;padding:5px 10px;font-size:12px;margin-left:auto}
+.day{padding:10px 18px 4px;font-size:12px;color:var(--ink-4);position:sticky;top:0;background:var(--panel)}
+.ev{display:grid;grid-template-columns:52px 28px 1fr;gap:12px;padding:10px 18px;position:relative}
+.ev:hover{background:var(--panel-2)}
+.ev .t{color:var(--ink-4);font-size:12px;font-variant-numeric:tabular-nums;padding-top:4px}
+.dot{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:13px}
+.d-add{background:rgba(var(--brand-rgb),.14);color:var(--brand)}
+.d-mod{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+.d-del{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger)}
+.d-sys{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.ev .l1{display:flex;gap:6px;flex-wrap:wrap;align-items:baseline}
+.who{font-weight:600}.verb{color:var(--ink-3)}.proj{color:var(--ink-1);font-weight:500;text-decoration:none;border-bottom:1px dashed var(--ink-4)}
+.slug{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--ink-4)}
+.agent{font-size:11px;color:var(--ink-4);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.diff{margin-top:6px;display:flex;flex-direction:column;gap:3px;font-size:12px}
+.diff div{display:flex;gap:8px;align-items:center}
+.diff .f{color:var(--ink-4);min-width:52px}
+.old{color:var(--ink-4);text-decoration:line-through}.arr{color:var(--ink-4)}
+.new{color:var(--ink-1);background:rgba(var(--brand-rgb),.1);border-radius:4px;padding:0 6px}
+.more{padding:14px;text-align:center;border-top:1px solid var(--line)}
+.note{font-size:12px;color:var(--ink-3);background:var(--panel-2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.set{grid-template-columns:1fr}.snav{position:static;flex-direction:row;overflow:auto}.sgrp{display:none}.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo"></div><div><b>临时预览站</b><span>临时预览 · 控制台</span></div></div>
+    <div class="lbl">工作区</div>
+    <div class="nav">📁 项目</div>
+    <div class="nav">👥 成员</div>
+    <div class="nav on">⚙️ 设置</div>
+    <div class="foot"><div class="nav">👁 访客门户 ↗</div><div class="nav">🟢 管理员</div></div>
+  </aside>
+
+  <main class="main">
+    <div class="top"><h1>设置</h1><button class="tbtn" onclick="toggleTheme()">切换亮/暗主题</button></div>
+    <p class="sub">侧栏不再单列「日志」——操作记录并入设置里的「活动」，取代原来的「最近操作」。</p>
+
+    <div class="set">
+      <nav class="snav" id="snav">
+        <div class="sgrp">通用</div>
+        <div class="si" data-p="site">站点</div>
+        <div class="si" data-p="look">外观与主题</div>
+        <div class="si" data-p="author">作者名片</div>
+        <div class="sgrp">项目</div>
+        <div class="si" data-p="defaults">默认值与到期</div>
+        <div class="si" data-p="tags">标签规则</div>
+        <div class="sgrp">数据</div>
+        <div class="si on" data-p="activity">活动 <span class="badge">12</span></div>
+        <div class="si" data-p="backup">备份与恢复</div>
+        <div class="sgrp">系统</div>
+        <div class="si" data-p="account">我的账号</div>
+        <div class="si" data-p="about">运行信息 · 关于</div>
+      </nav>
+
+      <div>
+        <!-- 活动 -->
+        <section class="pane on" id="p-activity">
+          <div class="card">
+            <div class="card-h">
+              <div><h3>活动</h3><p>全站操作记录 · 保留 90 天（可在下方修改）</p></div>
+              <button class="btn ghost">导出 CSV</button>
+            </div>
+            <div class="filters">
+              <span class="chip on">全部</span><span class="chip">发布</span><span class="chip">修改</span>
+              <span class="chip">删除 / 到期</span><span class="chip">成员</span><span class="chip">系统</span>
+              <select style="max-width:130px;padding:4px 8px;font-size:12px"><option>所有人</option><option>openclaw</option><option>workbuddy</option><option>admin</option></select>
+              <input placeholder="搜索项目名 / slug">
+            </div>
+
+            <div class="day">今天 · 11月25日 周三</div>
+            <div class="ev"><span class="t">17:11</span><span class="dot d-mod">✎</span><div>
+              <div class="l1"><span class="who">workbuddy</span><span class="verb">修改了</span><a class="proj" href="#">空天地接口文档工具</a><span class="slug">ktd-api-doc</span></div>
+              <div class="diff"><div><span class="f">介绍</span><span class="old">（空）</span><span class="arr">→</span><span class="new">空天地平台 API 服务快速筛选与接口文档查询工具…</span></div></div>
+            </div></div>
+            <div class="ev"><span class="t">16:28</span><span class="dot d-add">＋</span><div>
+              <div class="l1"><span class="who">openclaw</span><span class="verb">挂了外链</span><a class="proj" href="#">Agent HUD</a><span class="slug">agenthud</span></div>
+            </div></div>
+            <div class="ev"><span class="t">16:25</span><span class="dot d-mod">✎</span><div>
+              <div class="l1"><span class="who">openclaw</span><span class="verb">修改了</span><a class="proj" href="#">市场流程逻辑</a><span class="slug">market-flow-logic</span></div>
+              <div class="diff">
+                <div><span class="f">可见性</span><span class="old">私密</span><span class="arr">→</span><span class="new">门户公开</span></div>
+                <div><span class="f">到期</span><span class="old">已过期</span><span class="arr">→</span><span class="new">11-26 16:25</span></div>
+                <div><span class="f">状态</span><span class="old">已下线</span><span class="arr">→</span><span class="new">在线</span></div>
+              </div>
+            </div></div>
+            <div class="ev"><span class="t">15:59</span><span class="dot d-mod">⇆</span><div>
+              <div class="l1"><span class="who">admin</span><span class="verb">批量设置可见性</span><span class="agent">1 个项目</span></div>
+            </div></div>
+            <div class="ev"><span class="t">15:36</span><span class="dot d-add">↻</span><div>
+              <div class="l1"><span class="who">openclaw</span><span class="verb">覆盖发布</span><a class="proj" href="#">预览站落地页</a><span class="slug">tmp-preview-landing</span><span class="agent">3 个文件</span></div>
+            </div></div>
+            <div class="ev"><span class="t">11:40</span><span class="dot d-sys">⏱</span><div>
+              <div class="l1"><span class="who">系统</span><span class="verb">到期下线</span><a class="proj" href="#">市场流程逻辑</a><span class="slug">market-flow-logic</span></div>
+            </div></div>
+
+            <div class="day">昨天 · 11月24日 周二</div>
+            <div class="ev"><span class="t">22:03</span><span class="dot d-del">✕</span><div>
+              <div class="l1"><span class="who">admin</span><span class="verb">删除了</span><span class="proj" style="border:0;color:var(--ink-3)">旧版图钉演示</span><span class="slug">geopin-old</span></div>
+            </div></div>
+            <div class="ev"><span class="t">03:00</span><span class="dot d-sys">⛁</span><div>
+              <div class="l1"><span class="who">系统</span><span class="verb">自动备份</span><span class="agent">auto-20261124-0300.zip · 18.2 MB</span></div>
+            </div></div>
+            <div class="more"><button class="btn ghost">加载更早的记录</button></div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><div><h3>保留策略</h3></div></div>
+            <div class="row"><div class="k"><b>日志保留天数</b><span>0 = 永久保留</span></div><div><input value="90" style="max-width:120px"></div></div>
+          </div>
+        </section>
+
+        <!-- 站点（示意：所有分页统一用「卡片 + 左标签右控件」行） -->
+        <section class="pane" id="p-site">
+          <div class="card">
+            <div class="card-h"><div><h3>基本信息</h3><p>显示在门户和浏览器标签上</p></div></div>
+            <div class="row"><div class="k"><b>站点标题</b><span>留空用环境变量</span></div><div><input value="临时预览站"></div></div>
+            <div class="row"><div class="k"><b>副标题</b></div><div><input value="到期自动回收 · 多 Agent 共享"></div></div>
+            <div class="row"><div class="k"><b>站点图标</b><span>PNG / SVG，≤256KB</span></div><div><button class="btn ghost">上传</button></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div><h3>门户</h3></div></div>
+            <div class="row"><div class="k"><b>公开门户</b><span>未登录也能看</span></div><div><select style="max-width:160px"><option>关闭</option><option>开启</option></select></div></div>
+            <div class="row"><div class="k"><b>每页卡片数 / 列数</b></div><div style="display:flex;gap:8px"><input value="24" style="max-width:90px"><input value="4" style="max-width:90px"></div></div>
+          </div>
+          <div class="savebar"><button class="btn ghost">还原</button><button class="btn">保存</button></div>
+        </section>
+
+        <section class="pane" id="p-placeholder">
+          <div class="note">其它分页（外观与主题、作者名片、默认值与到期、标签规则、备份与恢复、我的账号、运行信息 · 关于）沿用「站点」页同一套卡片 + 行布局，只是把原来长页面里的 section 拆过来，内容不变。</div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'}
+document.querySelectorAll('.si').forEach(el=>el.onclick=()=>{
+  document.querySelectorAll('.si').forEach(x=>x.classList.toggle('on',x===el))
+  const id=['activity','site'].includes(el.dataset.p)?el.dataset.p:'placeholder'
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+id))
+})
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c))})
+</script>
+</body>
+</html>

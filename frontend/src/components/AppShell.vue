@@ -18,9 +18,9 @@ const roleLabel = computed(() => {
 })
 const nav = computed(() => [
   { name: 'projects', label: '项目', icon: 'folder', show: !isViewer.value },
-  { name: 'logs', label: '日志', icon: 'clock', show: !isViewer.value },
   { name: 'agents', label: '成员', icon: 'users', show: isAdmin.value },
   { name: 'settings', label: '设置', icon: 'sliders', show: isAdmin.value },
+  { name: 'logs', label: '日志', icon: 'clock', show: !isViewer.value },
 ])
 
 // 侧栏折叠：只留图标（228px → 64px），选择记在本地，下次进来还是收起的
