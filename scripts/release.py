@@ -160,7 +160,9 @@ def main() -> int:
     # ---- 建 Release ----
     log = ""
     if prev:
-        log = run(["git", "log", f"{prev}..HEAD", "--pretty=- %s", "--no-merges"])
+        # 排除发版自身的 chore(release) 提交，否则「变更」里会出现「- chore(release): vX.Y.Z」
+        log = run(["git", "log", f"{prev}..HEAD", "--pretty=- %s", "--no-merges",
+                   "--invert-grep", "--grep=^chore(release)"])
     body = "\n".join([
         f"## {tag}",
         "",
