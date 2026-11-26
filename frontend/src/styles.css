@@ -376,6 +376,8 @@ p { margin: 0; }
   .rail { display: none; }
   /* 侧栏收起后，分组 / 未归类的筛选改由工具栏下拉接管 */
   .colfallback { display: inline-flex; }
+  /* 多一个下拉就会折行，撑开的空白别再把排序甩到最右边 */
+  .toolbar .grow { display: none; }
 }
 
 
@@ -591,7 +593,7 @@ td.cell-num, th.cell-num { text-align: right; }
   font-size: 11px; font-weight: 650; font-family: var(--mono);
 }
 .pthumb.link { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-line); }
-.pmeta { min-width: 0; }
+.pmeta { min-width: 0; flex: 1 1 auto; }
 .pname { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 6px; }
 .pslug { font-size: 11px; color: var(--ink-4); font-family: var(--mono); }
 
@@ -929,6 +931,71 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
   .pslug { font-size: 10.5px; }
   .ttl { font-size: 12px; }
 }
+
+/* ---------------- 手机端：顶栏与筛选 ---------------- */
+
+/* 顶栏原本是一条不换行的 flex：屏幕一窄，搜索框被挤成 0 宽（只剩个放大镜），
+   最右边的「新建项目」直接顶出视口，整页就能左右拖。这里拆成两行：
+   第一行标题 + 图标动作 + 主操作，第二行搜索独占一行。 */
+@media (max-width: 700px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    /* 原来这里留 46px 给汉堡按钮；顶栏拆两行后，第二行的搜索框也跟着缩进，
+       左边就空出一条。改成整体对齐 14px，只让标题自己让开按钮。 */
+    padding: 9px 14px 10px 14px;
+  }
+  .topbar h1 { font-size: 15px; margin-left: 34px; }
+  .topbar .search {
+    order: 10;
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .topbar .search .field { height: 34px; }
+  /* 次要动作只留图标，把宽度让给标题和主操作 */
+  .topbar .btxt { display: none; }
+  .topbar .btn.primary .btxt { display: inline; }
+  .topbar .btn { padding: 0 9px; }
+}
+
+/* 再窄一档（≤340px）连主操作也只能留图标 */
+@media (max-width: 340px) {
+  .topbar .btn.primary .btxt { display: none; }
+}
+
+/* 筛选条：一排下拉在手机上会折成参差不齐的三四行。
+   改成两列栅格——类型分段控件独占一行并四等分，其余控件两两配对。 */
+@media (max-width: 700px) {
+  .toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+  }
+  /* 下拉的 min-width 写在行内（宽屏用），这里必须压掉，否则栅格撑破 */
+  .toolbar > * { width: 100%; min-width: 0 !important; }
+  /* 搜索框独占一行，跟顶栏那个搜索一样处理 */
+  .toolbar > .search { grid-column: 1 / -1; max-width: none; }
+  .toolbar .seg {
+    order: -1;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 3px;
+  }
+  .toolbar .seg button { height: 30px; padding: 0 4px; font-size: 12px; }
+  .toolbar .grow { display: none; }
+  .toolbar .field, .toolbar .btn { height: 34px; }
+  /* .btn.icon 自带 32px 定宽，会压过上面的 width:100%，方向按钮就只剩个箭头 */
+  .toolbar .btn.icon { width: 100%; }
+  /* 排序方向按钮在窄屏补上文字，单独一个「↓」没人看得懂 */
+  .toolbar .ordlbl { display: inline; margin-left: 4px; font-size: 12px; font-weight: 600; }
+  .chipbar { padding: 0 10px 10px; }
+}
+
+/* 宽屏下方向按钮只显示箭头 */
+.ordlbl { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }

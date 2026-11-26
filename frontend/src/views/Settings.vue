@@ -138,7 +138,22 @@ function pickAccent(v) {
 }
 
 function resetTheme() {
-  pickAccent(activePlugin.value ? activePlugin.value.default_accent : '#2563eb')
+  const p = activePlugin.value
+  // 插件清单还没拉到：退回内置默认色，但好歹让按钮有反应
+  if (!p) {
+    pickAccent('#2563eb')
+    toast('已回到默认主色 #2563eb · 记得点右上角保存')
+    return
+  }
+  const def = normalize(p.default_accent)
+  // 本来就是默认色 → 之前点了看着「没反应」，这里说清楚
+  if (normalize(accent.value) === def && !custom.value) {
+    toast(`当前已经是「${p.name}」的默认主色 ${def}`)
+    return
+  }
+  // 不只是换色值：把这套主题的令牌一起重放，等于重新点一次它的卡片
+  pickPlugin(p)
+  toast(`已回到「${p.name}」默认主色 ${def} · 记得点右上角保存`)
 }
 
 // ---------------- 主题商店 ----------------

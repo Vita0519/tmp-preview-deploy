@@ -316,7 +316,7 @@ onMounted(load)
         :title="!sort ? '先选一个排序字段' : order === 'desc' ? '改为升序' : '改为降序'"
         @click="order = order === 'desc' ? 'asc' : 'desc'"
       >
-        {{ order === 'desc' ? '↓' : '↑' }}
+        {{ order === 'desc' ? '↓' : '↑' }}<span class="ordlbl">{{ order === 'desc' ? '降序' : '升序' }}</span>
       </button>
 
       <button v-if="hasFilter" class="btn ghost sm" @click="resetFilters">清除筛选</button>

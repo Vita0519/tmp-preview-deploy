@@ -376,7 +376,9 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
 .gap { padding: 0 4px; color: var(--ink-4); }
 
 @media (max-width: 860px) {
-  .logs { padding: 18px 14px 30px; }
+  /* 这个页面不用 .topbar，汉堡按钮是 fixed 的，得自己把标题让开 */
+  .logs { padding: 58px 14px 80px; }
+  .head h1 { font-size: 19px; }
   .stats { grid-template-columns: 1fr; gap: 8px; }
   .tr { grid-template-columns: 84px minmax(0, 1fr) 20px; }
   .tr > span:nth-child(3), .tr > span:nth-child(4) { grid-column: 1 / 3; }
@@ -384,5 +386,11 @@ svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width:
   .detail { padding-left: 16px; }
   .diff { grid-template-columns: 1fr; }
   .diff .arr { display: none; }
+}
+
+@media (max-width: 700px) {
+  .lg-bar { padding: 10px; }
+  .lg-search { flex: 1 1 100%; }
+  .lg-bar select { flex: 1 1 calc(50% - 4px); min-width: 0; }
 }
 </style>

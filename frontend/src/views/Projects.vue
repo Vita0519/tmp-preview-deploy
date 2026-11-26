@@ -393,13 +393,13 @@ onBeforeUnmount(() => {
       <Icon name="refresh" :size="16" />
     </button>
     <button class="btn ghost" title="导入浏览器书签（Chrome / Edge / Firefox）" @click="importOpen = true">
-      <Icon name="download" :size="16" /> 导入书签
+      <Icon name="download" :size="16" /> <span class="btxt">导入书签</span>
     </button>
     <a class="btn ghost" :href="exportHref" title="导出为书签 HTML，可被浏览器直接导入">
-      <Icon name="external" :size="16" /> 导出
+      <Icon name="external" :size="16" /> <span class="btxt">导出</span>
     </a>
     <button class="btn primary" @click="uploadOpen = true">
-      <Icon name="plus" :size="16" /> 新建项目
+      <Icon name="plus" :size="16" /> <span class="btxt">新建项目</span>
     </button>
   </header>
 
@@ -484,7 +484,7 @@ onBeforeUnmount(() => {
         <option value="size_bytes">按体积</option>
       </select>
       <button class="btn icon" :title="filters.order === 'desc' ? '降序' : '升序'" @click="filters.order = filters.order === 'desc' ? 'asc' : 'desc'">
-        {{ filters.order === 'desc' ? '↓' : '↑' }}
+        {{ filters.order === 'desc' ? '↓' : '↑' }}<span class="ordlbl">{{ filters.order === 'desc' ? '降序' : '升序' }}</span>
       </button>
       <select v-model.number="size" class="field" style="min-width: 86px">
         <option :value="20">20 / 页</option>
