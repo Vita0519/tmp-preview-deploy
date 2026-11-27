@@ -123,7 +123,7 @@ def normalize_rows(conn) -> dict:
 
     只在库刚建好、或首次升级到有标签规则的版本时跑一次（由 init_db 的开关位守着）。
     """
-    stats = {"merged": 0, "dropped": 0, "trimmed": 0, "orphans": 0}
+    stats = {"merged": 0, "dropped": 0, "trimmed": 0, "renamed": 0, "orphans": 0}
     rows = conn.execute(
         "SELECT pt.project_id, pt.tag_id, t.name FROM project_tags pt "
         "JOIN tags t ON t.id=pt.tag_id ORDER BY pt.project_id, pt.rowid"
@@ -133,10 +133,15 @@ def normalize_rows(conn) -> dict:
     by_project: dict[int, list[str]] = {}
     for r in rows:
         names = by_project.setdefault(r["project_id"], [])
-        name = normalize_name(r["name"])[:MAX_LEN]
+        raw_name = r["name"]
+        name = normalize_name(raw_name)[:MAX_LEN]
         if not name or not ALLOWED.match(name):
             stats["dropped"] += 1
             continue
+        # 只差大小写 / 全角半角（3D vs 3d）也算要改：跨项目的同名标签不会在下面撞成
+        # merged，光看 merged/dropped/trimmed 会漏掉它们，库里就一直是两种写法
+        if name != raw_name:
+            stats["renamed"] += 1
         if name in names:
             stats["merged"] += 1
             continue
@@ -145,7 +150,7 @@ def normalize_rows(conn) -> dict:
             continue
         names.append(name)
 
-    changed = stats["merged"] or stats["dropped"] or stats["trimmed"]
+    changed = stats["merged"] or stats["dropped"] or stats["trimmed"] or stats["renamed"]
     if not changed:
         return stats
 
@@ -161,7 +166,7 @@ def normalize_rows(conn) -> dict:
                     (pid, row["id"]),
                 )
     print(f"[migrate] 标签规范化：合并 {stats['merged']}、丢弃 {stats['dropped']}、"
-          f"超出上限截掉 {stats['trimmed']}", flush=True)
+          f"超出上限截掉 {stats['trimmed']}、统一写法 {stats['renamed']}", flush=True)
     return stats
 
 

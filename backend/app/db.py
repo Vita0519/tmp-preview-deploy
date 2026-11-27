@@ -244,8 +244,10 @@ def _migrate_tags(conn) -> None:
     """存量标签按新规则规范化一次（归一化 / 合并重名 / 每项目截到上限 / 删孤儿）。
 
     用设置里的开关位守着，只跑一次；以后再改规则要换 key，别偷偷重排别人数据。
+    v2 → v3：老逻辑只看 merged/dropped/trimmed，跨项目的大小写变体（3D 与 3d）
+    不算变化，导致库里两种写法长期并存，这次换 key 再洗一遍。
     """
-    key = "tags_spec_v1"
+    key = "tags_spec_v2"
     row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     if row and row["value"] == "1":
         return
