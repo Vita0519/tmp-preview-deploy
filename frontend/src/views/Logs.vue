@@ -288,7 +288,8 @@ async function exportCsv() {
 </template>
 
 <style scoped>
-.logs { padding: 26px 28px 40px; max-width: 1180px; }
+/* 原来封顶 1180，宽屏右半边空着；日志是单列列表，放宽到 1400 更好读 */
+.logs { padding: 26px 28px 40px; max-width: 1400px; }
 svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

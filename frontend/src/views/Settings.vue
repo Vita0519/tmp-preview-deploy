@@ -1083,7 +1083,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <aside class="pvwrap">
+            <aside class="pvwrap author-preview">
               <div class="pvlabel">门户预览</div>
               <div class="pvcard">
                 <div class="pvava">{{ (form.author.name || '·').slice(0, 1).toUpperCase() }}</div>
@@ -1536,7 +1536,9 @@ onUnmounted(() => {
    现在统一成「左侧分区导航 + 右侧单列纵向」，阅读顺序和滚动方向一致。 */
 .setwrap {
   display: grid;
-  grid-template-columns: 158px minmax(0, 860px);
+  /* 原来是 minmax(0, 860px)，宽屏右侧白一大块；放到 1120 封顶，
+     再宽表单就太长了，读起来要甩头 */
+  grid-template-columns: 158px minmax(0, 1120px);
   gap: 28px;
   align-items: start;
 }
@@ -1907,16 +1909,26 @@ onUnmounted(() => {
 .usagetext b { color: var(--ink); }
 
 /* ---- 作者名片 ---- */
+/* 默认单栏：把整幅宽度让给「链接」行，一条链接一行放得下。
+   只有特别宽（≥1500）时才拆成 表单 + 预览 两栏，右边不再是一堵空墙 */
 .author-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 22px;
+  align-items: start;
 }
 .author-grid .frow { grid-template-columns: 76px minmax(0, 1fr); }
+.author-preview { position: static; }
+@media (min-width: 1500px) {
+  /* 2.6:1 —— 左侧要给「类型 + 标签 + 地址」留够宽度，预览卡窄一点够看就行 */
+  .author-grid { grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr); }
+  /* 预览卡跟着滚，右边不再是一片空墙 */
+  .author-preview { position: sticky; top: 76px; }
+}
 
 /* ---- 链接行 ---- */
 .linkrows { display: flex; flex-direction: column; gap: 8px; }
-/* 两行布局：第一行 拖柄/类型/显示文字/排序/删除，第二行 地址占满——窄栏里地址框也不会被挤没 */
+/* 默认两行：第一行 拖柄/类型/显示文字/排序/删除，第二行 地址占满 */
 .linkrow {
   display: grid; grid-template-columns: 14px 118px minmax(0, 1fr) auto auto;
   gap: 6px 7px; align-items: center; padding: 8px 8px 8px 4px;
@@ -1934,6 +1946,21 @@ onUnmounted(() => {
 .linkrow { border-radius: 8px; transition: background .15s, box-shadow .15s, opacity .15s; }
 .linkrow.dragging { opacity: .45; }
 .linkrow.dropover { box-shadow: 0 -2px 0 0 var(--brand) inset, 0 2px 0 0 var(--brand); }
+
+/* 够宽就把地址并到同一行：8 个链接从 600px 高压到 300px，页面不再无限长 */
+@media (min-width: 1080px) {
+  .linkrow {
+    grid-template-columns: 14px 112px minmax(96px, 0.72fr) minmax(0, 2fr) auto auto;
+    gap: 6px;
+    padding: 5px 8px 5px 4px;
+  }
+  .linkrow .grip { grid-area: 1 / 1; }
+  .linkrow .typesel { grid-area: 1 / 2; }
+  .linkrow .lab { grid-area: 1 / 3; }
+  .linkrow .url { grid-area: 1 / 4; }
+  .linkrow .mv { grid-area: 1 / 5; }
+  .linkrow .del { grid-area: 1 / 6; }
+}
 .linkrow .grip {
   flex: 0 0 auto; width: 16px; text-align: center; cursor: grab; user-select: none;
   color: var(--ink-4); letter-spacing: -2px; font-size: 13px; line-height: 32px;
