@@ -27,7 +27,7 @@
 
     'screens.title': 'Screens',
     'screens.c1': 'Project detail: visibility, expiry, file list, destructive actions',
-    'screens.c2': 'Settings: color series, site icon, default lifetimes, upload limit',
+    'screens.c2': 'Settings: site info, portal toggles, themes and accent color',
     'screens.c3': 'Public portal: card wall, browsable by category and tags',
 
     'docker.title': 'Install · Docker Compose',
