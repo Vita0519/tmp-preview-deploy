@@ -2,7 +2,7 @@
 # 生命周期入口：start/stop 由应用中心执行 compose，这里只做状态查询
 
 FILE_PATH="${TRIM_APPDEST}/docker/docker-compose.yaml"
-CONTAINER="tmp-preview"
+CONTAINER="tmp-preview-fnos"
 
 is_running() {
     if ! command -v docker >/dev/null 2>&1; then

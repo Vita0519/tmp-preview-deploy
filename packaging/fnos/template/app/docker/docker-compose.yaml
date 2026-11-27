@@ -1,10 +1,12 @@
 services:
-  tmp-preview:
+  # 容器名带 -fnos 后缀：同一个 NAS 上如果还按 docker compose 装过一份，
+  # 两边的容器名、服务名不重名，启动/停止互不干扰
+  tmp-preview-fnos:
     # 优先用已推送的镜像；拉不动时可在 NAS 上用 build_image.sh 构建同名镜像
     # 跟 :latest 走，由下方 watchtower 每天凌晨自动拉新版并重启；
     # 应用中心显示的版本号是安装包版本，实际运行版本以控制台「设置 → 关于」为准
     image: ghcr.io/vita0519/tmp-preview:latest
-    container_name: tmp-preview
+    container_name: tmp-preview-fnos
     restart: unless-stopped
     labels:
       com.centurylinklabs.watchtower.enable: "true"
@@ -22,9 +24,9 @@ services:
       - "${TRIM_PKGVAR}/data:/data"
 
   # 自动更新：只管带 watchtower.enable 标签的容器（即上面这一个），不碰 NAS 上其它容器
-  tmp-preview-watchtower:
+  tmp-preview-fnos-watchtower:
     image: containrrr/watchtower:latest
-    container_name: tmp-preview-watchtower
+    container_name: tmp-preview-fnos-watchtower
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
