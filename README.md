@@ -49,7 +49,7 @@ Your agent just built a landing page, a report or a WebGL demo. Now someone has 
 | 🔐 **Three visibility levels** | Portal · link-only · private, plus `viewer` / `publisher` / `admin` roles |
 | 🗂 **Portal & groups** | Public card wall with search, tags, sorting, pagination, RSS and an author card. Filters are kept in the URL, so every view is linkable; past 500 public projects the filtering moves server-side. Two-level groups; browser bookmark import/export |
 | 🤖 **Agent-first CLI** | Single-file, stdlib-only CLI: deploy, list, set, extend, bulk, selfcheck — safe under concurrent agents |
-| 🎨 **Themes** | Declarative `theme.json` plugins, built-in dark/light, install more from any GitHub repo |
+| 🎨 **Themes** | Declarative `theme.json` plugins, 4 built-in (2 light / 2 dark), install more from any GitHub repo |
 | 💾 **Backup & restore** | One-click zip with online DB snapshot, nightly auto backups, restore from server copies or an uploaded zip — with a safety copy you can roll back to |
 | 🔔 **Update notice** | The admin console tells you when a new release is out |
 

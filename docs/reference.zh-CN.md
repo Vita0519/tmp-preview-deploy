@@ -137,7 +137,7 @@ cloudflared tunnel run --protocol http2 --token <TOKEN>
 
 | 能力 | 说明 |
 |---|---|
-| **主题插件** | 主题是一份 `theme.json` 语义令牌清单（画布 / 容器 / 文字 / 描边 / 阴影，声明式、无可执行代码）。内置两套：**玄夜**（深色，默认）与**象牙**（浅色），设置页点卡片即时预览，保存后控制台、门户、预览页、错误页、`theme-color` 一起换 |
+| **主题插件** | 主题是一份 `theme.json` 语义令牌清单（画布 / 容器 / 文字 / 描边 / 阴影，声明式、无可执行代码）。内置四套：**玄夜**（深色，默认）、**象牙**（浅色）、**纸感**（浅色直角）、**刻度**（深色等宽），设置页点卡片即时预览，保存后控制台、门户、预览页、错误页、`theme-color` 一起换 |
 | **主题商店** | 设置 → 外观 → 主题商店：填一个 GitHub 仓库（`owner/repo`、仓库链接、`/tree/` 深链均可），自动枚举仓库里所有 `theme.json` 一键安装，装完可卸载（内置除外）。raw 不通的网络可用 `THEME_RAW_MIRROR` 指向自建镜像，GitHub API 限额可配 `THEME_GH_TOKEN`；仓库自带示例插件（`examples/theme-plugin/`），商店里点「装示例插件」不依赖外网即可体验完整安装链路。格式文档见 [`examples/theme-plugin/README.md`](../examples/theme-plugin/README.md) |
 | **主色不是随手配的** | `--brand-*` 一族永远由用户主色实时派生，且按主题明暗各有一把对比度尺子：白字压上按钮要够（不足往黑压），画布上放文字/徽标也要够（深底不足往白提、浅底不足往黑压），色相始终不动，设置页写明「实际按 #xxxxxx 渲染」 |
 | **「到期删除」看得见** | 到期动作是删文件的项目，门户卡片带琥珀色左边条 + 徽章 + 琥珀进度条，列表行、预览页顶栏、控制台表格与抽屉同样标记 |
@@ -284,7 +284,7 @@ backend/app/
   serializers.py     行 → API 结构（含倒计时派生字段）
   pages.py           访客预览外壳 / 门户 / 错误页（服务端渲染）
   theme.py           主题插件引擎（内置清单加载 / 商店拉取安装 / 派生公式）
-  builtin_themes/    内置主题包：noir（玄夜·黑）/ ivory（象牙·白）
+  builtin_themes/    内置主题包：noir（玄夜·黑）/ ivory（象牙·白）/ paper（纸感）/ ticker（刻度）
   routers/           auth · projects · agents · settings · public
 frontend/src/        Vue 3 控制台（零 UI 框架，手写设计系统）
 frontend/public/     站点图标与 manifest（favicon.svg 是唯一矢量源）
