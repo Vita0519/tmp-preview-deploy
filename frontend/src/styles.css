@@ -588,10 +588,16 @@ select.field { cursor: pointer; padding-right: 26px; appearance: none;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 0 0 var(--radius) var(--radius);
-  overflow: hidden;
+  /* 列多的时候宁可横向滚动，也别把右边几列直接裁掉（overflow:hidden 圆角照样生效） */
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: var(--shadow-panel);
 }
 table { width: 100%; border-collapse: collapse; }
+/* 只约束项目表：成员页 / 设置页的小表不该被强行撑宽。
+   fixed 布局让有 width 的列锁定宽度、「项目」列吃掉剩余空间，
+   标题再长也只在自己那一格里省略，不会把整张表顶宽。 */
+.tablewrap > table { table-layout: fixed; }
 thead th {
   height: 34px; padding: 0 12px;
   background: var(--surface-2);
@@ -628,6 +634,8 @@ td.cell-num { white-space: nowrap; }
 .pthumb.link { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-line); }
 .pmeta { min-width: 0; flex: 1 1 auto; }
 .pname { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+/* 没有这句「项目」列不会收缩：标题的 max-width 会把整列撑到 260 以上，表格只好横向滚 */
+.pmeta { min-width: 0; }
 .pslug { font-size: 11px; color: var(--ink-4); font-family: var(--mono); }
 
 .badge {
@@ -656,11 +664,11 @@ tbody tr.is-del td.cell-check { box-shadow: inset 3px 0 0 var(--warn); }
 .col-kind { width: 88px; }
 .col-vis { width: 96px; }
 .col-owner { width: 112px; }
-.col-views { width: 96px; }
-.col-size { width: 96px; }
-.col-ttl { width: 108px; }
-.col-updated { width: 108px; }
-.col-ops { width: 76px; }
+.col-views { width: 84px; }
+.col-size { width: 88px; }
+.col-ttl { width: 96px; }
+.col-updated { width: 92px; }
+.col-ops { width: 64px; }
 
 .ttl { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .ttl.warn { color: var(--warn); }
@@ -936,6 +944,19 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
 /* 表格列按宽度逐级收敛（唯一定义处） */
 @media (max-width: 1240px) { .col-owner { display: none; } }
 
+/* 分类面板展开时主列会窄一大截，按剩余空间逐级让列位：
+   能放下就都留，放不下先省「归属」，再省「类型」，最后省「体积」。
+   表格本身有横向滚动兜底，这里只是尽量不触发它。 */
+@media (max-width: 1400px) {
+  .withrail:not(.rail-off) .col-owner { display: none; }
+}
+@media (max-width: 1340px) {
+  .withrail:not(.rail-off) .col-kind { display: none; }
+}
+@media (max-width: 1280px) {
+  .withrail:not(.rail-off) .col-size { display: none; }
+}
+
 @media (max-width: 1080px) {
   .col-vis { display: none; }
   .stats { grid-template-columns: repeat(2, 1fr); }
@@ -953,6 +974,7 @@ tr:hover .rowactions, tr:focus-within .rowactions { opacity: 1; }
   .topbar .search { min-width: 0; flex: 1 1 120px; max-width: none; }
   .topbar .btn.primary { padding: 0 10px; }
   .tablewrap { overflow-x: hidden; }
+  .tablewrap > table { min-width: 0; }
   .col-updated { display: none; }
   .col-kind { display: none; }
   .col-ops { display: none; }

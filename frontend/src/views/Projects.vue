@@ -21,11 +21,11 @@ const data = reactive({
 const trend = ref([])
 
 // 分类面板可手动收起：宽屏下它固定占 208px，收起来表格能松一大截。
-// 没手动设过时按视口给个默认值 —— 1440 以下先收起，免得一进来表格就挤成三行
+// 默认展开 —— 折叠状态下要点一下才能筛分组，反而多一步；只有用户自己收过才记住
 const savedRail = (() => {
   try { return localStorage.getItem('pv_rail_open') } catch { return null }
 })()
-const railOpen = ref(savedRail === null ? window.innerWidth >= 1440 : savedRail !== '0')
+const railOpen = ref(savedRail !== '0')
 function toggleRail(open) {
   railOpen.value = typeof open === 'boolean' ? open : !railOpen.value
   try {
