@@ -38,6 +38,7 @@ const PATHS = {
   menu: 'M2.8 4.4h10.4M2.8 8h10.4M2.8 11.6h10.4',
   inbox: 'M2.6 9.4h3l.7 1.5h3.4l.7-1.5h3M2.6 9.4 4.2 3.9h7.6l1.6 5.5v2.2c0 .6-.5 1.1-1.1 1.1H3.7c-.6 0-1.1-.5-1.1-1.1V9.4Z',
   warning: 'M8 2.9 14 13.1H2L8 2.9ZM8 6.5v3M8 11.3h.6',
+  xcircle: 'M8 14.2A6.2 6.2 0 1 0 8 1.8a6.2 6.2 0 0 0 0 12.4M6.3 6.3l3.4 3.4M9.7 6.3l-3.4 3.4',
 }
 
 const d = computed(() => PATHS[props.name] || PATHS.folder)

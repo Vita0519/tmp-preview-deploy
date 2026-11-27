@@ -263,6 +263,18 @@ function toggleTag(name) {
   else filters.tags.push(name)
 }
 
+// 清除按钮只在真的筛过东西时出现；status 的 online 是默认值，不算
+const hasFilters = computed(
+  () =>
+    !!filters.q ||
+    !!filters.agent ||
+    !!filters.kind ||
+    !!filters.visibility ||
+    !!filters.collection ||
+    filters.tags.length > 0 ||
+    filters.status !== 'online'
+)
+
 function resetFilters() {
   filters.q = ''
   filters.agent = ''
@@ -437,6 +449,8 @@ onBeforeUnmount(() => {
       <div class="maincol">
         <StatStrip :stats="data.stats" :trend="trend" />
 
+    <!-- 筛选区吸顶：往下翻项目时条件一直看得到，不用滚回顶部 -->
+    <div class="filterbar">
     <div class="toolbar">
       <!-- 收起分类面板后，这里给个回收入口；分组筛选同时由下面的下拉接管 -->
       <button
@@ -519,12 +533,19 @@ onBeforeUnmount(() => {
         <option :value="50">50 / 页</option>
         <option :value="100">100 / 页</option>
       </select>
-      <button v-if="filters.q || filters.tags.length || filters.agent || filters.kind || filters.visibility" class="btn ghost sm" @click="resetFilters">
-        清除筛选
-      </button>
     </div>
 
     <div class="chipbar">
+      <!-- 清除筛选收成一个图标，钉在标签前面：原来它是文字按钮，挤到工具栏第二行占了一整行 -->
+      <button
+        v-if="hasFilters"
+        class="chip chipclear"
+        title="清除筛选"
+        aria-label="清除筛选条件"
+        @click="resetFilters"
+      >
+        <Icon name="xcircle" :size="13" />
+      </button>
       <button
         v-for="t in tagsForBar"
         :key="t.name"
@@ -540,6 +561,7 @@ onBeforeUnmount(() => {
       <span v-if="filters.tags.length" class="dim" style="font-size: 11.5px; padding: 3px 0; margin-left: auto">
         已选 {{ filters.tags.length }} 个标签
       </span>
+    </div>
     </div>
 
     <div v-if="err" class="panel" style="padding: 12px 14px; margin-bottom: 12px; color: var(--danger)">
