@@ -581,12 +581,16 @@ select.field { cursor: pointer; padding-right: 26px; appearance: none;
 
 .chipbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px;
   background: var(--surface); border: 1px solid var(--line); border-top: 0; }
-/* 清除筛选：一个小圆圈叉，钉在标签前面，不再单独占一行 */
-.chipclear {
+/* 清除筛选：一个小圆圈叉，钉在标签前面，不再单独占一行。
+   用主色描边 + 淡底，跟旁边灰扑扑的标签区分开 —— 不然一眼找不到。
+   选择器要写成 .chip.chipclear：单独一个类会被后面的 .chip 覆盖掉 */
+.chip.chipclear {
   width: 24px; padding: 0; justify-content: center;
-  border-style: dashed; color: var(--ink-4);
+  color: var(--brand);
+  border-color: rgba(var(--brand-rgb), 0.42);
+  background: var(--brand-soft);
 }
-.chipclear:hover { color: var(--danger); border-color: currentColor; background: transparent; }
+.chip.chipclear:hover { color: #fff; background: var(--brand); border-color: var(--brand); }
 .chip {
   display: inline-flex; align-items: center; gap: 5px;
   height: 24px; padding: 0 9px; border-radius: 999px;

@@ -544,7 +544,7 @@ onBeforeUnmount(() => {
         aria-label="清除筛选条件"
         @click="resetFilters"
       >
-        <Icon name="xcircle" :size="13" />
+        <Icon name="xcircle" :size="14" />
       </button>
       <button
         v-for="t in tagsForBar"
