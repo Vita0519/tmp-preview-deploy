@@ -12,7 +12,7 @@ const props = defineProps({
   ownerFilter: { type: String, default: '' },
   loading: { type: Boolean, default: false },
 })
-const emit = defineEmits(['select', 'changed', 'filter-owner'])
+const emit = defineEmits(['select', 'changed', 'filter-owner', 'collapse'])
 
 const items = computed(() => props.tree.items || [])
 const loose = computed(() => props.tree.unassigned || 0)
@@ -203,9 +203,14 @@ function countOf(node) {
   <aside class="rail">
     <div class="railhead">
       <span>分类</span>
-      <button class="railadd" title="新建分组" @click="startNew(null)">
-        <Icon name="plus" :size="14" />
-      </button>
+      <span class="railacts">
+        <button class="railadd" title="新建分组" @click="startNew(null)">
+          <Icon name="plus" :size="14" />
+        </button>
+        <button class="railfold" title="收起分类面板" aria-label="收起分类面板" @click="emit('collapse')">
+          <Icon name="chevron" :size="14" />
+        </button>
+      </span>
     </div>
 
     <div class="raillist">

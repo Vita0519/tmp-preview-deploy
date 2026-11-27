@@ -19,6 +19,22 @@ const data = reactive({
   server_now: 0,
 })
 const trend = ref([])
+
+// 分类面板可手动收起：宽屏下它固定占 208px，收起来表格能松一大截。
+// 没手动设过时按视口给个默认值 —— 1440 以下先收起，免得一进来表格就挤成三行
+const savedRail = (() => {
+  try { return localStorage.getItem('pv_rail_open') } catch { return null }
+})()
+const railOpen = ref(savedRail === null ? window.innerWidth >= 1440 : savedRail !== '0')
+function toggleRail(open) {
+  railOpen.value = typeof open === 'boolean' ? open : !railOpen.value
+  try {
+    localStorage.setItem('pv_rail_open', railOpen.value ? '1' : '0')
+  } catch {
+    /* 隐身模式写不了，本次会话照样生效 */
+  }
+}
+
 const filters = reactive({
   q: '',
   agent: '',
@@ -404,7 +420,7 @@ onBeforeUnmount(() => {
   </header>
 
   <div class="content">
-    <div class="withrail">
+    <div class="withrail" :class="{ 'rail-off': !railOpen }">
       <CollectionTree
         :tree="colTree"
         :active="filters.collection"
@@ -414,6 +430,7 @@ onBeforeUnmount(() => {
         :loading="colLoading"
         @select="onCollectionPicked"
         @changed="onCollectionsChanged"
+        @collapse="toggleRail(false)"
         @filter-owner="ownerFilter = $event"
       />
 
@@ -421,6 +438,17 @@ onBeforeUnmount(() => {
         <StatStrip :stats="data.stats" :trend="trend" />
 
     <div class="toolbar">
+      <!-- 收起分类面板后，这里给个回收入口；分组筛选同时由下面的下拉接管 -->
+      <button
+        v-if="!railOpen"
+        class="btn ghost icon railbtn"
+        title="显示分类面板"
+        aria-label="显示分类面板"
+        @click="toggleRail(true)"
+      >
+        <Icon name="layers" :size="16" />
+      </button>
+
       <select v-if="isAdmin" v-model="filters.agent" class="field" style="min-width: 116px">
         <option value="">全部成员</option>
         <option v-for="a in data.facets.agents" :key="a.username" :value="a.username">

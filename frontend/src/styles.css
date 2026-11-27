@@ -136,6 +136,8 @@ p { margin: 0; }
   background: var(--bg);
   border-right: 1px solid var(--line);
   z-index: 30;
+  /* 228 ↔ 64 之间滑动，别让整页跟着硬跳 */
+  transition: width 0.18s var(--ease), padding 0.18s var(--ease);
 }
 
 .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
@@ -214,7 +216,8 @@ p { margin: 0; }
 .userchip .who span { display: block; font-size: 10.5px; color: var(--ink-4); }
 .userchip .ico.out { margin-left: auto; display: grid; place-items: center; width: 16px; }
 
-.main { flex: 1 1 auto; margin-left: var(--sidebar-w); min-width: 0; display: flex; flex-direction: column; }
+.main { flex: 1 1 auto; margin-left: var(--sidebar-w); min-width: 0; display: flex; flex-direction: column;
+  transition: margin-left 0.18s var(--ease); }
 
 .topbar {
   position: sticky; top: 0; z-index: 25;
@@ -233,6 +236,10 @@ p { margin: 0; }
 
 /* ---------------- 分组侧栏 ---------------- */
 .withrail { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 18px; align-items: start; }
+/* 手动收起分类面板：主区吃满，分组筛选改由工具栏下拉接管（否则收起后没法按分组筛） */
+.withrail.rail-off { grid-template-columns: minmax(0, 1fr); }
+.withrail.rail-off .rail { display: none; }
+.withrail.rail-off .colfallback { display: inline-flex; }
 .maincol { min-width: 0; }
 
 .rail {
@@ -251,6 +258,7 @@ p { margin: 0; }
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
   color: var(--ink-4); font-weight: 600;
 }
+.railacts { display: inline-flex; align-items: center; gap: 4px; }
 .railadd {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 5px;
@@ -258,6 +266,15 @@ p { margin: 0; }
   color: var(--ink-3); cursor: pointer; padding: 0;
 }
 .railadd:hover { color: var(--brand); border-color: var(--brand-line); background: var(--brand-soft); }
+/* 收起分类面板：跟侧栏一样只留图标，展开时翻转箭头 */
+.railfold {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--ink-4); cursor: pointer; padding: 0;
+}
+.railfold:hover { color: var(--brand); border-color: var(--brand-line); background: var(--brand-soft); }
+.railfold svg { transform: rotate(-90deg); transition: transform 0.16s var(--ease); }
 .raillist { overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
 
 .railrow {
@@ -376,6 +393,8 @@ p { margin: 0; }
   .rail { display: none; }
   /* 侧栏收起后，分组 / 未归类的筛选改由工具栏下拉接管 */
   .colfallback { display: inline-flex; }
+  /* 这个宽度下面板本来就常隐，别再给一个点了没反应的开关 */
+  .railbtn { display: none; }
   /* 多一个下拉就会折行，撑开的空白别再把排序甩到最右边 */
   .toolbar .grow { display: none; }
 }
@@ -596,6 +615,8 @@ tbody tr.is-expired .pname { color: var(--ink-3); }
 
 td.cell-check, th.cell-check { width: 38px; padding-left: 14px; }
 td.cell-num, th.cell-num { text-align: right; }
+/* 数值列不给断行：1280 这种宽度下「678 KB」会被拦腰拆成两行，数字看着很乱 */
+td.cell-num { white-space: nowrap; }
 
 .pcell { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .pthumb {
