@@ -1,3 +1,23 @@
 #!/bin/bash
-# 安装后：首次启动由应用中心执行 docker compose（含 build），这里无需额外动作
+# 安装后清掉旧版容器：v2.9.2 之前容器叫 tmp-preview，现在改叫 tmp-preview-fnos。
+# 旧容器如果还在，会一直占着 519 端口，新容器起不来。
+#
+# 只清理「由本应用目录的 compose 启动的」那一个 —— 用户自己用 docker compose
+# 装的实例（工作目录不同）绝不能碰，那正是这次改名要保护的对象。
+
+OLD="tmp-preview"
+MARK="${TRIM_APPDEST}/docker"
+
+if ! command -v docker >/dev/null 2>&1; then
+    exit 0
+fi
+
+if docker inspect "$OLD" >/dev/null 2>&1; then
+    wd=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$OLD" 2>/dev/null)
+    if [ -n "$wd" ] && [ "$wd" = "$MARK" ]; then
+        docker rm -f "$OLD" >/dev/null 2>&1
+        echo "[i] 已清理旧版容器 $OLD（释放 519 端口）" >> "${TRIM_TEMP_LOGFILE:-/dev/null}" 2>/dev/null
+    fi
+fi
+
 exit 0
