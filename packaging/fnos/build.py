@@ -18,6 +18,18 @@ APP = OUT / 'tmp-preview'
 FNPACK = os.environ.get('FNPACK') or shutil.which('fnpack') or r'C:\tmp\fnpack.exe'
 
 
+def manifest_field(name: str, default: str = '') -> str:
+    """取 template/manifest 里的单行字段（key = value，值里可能还带 =）。"""
+    mf = TPL / 'manifest'
+    if not mf.exists():
+        return default
+    for line in mf.read_text(encoding='utf-8', errors='replace').splitlines():
+        key, sep, val = line.partition('=')
+        if sep and key.strip() == name:
+            return val.strip()
+    return default
+
+
 def normalize_lf(root: Path) -> int:
     """Windows 上模板会被写成 CRLF；fnOS 用 shell 解析 manifest，带 \\r 会解析错。"""
     binary = {'.png', '.jpg', '.jpeg', '.ico', '.gz', '.tgz', '.fpk', '.zip'}
@@ -148,13 +160,19 @@ def main() -> int:
         print('[!] fnpack 没有产出 .fpk', file=sys.stderr)
         return 1
 
-    target = OUT / produced[0].name
+    # 产物名带上版本与架构：tmp-preview_2.9.2_all.fpk
+    # platform 取 manifest 里的值（本项目是 all：只驱动 NAS 上的 Docker 拉多架构镜像）
+    ver = manifest_field('version', '0.0.0')
+    plat = manifest_field('platform', 'all')
+    target = OUT / f'tmp-preview_{ver}_{plat}.fpk'
     if produced[0] != target:
+        if target.exists():
+            target.unlink()
         shutil.move(str(produced[0]), target)
     size = target.stat().st_size / 1024 / 1024
     if fix_manifest_lf(target):
         print('[i] 已修正 manifest 行尾与 cmd 脚本执行位')
-    print(f'\n产物: {target}\n大小: {size:.1f} MB')
+    print(f'\n产物: {target}\n版本: {ver} · 架构: {plat}\n大小: {size:.1f} MB')
     return 0
 
 

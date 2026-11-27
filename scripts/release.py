@@ -180,10 +180,14 @@ def main() -> int:
     # ---- 打包 fpk ----
     print("打包飞牛 fpk…")
     run([sys.executable, "packaging/fnos/build.py"])
-    fpk = ROOT / "packaging" / "fnos" / "out" / "tmp-preview.fpk"
-    if not fpk.exists():
+    # build.py 现在按「tmp-preview_<版本>_<架构>.fpk」命名，按修改时间取最新那个
+    out_dir = ROOT / "packaging" / "fnos" / "out"
+    cands = sorted(out_dir.glob("*.fpk"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not cands:
         print("fpk 未生成")
         return 1
+    fpk = cands[0]
+    print(f"产物：{fpk.name}（{fpk.stat().st_size / 1024 / 1024:.1f} MB）")
 
     # ---- 建 Release ----
     log = ""
@@ -201,7 +205,9 @@ def main() -> int:
         "固定版本可复现；`latest` 同步指向本版本。",
         "",
         "### 飞牛 fnOS 安装包",
-        f"`tmp-preview.fpk`（见下方 Assets），安装后访问 `http://<NAS 地址>:519`。",
+        f"`{fpk.name}`（见下方 Assets），安装后访问 `http://<NAS 地址>:519`。",
+        "包内 `platform=all`：只调用 NAS 上的 Docker 拉镜像，x86 与 ARM 通用；"
+        "镜像本身是多架构构建（`amd64` / `arm64`）。",
         "安装前确认 NAS 能拉镜像，或解包用 `docker/build_image.sh` 本地构建。",
         "",
         "### 变更",
@@ -219,9 +225,8 @@ def main() -> int:
     rid = rel["id"]
     print(f"Release: {rel.get('html_url')}")
 
-    for name in ("tmp-preview.fpk",):
-        a = upload_asset(rid, fpk)
-        print(f"  附件 {name}: {a.get('state') or a.get('message')}")
+    a = upload_asset(rid, fpk)
+    print(f"  附件 {fpk.name}: {a.get('state') or a.get('message')}")
     compose = ROOT / "docker-compose.yml"
     if compose.exists():
         a = upload_asset(rid, compose)
