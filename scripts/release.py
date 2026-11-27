@@ -46,13 +46,41 @@ def run(cmd, cwd=None, env=None, check=True):
     return r.stdout.strip()
 
 
+_TOKEN = None
+
+
 def token() -> str:
-    out = subprocess.run(
-        ["git", "credential", "fill"],
-        input="protocol=https\nhost=github.com\n\n",
-        capture_output=True, text=True, cwd=ROOT,
-    ).stdout
-    return dict(l.split("=", 1) for l in out.strip().splitlines() if "=" in l).get("password", "")
+    """GitHub token。优先环境变量，其次 git credential。
+
+    没有 TTY 时 `git credential fill` 会挂在系统凭据弹窗上（GCM 不会自己返回），
+    所以在非交互环境里必须先备好 GH_TOKEN，否则这里 15 秒后直接报错，
+    而不是让整个发版流程僵在那里。取一次就缓存，免得每次 API 调用都重试。
+    """
+    global _TOKEN
+    if _TOKEN:
+        return _TOKEN
+
+    import os
+
+    env = (os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or "").strip()
+    if env:
+        _TOKEN = env
+        return _TOKEN
+
+    try:
+        out = subprocess.run(
+            ["git", "credential", "fill"],
+            input="protocol=https\nhost=github.com\n\n",
+            capture_output=True, text=True, cwd=ROOT, timeout=15,
+        ).stdout
+    except subprocess.TimeoutExpired:
+        raise SystemExit(
+            "取不到 GitHub token：git credential 在无交互环境会挂住。\n"
+            "先设置环境变量再跑，例如 PowerShell: $env:GH_TOKEN='gho_...'"
+        )
+
+    _TOKEN = dict(l.split("=", 1) for l in out.strip().splitlines() if "=" in l).get("password", "")
+    return _TOKEN
 
 
 def api(method, path, payload=None, timeout=180):
