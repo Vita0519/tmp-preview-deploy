@@ -5,7 +5,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from .. import collections as colls, config, defaults, namerule, storage, tagspec, views
@@ -115,7 +115,9 @@ def list_projects(
     request: Request,
     q: str = "",
     agent: str = "",
-    tag: list[str] | None = None,
+    # list 类型不加 Query() 会被 FastAPI 当成 body 参数：GET 请求没有 body，
+    # 于是 ?tag=xxx 被静默丢掉，标签筛选看上去点了没反应
+    tag: list[str] | None = Query(None),
     kind: str = "",
     status: str = "online",
     visibility: str = "",
@@ -165,7 +167,9 @@ def list_projects(
             where.append(f"p.collection_id IN ({marks})")
             args += ids
 
-    tag_names = [t for t in (tag or []) if not t.startswith("kind:")]
+    # 过一遍归一化：库里存的是 3d，前端/CLI 传 3D 也要能命中
+    tag_names = [tagspec.normalize_name(t) for t in (tag or []) if not t.startswith("kind:")]
+    tag_names = [t for t in tag_names if t]
     if tag_names:
         marks = ",".join("?" * len(tag_names))
         where.append(
